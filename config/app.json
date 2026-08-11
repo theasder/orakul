@@ -1,0 +1,48 @@
+{
+  "$comment": [
+    "Идентичность приложения orakul. Отдельная от Cruxwing во всём, что macOS",
+    "и Windows считают признаком приложения.",
+    "",
+    "Почему это не косметика. macOS привязывает разрешения на запись экрана и",
+    "микрофона к bundle id: при совпадении две программы делят один доступ, и",
+    "отозвать его у одной, не забрав у второй, нельзя. UserDefaults suite и",
+    "служба в Связке ключей — то же самое для настроек и токенов: общий",
+    "идентификатор означает, что установка orakul меняет настройки Cruxwing.",
+    "Поэтому ни одно поле ниже не должно совпадать с com.meetgpt.macapp."
+  ],
+  "app": {
+    "name": "orakul",
+    "displayName": "orakul",
+    "bundleId": "ai.orakul.desktop",
+    "volumeName": "orakul",
+    "defaultsSuite": "ai.orakul.desktop.settings",
+    "keychainService": "ai.orakul.desktop.credentials",
+    "locale": "ru-RU"
+  },
+  "artifacts": {
+    "macos": {
+      "status": "planned",
+      "minimumVersion": "14.0",
+      "installers": [
+        "orakul-AppleSilicon.dmg",
+        "orakul-Intel.dmg"
+      ]
+    },
+    "windows": {
+      "status": "planned",
+      "minimumVersion": "10 (1903)",
+      "installers": [
+        "orakul-Setup-x64.exe"
+      ],
+      "capture": "WASAPI loopback",
+      "note": "Отдельная реализация захвата звука: ScreenCaptureKit существует только на macOS. Расшифровка и поиск по встречам общие, слой захвата — платформенный."
+    }
+  },
+  "downloadDir": "orakul/public/download",
+  "separateFrom": {
+    "product": "Cruxwing",
+    "bundleId": "com.meetgpt.macapp",
+    "volumeName": "Cruxwing",
+    "reason": "Разные продукты для разных рынков. Общее ядро в коде допустимо, общая установка — нет."
+  }
+}
