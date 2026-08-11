@@ -50,6 +50,14 @@ describe('orakul landing (ru)', () => {
     assert.match(text, /реша(ет|ют) (то же самое )?заново|решать одно и то же/i);
   });
 
+  test('admits the search understands words, not meaning', () => {
+    // RecallIndex is lexical: it handles Russian inflection but not synonyms,
+    // so «цены» will not find a meeting that said «тарифы». A page that
+    // implies semantic search sets up a failure the user cannot diagnose.
+    assert.match(text, /Синонимы пока нет|синонимов пока нет/i);
+    assert.doesNotMatch(text, /понимает смысл|семантическ|поймёт вопрос как человек/i);
+  });
+
   test('promises a quote, and admits what happens without one', () => {
     // The whole trust argument: an answer is grounded in transcript words, and
     // an ungrounded answer is not shown at all.
@@ -97,10 +105,11 @@ describe('orakul landing (ru)', () => {
     // The product is free in full. That is checkable, and worth checking,
     // because a paid tier tends to reappear one feature at a time.
     assert.match(text, /Тарифов нет/i);
-    // Not a blunt search for "цена": the hero asks «что мы решили по ценам?»,
-    // which is a meeting topic, not a product price. Match what a paywall
-    // actually looks like.
-    assert.doesNotMatch(text, /₽|руб\.|подписк|платная версия|тариф(?!ов нет)/i,
+    // Twice now a blunt regex has flagged ordinary copy: the hero asks «что мы
+    // решили по ценам?» and the search section explains «тарифам/тарифами».
+    // Both are meeting topics. A paywall has its own vocabulary — money
+    // symbols, subscriptions, paid versions — and that is what to look for.
+    assert.doesNotMatch(text, /₽|руб\.|подписк|платная версия|тарифный план|наши тарифы/i,
       'a price crept back onto the page');
     assert.doesNotMatch(text, /Команда<\/h3>|Компания<\/h3>/, 'a paid tier card is back');
     // And no feature may be described as belonging to a plan.
