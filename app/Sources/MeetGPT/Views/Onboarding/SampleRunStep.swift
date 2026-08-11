@@ -201,7 +201,7 @@ struct SampleRunStep: View {
     private var footer: some View {
         HStack(spacing: Space.m) {
             if finished {
-                Text("That's the loop. Your turn.")
+                Text("Вот и весь круг. Теперь вы.")
                     .font(Typo.callout.weight(.medium)).foregroundStyle(Theme.ink)
             }
             Spacer(minLength: Space.s)

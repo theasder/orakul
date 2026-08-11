@@ -79,7 +79,7 @@ struct PromptBudgetBarViewTests {
         let mcp = MCPConnectionManager(tokenStore: InMemoryKeychain())
         let inspected = try bar(state: state, mcp: mcp).inspect()
 
-        #expect(throws: Never.self) { try inspected.find(text: "No apps connected") }
+        #expect(throws: Never.self) { try inspected.find(text: "Приложения не подключены") }
         #expect(throws: Never.self) { try inspected.find(text: "Добавить приложения") }
         let toggle = try inspected.find(ViewType.Toggle.self)
         #expect(toggle.isDisabled())

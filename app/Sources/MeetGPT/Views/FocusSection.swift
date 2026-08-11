@@ -61,7 +61,7 @@ struct FocusSection: View {
 
 /// Shown right after a Focus row is tapped. Dismissal is not the same as undo:
 /// keeping the context is the common case, so "Оставить" simply retires the banner
-/// while "Undo" reverses every field the tap rewrote and hides the meeting —
+/// while "Отменить" reverses every field the tap rewrote and hides the meeting —
 /// an accidental tap almost always means "not this one".
 private struct AppliedMeetingBanner: View {
     let fileName: String
@@ -84,7 +84,7 @@ private struct AppliedMeetingBanner: View {
                 .font(Typo.caption)
                 .foregroundStyle(Theme.inkSecondary)
             HStack(spacing: Space.s) {
-                Button("Undo", action: onUndo)
+                Button("Отменить", action: onUndo)
                     .buttonStyle(.plain)
                     .font(Typo.caption.weight(.semibold))
                     .foregroundStyle(Theme.accentText)

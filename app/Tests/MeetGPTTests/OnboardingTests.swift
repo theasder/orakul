@@ -80,7 +80,7 @@ struct OnboardingTests {
             .environmentObject(AppState(llm: MockLLMGateway(response: "")))
         let sut = try view.inspect()
         #expect(throws: Never.self) {
-            try sut.find(textWhere: { s, _ in s.contains("Fictional call") })
+            try sut.find(textWhere: { s, _ in s.contains("Вымышленный звонок") })
         }
         #expect(throws: Never.self) { try sut.find(button: "Пропустить") }
     }

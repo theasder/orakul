@@ -122,7 +122,7 @@ struct TeamSourcesView: View {
             Image(systemName: "plus.circle.fill")
                 .font(.system(size: 12))
                 .foregroundStyle(Theme.inkTertiary)
-            TextField("", text: $draft, prompt: Text("add a rule — e.g. incident, outage, breach"))
+            TextField("", text: $draft, prompt: Text("добавьте правило — например инцидент, простой, утечка"))
                 .textFieldStyle(.plain)
                 .font(Typo.callout)
                 .onSubmit(addDraft)

@@ -28,7 +28,7 @@ struct SettingsView: View {
                 .tabItem { Label("Общее", systemImage: "gearshape") }
                 .tag(SettingsTab.general)
             TranscriptionSettingsTab()
-                .tabItem { Label("Transcription", systemImage: "waveform") }
+                .tabItem { Label("Расшифровка", systemImage: "waveform") }
                 .tag(SettingsTab.transcription)
             AISettingsTab()
                 .tabItem { Label("AI", systemImage: "sparkles") }
@@ -123,7 +123,7 @@ private struct GeneralSettingsTab: View {
                             Text(position.label).tag(String?.some(position.id))
                         }
                         Divider()
-                        Text("Write my own…").tag(String?.some(RoleSkillMatrix.customRoleID))
+                        Text("Написать своё…").tag(String?.some(RoleSkillMatrix.customRoleID))
                     }
                     .labelsHidden().pickerStyle(.menu)
                     .frame(maxWidth: 240)
@@ -278,7 +278,7 @@ private struct TranscriptionSettingsTab: View {
                         .labelsHidden().pickerStyle(.menu)
                         .frame(maxWidth: 220)
                         .onChange(of: transcriptionLanguage) { Config.transcriptionLanguage = $0 }
-                        .accessibilityLabel("Transcription language")
+                        .accessibilityLabel("Язык расшифровки")
                         .accessibilityIdentifier("settings.transcription.language")
                     }
                 }
@@ -399,12 +399,12 @@ private struct TranscriptionSettingsTab: View {
                     Divider().overlay(Theme.hairline)
 
                     SettingsRow {
-                        Label("Use connected apps for suggestions", systemImage: "app.connected.to.app.below.fill")
+                        Label("Брать подсказки из рабочих приложений", systemImage: "app.connected.to.app.below.fill")
                             .labelStyle(SettingLabelStyle())
                         Spacer()
                         Toggle("", isOn: $state.useConnectedAppsInPrompts)
                             .labelsHidden().toggleStyle(.switch)
-                            .accessibilityLabel("Use connected apps for transcription suggestions")
+                            .accessibilityLabel("Брать подсказки для расшифровки из рабочих приложений")
                             .accessibilityIdentifier("settings.transcription.glossary-suggestions.enabled")
                     }
 
@@ -657,7 +657,7 @@ private struct ConnectedAppsTab: View {
                         .padding(.top, Space.s)
                 } label: {
                     HStack(spacing: Space.s) {
-                        SectionLabel("Team sources")
+                        SectionLabel("Источники команды")
                         if !TeamConnectors.configured.isEmpty {
                             Text("\(TeamConnectors.configured.count) configured")
                                 .font(Typo.caption)
@@ -857,7 +857,7 @@ private struct AccountPrivacyTab: View {
                     }
                     if let preview = Tier(rawValue: devTierPreview) {
                         SettingsRow {
-                            Label("This plan gets", systemImage: "checklist")
+                            Label("В этот тариф входит", systemImage: "checklist")
                                 .labelStyle(SettingLabelStyle())
                             Spacer()
                             Text(Self.devTierSummary(preview))
@@ -1143,7 +1143,7 @@ private struct WheesprAccountRow: View {
                 .truncationMode(.middle)
             Spacer()
             if !state.wheesprAvailable {
-                Text("Unavailable in this build")
+                Text("Недоступно в этой сборке")
                     .font(Typo.caption).foregroundStyle(Theme.inkTertiary)
             } else if state.wheesprConnected {
                 Button("Выйти") { state.signOutWheespr() }
@@ -1213,7 +1213,7 @@ struct SignInSheet: View {
             } else if method == "phone" {
                 phoneFlow
             } else if !codeStep {
-                Text("We'll email you a 6-digit code — no password.")
+                Text("Пришлём код из шести цифр на почту — пароль не нужен.")
                     .font(Typo.callout).foregroundStyle(Theme.inkSecondary)
                 field($email, prompt: "you@company.com")
                 HStack {
@@ -1303,7 +1303,7 @@ struct SignInSheet: View {
     private var passwordFlow: some View {
         VStack(alignment: .leading, spacing: Space.m) {
             field($email, prompt: "you@company.com")
-            SecureField("", text: $password, prompt: Text("password (min 8 characters)"))
+            SecureField("", text: $password, prompt: Text("пароль (минимум 8 символов)"))
                 .textFieldStyle(.plain).padding(Space.m)
                 .background(Theme.surface, in: RoundedRectangle(cornerRadius: Radius.s, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: Radius.s, style: .continuous).strokeBorder(Theme.hairline, lineWidth: 1))

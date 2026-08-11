@@ -368,7 +368,7 @@ private struct ConnectedAppsBudgetToggle: View {
                     ? "Pause connected-app retrieval. Every app stays connected."
                     : "Restore connected-app context. Every app remained connected while paused.")
                 : "Connect an app first")
-            .accessibilityLabel("Use connected apps in prompts")
+            .accessibilityLabel("Использовать рабочие приложения в промптах")
             .accessibilityValue(accessibilityValue)
     }
 
@@ -893,7 +893,7 @@ struct PromptBudgetDetails: View {
             Hairline()
 
             VStack(alignment: .leading, spacing: Space.xs) {
-                Text("What drives this prompt's cost")
+                Text("Из чего складывается цена промпта")
                     .font(Typo.bodyStrong)
                     .foregroundStyle(Theme.inkSecondary)
                 Text("Current partial estimate ~\(TokenEstimate.label(estimate.totalTokens)) input tokens")

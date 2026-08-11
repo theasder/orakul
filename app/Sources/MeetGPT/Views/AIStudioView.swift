@@ -175,7 +175,7 @@ struct AIStudioView: View {
                         Button {
                             exportResponseAsDOCX()
                         } label: {
-                            Label("Word document (.docx)", systemImage: "arrow.down.doc")
+                            Label("Документ Word (.docx)", systemImage: "arrow.down.doc")
                         }
                         // Google Docs — only with a Google account connected.
                         if state.canExportToGoogleDocs {
@@ -539,7 +539,7 @@ private struct AskComposer: View {
             Button { open(.file) }  label: { Label("Создать", systemImage: "doc") }
             Button { open(.folder) } label: { Label("Папка…", systemImage: "folder.badge.plus") }
             Button { open(.audio) } label: { Label("Звук", systemImage: "waveform") }
-            Button { open(.video) } label: { Label("Video", systemImage: "film") }
+            Button { open(.video) } label: { Label("Видео", systemImage: "film") }
             Divider()
             Menu {
                 ForEach(allPrompts) { prompt in

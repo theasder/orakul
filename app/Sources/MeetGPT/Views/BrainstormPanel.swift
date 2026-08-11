@@ -107,7 +107,7 @@ struct BrainstormSection: View {
                         .font(Typo.caption)
                         .foregroundStyle(Theme.inkTertiary)
                         .lineLimit(1)
-                    Button("clear") { state.clearProposedGoal() }
+                    Button("очистить") { state.clearProposedGoal() }
                         .buttonStyle(QuietButtonStyle(prominent: true))
                         .help("Clear the proposed goal and let Cruxwing suggest another")
                     Spacer(minLength: 0)
@@ -392,14 +392,14 @@ private struct RecordingContextChip: View {
         .alert("Тип записи", isPresented: $showingCustomType) {
             TextField("For example: architecture review video", text: $customDraft)
                 .accessibilityIdentifier("recording.context.custom-field")
-            Button("Use type") {
+            Button("Тип использования") {
                 state.selectRecordingContext(.custom, customLabel: customDraft)
             }
             .disabled(RecordingContextSelection.sanitizeCustomLabel(customDraft) == nil)
             .accessibilityIdentifier("recording.context.custom-save")
             Button("Отмена", role: .cancel) {}
         } message: {
-            Text("This label guides summaries and answers for this recording only.")
+            Text("Эта пометка влияет на итоги и ответы только для этой записи.")
         }
     }
 }
@@ -668,7 +668,7 @@ private struct GoalField: View {
             // input; this one says what a good answer looks like, which is the
             // difference between an empty field and a usable one on a first run.
             TextField("", text: $text,
-                      prompt: Text("What has to be true when this call ends?"),
+                      prompt: Text("Что должно быть верно к концу звонка?"),
                       axis: .vertical)
                 .lineLimit(1...4)
                 .textFieldStyle(.plain)

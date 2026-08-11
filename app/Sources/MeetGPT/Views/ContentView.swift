@@ -279,7 +279,7 @@ private struct MeetingColumn: View {
                         .foregroundStyle(Theme.inkSecondary)
                         .lineLimit(1)
                         .truncationMode(.tail)
-                    Button("Use") { state.acceptSuggestedMeetingTitle() }
+                    Button("Использовать") { state.acceptSuggestedMeetingTitle() }
                         .buttonStyle(QuietButtonStyle(prominent: true))
                         .help("Name this meeting with the proposed title")
                     Button { state.dismissSuggestedMeetingTitle() } label: {
@@ -465,7 +465,7 @@ private struct TranscriptionPerformanceBanner: View {
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: Space.s)
             if notice.action == .useDeepgram {
-                Button("Use Deepgram next recording") {
+                Button("Использовать Deepgram в следующей записи") {
                     state.useRecommendedDeepgramForNextRecording()
                 }
                 .buttonStyle(QuietButtonStyle(prominent: true))
@@ -491,7 +491,7 @@ private struct MeetingTitleField: View {
     @FocusState private var focused: Bool
 
     var body: some View {
-        TextField("", text: $title, prompt: Text("Untitled meeting").foregroundColor(Theme.inkTertiary))
+        TextField("", text: $title, prompt: Text("Встреча без названия").foregroundColor(Theme.inkTertiary))
             .textFieldStyle(.plain)
             .font(Typo.displayL)
             .foregroundStyle(Theme.ink)

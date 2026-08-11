@@ -363,7 +363,7 @@ private struct AssistantPromptBlock: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.xs) {
-            Text("You asked")
+            Text("Вы спросили")
                 .font(Typo.caption.weight(.semibold))
                 .foregroundStyle(Theme.inkSecondary)
             Text(prompt)

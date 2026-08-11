@@ -59,7 +59,7 @@ struct ClarificationCard: View {
                     .padding(.vertical, Space.xxs)
                     .background(Theme.accentSoft, in: Capsule())
                 if question.multiSelect {
-                    Text("pick any")
+                    Text("любой на выбор")
                         .font(Typo.caption)
                         .foregroundStyle(Theme.inkTertiary)
                 }

@@ -205,7 +205,7 @@ struct PaywallView: View {
             Label(usingFree ? "Sign in for Free" : "Sign in to subscribe",
                   systemImage: "person.crop.circle")
                 .font(Typo.title).foregroundStyle(Theme.ink)
-            Text("Your plan is tied to your account. We'll email you a one-time code.")
+            Text("Тариф привязан к аккаунту. Пришлём одноразовый код на почту.")
                 .font(Typo.callout).foregroundStyle(Theme.inkSecondary)
             TextField("", text: $email, prompt: Text("you@example.com"))
                 .textFieldStyle(.plain).padding(Space.m)
@@ -241,7 +241,7 @@ struct PaywallView: View {
             ProgressView().controlSize(.large)
             Text("Завершите оплату в браузере…")
                 .font(Typo.headline).foregroundStyle(Theme.ink)
-            Text("This screen updates automatically once Stripe confirms.")
+            Text("Экран обновится сам, как только Stripe подтвердит оплату.")
                 .font(Typo.caption).foregroundStyle(Theme.inkTertiary)
             Button("Отмена") { stage = .pricing }.buttonStyle(QuietButtonStyle())
         }
@@ -252,10 +252,10 @@ struct PaywallView: View {
         VStack(alignment: .center, spacing: Space.l) {
             Text("🎉").font(.system(size: 44))
                 .accessibilityHidden(true)
-            Text("You're all set")
+            Text("Всё готово")
                 .font(Typo.title).foregroundStyle(Theme.ink)
                 .accessibilityIdentifier("paywall.success")
-            Text("Your plan is active — models and limits unlock immediately.")
+            Text("Тариф активен — модели и лимиты доступны сразу.")
                 .font(Typo.callout).foregroundStyle(Theme.inkSecondary)
             Button("Start using Cruxwing") {
                 Config.paywallChoiceMade = true

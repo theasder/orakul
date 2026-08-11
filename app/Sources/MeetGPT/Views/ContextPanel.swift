@@ -277,7 +277,7 @@ private struct SaveSetSheet: View {
             Text("Save the current files + notes as a reusable set you can apply to a future call.")
                 .font(Typo.callout)
                 .foregroundStyle(Theme.inkSecondary)
-            TextField("", text: $name, prompt: Text("e.g. Acme weekly sync"))
+            TextField("", text: $name, prompt: Text("например, еженедельный созвон Acme"))
                 .textFieldStyle(.plain)
                 .padding(Space.m)
                 .background(Theme.surface, in: RoundedRectangle(cornerRadius: Radius.s, style: .continuous))

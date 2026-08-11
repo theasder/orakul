@@ -32,7 +32,7 @@ struct FactCheckSheet: View {
                 Button {
                     state.runFactCheck(searchWeb: true)
                 } label: {
-                    Label("Verify on the web", systemImage: "globe")
+                    Label("Проверить в вебе", systemImage: "globe")
                 }
                 .buttonStyle(QuietButtonStyle())
                 .disabled(state.factChecking)
@@ -87,7 +87,7 @@ struct FactCheckSheet: View {
                         if let sources = state.factCheckSearch?.sources,
                            state.factCheckSearch?.ran == true, !sources.isEmpty {
                             VStack(alignment: .leading, spacing: Space.xs) {
-                                Text("WEB SOURCES CONSULTED")
+                                Text("ИСТОЧНИКИ В ВЕБЕ")
                                     .font(Typo.label).tracking(0.5)
                                     .foregroundStyle(Theme.inkTertiary)
                                 ForEach(Array(sources.prefix(5).enumerated()), id: \.offset) { _, source in
@@ -148,7 +148,7 @@ private struct FactClaimRow: View {
                         // page" is a weaker epistemic state than "verified
                         // against a document you attached", and the reader must
                         // be able to tell which one they are trusting.
-                        Label("Web", systemImage: "globe")
+                        Label("Веб", systemImage: "globe")
                             .font(Typo.label)
                             .foregroundStyle(Theme.inkTertiary)
                             .help("Checked against a retrieved web page, not your attached context")
