@@ -47,6 +47,82 @@ public enum WAVFile {
         }
         return data
     }
+
+    public enum DecodeError: Error, Equatable {
+        case notRIFF
+        case notPCM16
+        /// Частоту не пересчитываем: плохой ресемплер портит распознавание
+        /// тише, чем отказ, и человек об этом не узнает.
+        case unsupportedSampleRate(Int)
+    }
+
+    /// Сэмплы из WAV-файла. Стерео сводится в моно усреднением каналов.
+    public static func decode(_ data: Data) throws -> [Float] {
+        guard data.count >= 44,
+              String(decoding: data[0..<4], as: UTF8.self) == "RIFF",
+              String(decoding: data[8..<12], as: UTF8.self) == "WAVE" else {
+            throw DecodeError.notRIFF
+        }
+
+        func uint16(at offset: Int) -> Int {
+            Int(data.withUnsafeBytes {
+                UInt16(littleEndian: $0.loadUnaligned(fromByteOffset: offset, as: UInt16.self))
+            })
+        }
+        func uint32(at offset: Int) -> Int {
+            Int(data.withUnsafeBytes {
+                UInt32(littleEndian: $0.loadUnaligned(fromByteOffset: offset, as: UInt32.self))
+            })
+        }
+
+        // Блоки идут в произвольном порядке, и между fmt и data встречаются
+        // чужие: файл от диктофона с LIST-блоком иначе прочитался бы как шум.
+        var offset = 12
+        var channels = 1
+        var rate = sampleRate
+        var bits = 16
+        var format = 1
+        var payload: Range<Int>?
+
+        while offset + 8 <= data.count {
+            let identifier = String(decoding: data[offset..<offset + 4], as: UTF8.self)
+            let size = uint32(at: offset + 4)
+            let body = offset + 8
+            guard size >= 0, body + size <= data.count || identifier == "data" else { break }
+
+            if identifier == "fmt " {
+                format = uint16(at: body)
+                channels = max(1, uint16(at: body + 2))
+                rate = uint32(at: body + 4)
+                bits = uint16(at: body + 14)
+            } else if identifier == "data" {
+                payload = body..<min(body + size, data.count)
+                break
+            }
+            offset = body + size + (size % 2)   // блоки выровнены по чётности
+        }
+
+        guard format == 1, bits == 16 else { throw DecodeError.notPCM16 }
+        guard rate == sampleRate else { throw DecodeError.unsupportedSampleRate(rate) }
+        guard let payload, !payload.isEmpty else { return [] }
+
+        var samples: [Float] = []
+        samples.reserveCapacity(payload.count / 2 / channels)
+        var index = payload.lowerBound
+        while index + 2 * channels <= payload.upperBound {
+            var sum = 0.0
+            for channel in 0..<channels {
+                let raw = data.withUnsafeBytes {
+                    Int16(littleEndian: $0.loadUnaligned(fromByteOffset: index + channel * 2,
+                                                         as: Int16.self))
+                }
+                sum += Double(raw) / 32_767
+            }
+            samples.append(Float(sum / Double(channels)))
+            index += 2 * channels
+        }
+        return samples
+    }
 }
 
 /// Расшифровка внешней программой, которая уже стоит у человека.
@@ -127,6 +203,11 @@ public struct ExternalTranscriber: Transcriber {
             throw TranscriberError.engineFailed(
                 message.isEmpty ? "код \(process.terminationStatus)" : message)
         }
-        return String(data: data, encoding: .utf8) ?? ""
+        // Декодируем терпимо. Строгий UTF-8 возвращает nil на ОДНОМ битом
+        // байте и выбрасывает вместе с ним всю расшифровку — движок, который
+        // подмешал в вывод хоть что-то нетекстовое, стоил бы человеку целого
+        // созвона, а сообщение гласило бы «движок промолчал».
+        if let text = String(data: data, encoding: .utf8) { return text }
+        return String(decoding: data, as: UTF8.self)
     }
 }

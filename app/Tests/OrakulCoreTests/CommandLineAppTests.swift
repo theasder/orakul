@@ -8,7 +8,15 @@ import Testing
 @Suite("Командная строка")
 struct CommandLineAppTests {
 
-    private func makeApp(files: [String: String] = [:])
+    private struct StubEngine: Transcriber {
+        let text: String
+        func transcribe(samples: [Float]) async throws -> String { text }
+    }
+
+    private func makeApp(files: [String: String] = [:],
+                         audio: [String: Data] = [:],
+                         engine: String? = nil,
+                         recognised: String = "Решили выкатить в прод.")
         -> (app: CommandLineApp, store: SessionStore) {
         let store = SessionStore(root: FileManager.default.temporaryDirectory
             .appendingPathComponent("orakul-cli-\(UUID().uuidString)", isDirectory: true))
@@ -17,7 +25,10 @@ struct CommandLineAppTests {
             store: store,
             today: { "2026-07-24" },
             makeIdentifier: { counter.next() },
-            readFile: { files[$0] })
+            readFile: { files[$0] },
+            readAudio: { audio[$0] },
+            engineCommand: engine,
+            transcriberFactory: { _ in StubEngine(text: recognised) })
         return (app, store)
     }
 
@@ -157,6 +168,59 @@ struct CommandLineAppTests {
         let result = app.run(["список"])
         #expect(result.output.contains("Не смог прочитать"))
         #expect(result.output.contains("bad.json"), "тихо потерянная встреча — худший исход")
+    }
+
+    @Test("запись расшифровывается и попадает в архив одной командой")
+    func transcribeEndToEnd() {
+        let wav = WAVFile.encode(samples: [0.1, -0.1, 0.2])
+        let (app, store) = makeApp(audio: ["созвон.wav": wav],
+                                   engine: "whisper -f {файл}",
+                                   recognised: "Решили выкатить в prod.")
+        defer { cleanUp(store) }
+
+        let result = app.run(["расшифровать", "созвон.wav", "Планёрка"])
+        #expect(result.exitCode == 0)
+        #expect(result.output.contains("Расшифровано"))
+
+        // И сразу ищется — вся цепочка целиком, включая словарь.
+        let found = app.run(["найти", "что решили про прод"])
+        #expect(found.output.contains("Планёрка"))
+        #expect(store.load().sessions.first?.digest.contains("прод") == true)
+    }
+
+    @Test("без настроенного движка команда объясняет, как его задать")
+    func missingEngineExplainsItself() {
+        let (app, store) = makeApp(audio: ["a.wav": WAVFile.encode(samples: [0.1])],
+                                   engine: nil)
+        defer { cleanUp(store) }
+
+        let result = app.run(["расшифровать", "a.wav"])
+        #expect(result.exitCode == 2)
+        #expect(result.output.contains("ORAKUL_ENGINE"), "нужна готовая строка настройки")
+        #expect(store.load().sessions.isEmpty)
+    }
+
+    @Test("чужая частота записи объясняется вместе с командой конвертации")
+    func wrongSampleRateIsActionable() {
+        let wav = WAVFile.encode(samples: [0.1], sampleRate: 44_100)
+        let (app, store) = makeApp(audio: ["a.wav": wav], engine: "whisper -f {файл}")
+        defer { cleanUp(store) }
+
+        let result = app.run(["расшифровать", "a.wav"])
+        #expect(result.exitCode == 1)
+        #expect(result.output.contains("44100"), "человек должен узнать частоту своего файла")
+        #expect(result.output.contains("ffmpeg"), "к отказу нужна команда, которой это чинится")
+    }
+
+    @Test("не-WAV не уходит движку впустую")
+    func nonWavIsRejectedBeforeTheEngine() {
+        let (app, store) = makeApp(audio: ["a.wav": Data("не запись".utf8)],
+                                   engine: "whisper -f {файл}")
+        defer { cleanUp(store) }
+
+        let result = app.run(["расшифровать", "a.wav"])
+        #expect(result.exitCode == 1)
+        #expect(result.output.contains("PCM"))
     }
 
     @Test("удаление убирает встречу и не трогает соседние")

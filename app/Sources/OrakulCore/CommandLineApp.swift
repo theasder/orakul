@@ -22,28 +22,43 @@ public struct CommandLineApp {
     let today: @Sendable () -> String
     let makeIdentifier: @Sendable () -> String
     let readFile: @Sendable (String) -> String?
+    let readAudio: @Sendable (String) -> Data?
+    /// Чем расшифровывать. Пусто — команда расшифровки объяснит, как настроить.
+    let engineCommand: String?
 
     public init(store: SessionStore,
                 today: @escaping @Sendable () -> String = MeetingPipeline.currentDay,
                 makeIdentifier: @escaping @Sendable () -> String = { UUID().uuidString },
                 readFile: @escaping @Sendable (String) -> String? = {
                     try? String(contentsOfFile: $0, encoding: .utf8)
-                }) {
+                },
+                readAudio: @escaping @Sendable (String) -> Data? = {
+                    try? Data(contentsOf: URL(fileURLWithPath: $0))
+                },
+                engineCommand: String? = ProcessInfo.processInfo.environment["ORAKUL_ENGINE"],
+                transcriberFactory: (@Sendable (String) -> any Transcriber)? = nil) {
         self.store = store
         self.today = today
         self.makeIdentifier = makeIdentifier
         self.readFile = readFile
+        self.readAudio = readAudio
+        self.engineCommand = engineCommand
+        self.makeTranscriber = transcriberFactory ?? { ExternalTranscriber(command: $0) }
     }
+
+    let makeTranscriber: @Sendable (String) -> any Transcriber
 
     public static let usage = """
     orakul — поиск по своим созвонам, на русском и без сети
 
-      orakul добавить <файл> [название]   расшифровка из файла в архив
+      orakul добавить <файл> [название]   готовая расшифровка в архив
+      orakul расшифровать <wav> [название] расшифровать запись и положить в архив
       orakul найти <вопрос>               что решили по этому поводу
       orakul список                       что вообще есть в архиве
       orakul удалить <идентификатор>      убрать одну встречу
 
     Архив — обычные JSON-файлы: их можно читать и без нас.
+    Расшифровка идёт вашим движком: ORAKUL_ENGINE="whisper-cli -l ru -otxt -f {файл}"
     """
 
     /// Выполнить команду. Аргументы — без имени программы.
@@ -57,6 +72,8 @@ public struct CommandLineApp {
         switch command {
         case "добавить", "add":
             return add(rest)
+        case "расшифровать", "transcribe":
+            return transcribe(rest)
         case "найти", "search":
             return search(rest)
         case "список", "list":
@@ -105,6 +122,62 @@ public struct CommandLineApp {
         return Result(output: "Добавлено: «\(session.title)» (\(session.id))", exitCode: 0)
     }
 
+    private func transcribe(_ arguments: [String]) -> Result {
+        guard let path = arguments.first else {
+            return Result(output: "Нужен файл записи: orakul расшифровать <wav>", exitCode: 2)
+        }
+        guard let command = engineCommand, !command.isEmpty else {
+            // Молча ничего не делать здесь нельзя: человек ждёт расшифровку и
+            // должен узнать, чего именно не хватает.
+            return Result(output: """
+            Не настроен движок распознавания. orakul не возит свою модель — он \
+            запускает вашу:
+
+              export ORAKUL_ENGINE="whisper-cli -m модель.bin -l ru -otxt -f {файл}"
+            """, exitCode: 2)
+        }
+        guard let data = readAudio(path) else {
+            return Result(output: "Не смог прочитать запись: \(path)", exitCode: 1)
+        }
+
+        let samples: [Float]
+        do {
+            samples = try WAVFile.decode(data)
+        } catch WAVFile.DecodeError.unsupportedSampleRate(let rate) {
+            // Пересчитывать частоту молча — значит тихо ухудшить распознавание.
+            return Result(output: """
+            Запись на \(rate) Гц, а движку нужно 16000. Переведите её заранее:
+
+              ffmpeg -i \(path) -ar 16000 -ac 1 запись-16k.wav
+            """, exitCode: 1)
+        } catch {
+            return Result(output: "Не понял формат записи: нужен WAV, PCM 16 бит.", exitCode: 1)
+        }
+
+        let title = arguments.dropFirst().joined(separator: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let pipeline = MeetingPipeline(transcriber: makeTranscriber(command), store: store,
+                                       today: today, makeIdentifier: makeIdentifier)
+
+        // Расшифровка асинхронная, командная строка — нет. Ждём здесь, иначе
+        // программа завершится раньше движка.
+        let outcome = Semaphore<Result>()
+        Task {
+            do {
+                let session = try await pipeline.record(
+                    samples: samples,
+                    title: title.isEmpty
+                        ? URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent
+                        : title)
+                outcome.set(Result(output: "Расшифровано: «\(session.title)» (\(session.id))",
+                                   exitCode: 0))
+            } catch {
+                outcome.set(Result(output: "Не смог расшифровать: \(error)", exitCode: 1))
+            }
+        }
+        return outcome.wait()
+    }
+
     private func search(_ arguments: [String]) -> Result {
         let query = arguments.joined(separator: " ")
         guard !query.trimmingCharacters(in: .whitespaces).isEmpty else {
@@ -144,5 +217,21 @@ public struct CommandLineApp {
             return Result(output: "Не смог удалить: \(error)", exitCode: 1)
         }
         return Result(output: "Удалено: \(id)", exitCode: 0)
+    }
+}
+
+/// Мостик из асинхронного мира в синхронную командную строку.
+private final class Semaphore<Value>: @unchecked Sendable {
+    private let semaphore = DispatchSemaphore(value: 0)
+    private var value: Value?
+
+    func set(_ newValue: Value) {
+        value = newValue
+        semaphore.signal()
+    }
+
+    func wait() -> Value {
+        semaphore.wait()
+        return value!
     }
 }

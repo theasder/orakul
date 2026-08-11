@@ -44,6 +44,71 @@ struct ExternalTranscriberTests {
         #expect(WAVFile.encode(samples: []).count == 44)
     }
 
+    // MARK: - Чтение WAV
+
+    @Test("что записали, то и прочитали")
+    func encodeDecodeRoundTrip() throws {
+        let original: [Float] = [0, 0.5, -0.5, 1, -1]
+        let decoded = try WAVFile.decode(WAVFile.encode(samples: original))
+        #expect(decoded.count == original.count)
+        for (a, b) in zip(original, decoded) {
+            #expect(abs(a - b) < 0.001, "сэмпл изменился при записи и чтении")
+        }
+    }
+
+    @Test("не-WAV отклоняется, а не читается как шум")
+    func garbageIsRejected() {
+        #expect(throws: WAVFile.DecodeError.notRIFF) {
+            try WAVFile.decode(Data("это просто текст, а не запись".utf8))
+        }
+        #expect(throws: WAVFile.DecodeError.notRIFF) { try WAVFile.decode(Data()) }
+    }
+
+    @Test("частота не 16 кГц — отказ с названной частотой")
+    func wrongSampleRateIsNamed() {
+        // Пересчитать молча — значит тихо ухудшить распознавание. Человек
+        // должен узнать частоту, чтобы сконвертировать файл самому.
+        #expect(throws: WAVFile.DecodeError.unsupportedSampleRate(44_100)) {
+            try WAVFile.decode(WAVFile.encode(samples: [0.1], sampleRate: 44_100))
+        }
+    }
+
+    @Test("стерео сводится в моно, а не читается как двойная скорость")
+    func stereoIsMixedDown() throws {
+        // Стерео, прочитанное как моно, звучит вдвое быстрее и распознаётся
+        // как каша. Каналы усредняются.
+        var data = WAVFile.encode(samples: [])
+        data[22] = 2                                   // channels = 2
+        let left: [Int16] = [16_000, -16_000]
+        let right: [Int16] = [16_000, -16_000]
+        var payload = Data()
+        for (l, r) in zip(left, right) {
+            withUnsafeBytes(of: l.littleEndian) { payload.append(contentsOf: $0) }
+            withUnsafeBytes(of: r.littleEndian) { payload.append(contentsOf: $0) }
+        }
+        var sized = data
+        withUnsafeBytes(of: UInt32(payload.count).littleEndian) { bytes in
+            sized.replaceSubrange(40..<44, with: bytes)
+        }
+        let decoded = try WAVFile.decode(sized + payload)
+        #expect(decoded.count == 2, "каналы не свелись в моно")
+    }
+
+    @Test("посторонний блок между fmt и data не ломает чтение")
+    func unknownChunksAreSkipped() throws {
+        // Диктофоны вставляют LIST с названием устройства. Файл, прочитанный
+        // «по фиксированным смещениям», превратился бы в шум.
+        let base = WAVFile.encode(samples: [0.25, -0.25])
+        var withList = base[0..<36]
+        withList.append(contentsOf: Array("LIST".utf8))
+        withUnsafeBytes(of: UInt32(4).littleEndian) { withList.append(contentsOf: $0) }
+        withList.append(contentsOf: Array("INFO".utf8))
+        withList.append(contentsOf: base[36...])
+
+        let decoded = try WAVFile.decode(Data(withList))
+        #expect(decoded.count == 2)
+    }
+
     // MARK: - Запуск движка
 
     @Test("аудио попадает в команду на место подстановки")
@@ -111,6 +176,22 @@ struct ExternalTranscriberTests {
         await #expect(throws: ExternalTranscriber.TranscriberError.engineFailed("нет модели")) {
             try await transcriber.transcribe(samples: [0.1])
         }
+    }
+
+    @Test("один битый байт не съедает всю расшифровку")
+    func invalidUTF8DoesNotDiscardTheTranscript() async throws {
+        // Найдено на живом прогоне: движок-заглушка подмешал в вывод бинарные
+        // байты, строгий UTF-8 вернул nil, и весь текст пропал под сообщением
+        // «движок промолчал». Настоящий движок с одним сбойным байтом стоил бы
+        // человеку целого созвона.
+        var mixed = Data("Решили выкатить в прод.".utf8)
+        mixed.append(contentsOf: [0xFF, 0xFE])
+        let transcriber = ExternalTranscriber(
+            command: "engine -f {файл}",
+            run: { _, _, _ in String(decoding: mixed, as: UTF8.self) })
+
+        let text = try await transcriber.transcribe(samples: [0.1])
+        #expect(text.contains("Решили выкатить в прод"))
     }
 
     @Test("временный файл убирается за собой")
