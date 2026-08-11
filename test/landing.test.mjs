@@ -58,11 +58,28 @@ describe('orakul landing (ru)', () => {
     assert.doesNotMatch(text, /понимает смысл|семантическ|поймёт вопрос как человек/i);
   });
 
-  test('promises a quote, and admits what happens without one', () => {
-    // The whole trust argument: an answer is grounded in transcript words, and
-    // an ungrounded answer is not shown at all.
+  test('shows the real answer format, including the refusal', () => {
+    // The example must be what RecallAnswer.compose actually produces —
+    // «title», human date, then the quote — or the page is a mockup of a
+    // product that does not exist. The refusal case matters more than the
+    // success case: it is the whole trust argument, and it is the one a
+    // competitor cannot copy without building the check behind it.
+    assert.match(text, /«Планёрка по тарифам», 24 июля 2026/);
+    assert.match(text, /Ответ придумывать не буду/);
     assert.match(text, /цитат/i);
-    assert.match(text, /Если этих слов в ней нет — ответа не будет/);
+  });
+
+  test('demonstrates a question the engine can actually answer', () => {
+    // The old example asked «по ценам» about a meeting titled «Цены» — a
+    // synonym query, which this lexical search cannot do. Demoing a failure as
+    // the flagship example is worse than demoing nothing.
+    const ask = html.slice(html.indexOf('class="ask"'), html.indexOf('id="problem"'));
+    const question = ask.match(/<p class="q">([^<]+)</)?.[1] ?? '';
+    const quote = ask.match(/<blockquote class="quote">([\s\S]*?)<\/blockquote>/)?.[1] ?? '';
+    const stem = (word) => word.toLowerCase().replace(/[аяоеыиуюъь]$/, '').slice(0, 6);
+    const asked = question.replace(/[?«»]/g, '').split(/\s+/).filter((w) => w.length > 4);
+    assert.ok(asked.some((word) => quote.toLowerCase().includes(stem(word))),
+      `nothing in the question "${question}" appears in the answer it supposedly produced`);
   });
 
   test('states the speaker-label figure that was actually measured', () => {
