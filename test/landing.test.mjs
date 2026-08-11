@@ -106,14 +106,21 @@ describe('orakul landing (ru)', () => {
   });
 
   test('marks every unreleased connector as unreleased', () => {
-    // Dashed chips are a visual promise; the class is what makes it testable.
-    // Anything named here that is not built yet must carry `soon`, or the page
-    // advertises an integration a user cannot have.
-    for (const tool of ['WEEEK', 'YouGile', 'Pyrus', 'SberJazz', 'TrueConf']) {
-      const chip = new RegExp(`<span class="tool soon">${tool}</span>`);
-      assert.match(html, chip, `${tool} is not built yet and must be marked soon`);
+    // The page had this backwards: it showed Яндекс Трекер and Kaiten as
+    // shipped while the build contains no Russian connector at all, and it
+    // listed none of the fifteen that do work. The catalogue in the app is the
+    // authority, so the test reads it rather than a list maintained by hand.
+    const catalogue = readFileSync(
+      resolve(here, '..', 'app', 'Sources', 'MeetGPT', 'MCP', 'MCPCatalog.swift'), 'utf8');
+    for (const tool of ['Яндекс Трекер', 'Kaiten', 'WEEEK', 'YouGile', 'Pyrus',
+                        'Яндекс Телемост', 'VK Teams', 'SberJazz', 'TrueConf']) {
+      assert.match(html, new RegExp(`<span class="tool soon">${tool}</span>`),
+        `${tool} is not in the build and must be marked soon`);
     }
-    assert.match(text, /Пунктиром отмечено то, что ещё в работе/);
+    // And something that IS in the build must be shown as available.
+    assert.ok(catalogue.includes('id: "notion"'), 'catalogue changed shape');
+    assert.match(html, /<span class="tool">Notion<\/span>/);
+    assert.match(text, /Пунктиром — российские сервисы, которых ещё нет/);
   });
 
   test('names the licence, because "open source" alone is not a licence', () => {
