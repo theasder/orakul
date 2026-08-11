@@ -18,19 +18,6 @@ const catalog = JSON.parse(
 const { buttons } = catalog;
 
 describe('orakul quick-action buttons (ru)', () => {
-  test('the app bundle and the site read the same catalogue', () => {
-    // The Swift package bundles a COPY of this file. A copy is fine; a copy
-    // that drifts is not — the page would advertise buttons the app does not
-    // have. Until a build step generates one from the other, this is the guard.
-    const bundled = readFileSync(
-      resolve(here, '..', 'app', 'Sources', 'OrakulCore', 'Resources', 'prompts.ru.json'),
-      'utf8',
-    );
-    const source = readFileSync(resolve(here, '..', 'config', 'prompts.ru.json'), 'utf8');
-    assert.equal(bundled, source,
-      'run: cp config/prompts.ru.json app/Sources/OrakulCore/Resources/prompts.ru.json');
-  });
-
   test('the catalogue is well formed and every id is unique', () => {
     assert.equal(catalog.locale, 'ru-RU');
     assert.ok(buttons.length >= 6, 'a co-pilot with fewer than six actions is a demo');

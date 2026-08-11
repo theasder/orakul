@@ -1,0 +1,9 @@
+{
+  "name": "orakul-site",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "//": "Тесты форка (app/Tests) гоняет swift test и vitest самого приложения — их сюда не подмешиваем."
+}

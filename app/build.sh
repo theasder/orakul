@@ -6,15 +6,15 @@ BUILD_ARCH="${MEETGPT_ARCH:-native}"
 SWIFT_BUILD_ARGS=(-c release)
 case "$BUILD_ARCH" in
     native)
-        DEFAULT_APP_BASENAME="Cruxwing"
+        DEFAULT_APP_BASENAME="orakul"
         ;;
     arm64|x86_64)
         SWIFT_BUILD_ARGS+=(--triple "${BUILD_ARCH}-apple-macosx13.0"
                            --scratch-path "$ROOT/.build/$BUILD_ARCH")
         if [ "$BUILD_ARCH" = "x86_64" ]; then
-            DEFAULT_APP_BASENAME="Cruxwing-Intel"
+            DEFAULT_APP_BASENAME="orakul-Intel"
         else
-            DEFAULT_APP_BASENAME="Cruxwing"
+            DEFAULT_APP_BASENAME="orakul"
         fi
         ;;
     *)
@@ -219,8 +219,8 @@ BUILD_NUM="$(git -C "$ROOT" rev-list --count HEAD 2>/dev/null || echo 1)"
 # wrong ref still produces a green log and a working DMG — the only way to
 # catch it is to ask the binary what it is, which needs this stamp to exist.
 GIT_SHA="$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)"
-/usr/libexec/PlistBuddy -c "Add :CruxwingCommit string $GIT_SHA" "$STAGE/Contents/Info.plist" 2>/dev/null \
-    || /usr/libexec/PlistBuddy -c "Set :CruxwingCommit $GIT_SHA" "$STAGE/Contents/Info.plist" 2>/dev/null || true
+/usr/libexec/PlistBuddy -c "Add :OrakulCommit string $GIT_SHA" "$STAGE/Contents/Info.plist" 2>/dev/null \
+    || /usr/libexec/PlistBuddy -c "Set :OrakulCommit $GIT_SHA" "$STAGE/Contents/Info.plist" 2>/dev/null || true
 # App-level privacy manifest (App Review requirement).
 cp "$ROOT/Support/PrivacyInfo.xcprivacy" "$STAGE/Contents/Resources/PrivacyInfo.xcprivacy"
 

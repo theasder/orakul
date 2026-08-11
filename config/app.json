@@ -21,12 +21,14 @@
   },
   "artifacts": {
     "macos": {
-      "status": "planned",
+      "status": "built",
       "minimumVersion": "14.0",
       "installers": [
         "orakul-AppleSilicon.dmg",
         "orakul-Intel.dmg"
-      ]
+      ],
+      "notarised": true,
+      "note": "Собраны и нотаризованы Apple, лежат в public/download. На сайт не выложены: страница не должна давать ссылку, которой нет на сервере."
     },
     "windows": {
       "status": "planned",

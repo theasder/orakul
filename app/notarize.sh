@@ -22,8 +22,8 @@ ROOT="$(cd "$(dirname "$0")" && pwd)"
 ARCH="${MEETGPT_ARCH:-native}"
 case "$ARCH" in
     x86_64) APP_BASENAME="orakul-Intel"; PUBLISH_NAME="orakul-Intel" ;;
-    arm64)  APP_BASENAME="Cruxwing";       PUBLISH_NAME="orakul-AppleSilicon" ;;
-    native) APP_BASENAME="Cruxwing";       PUBLISH_NAME="Cruxwing" ;;
+    arm64)  APP_BASENAME="orakul";       PUBLISH_NAME="orakul-AppleSilicon" ;;
+    native) APP_BASENAME="orakul";       PUBLISH_NAME="orakul" ;;
     *) echo "!! unsupported MEETGPT_ARCH=$ARCH (use native, arm64, or x86_64)" >&2; exit 2 ;;
 esac
 APP="$ROOT/build/$APP_BASENAME.app"

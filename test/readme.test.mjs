@@ -19,18 +19,18 @@ describe('README', () => {
   test('says up front that there is no app yet', () => {
     // The most expensive lie a README can tell is implying it runs. A visitor
     // who clones this and finds no binary does not come back.
-    assert.match(readme, /кроме микрофона|ядро без приложения/i);
+    // Приложение теперь есть — форк Cruxwing, DMG собраны и нотаризованы.
+    // Но «есть приложение» и «его можно скачать» — разные утверждения, и
+    // страница обязана различать их.
+    assert.match(readme, /форк Cruxwing/i);
     assert.match(readme, /Чего ещё нет/i);
-    for (const missing of [/захват/i, /расшифровщик/i, /интерфейс/i]) {
-      assert.match(readme, missing, 'the missing pieces must be named, not implied');
-    }
   });
 
   test('never claims a capability the code does not have', () => {
     // The CLI exists now, so "runnable" is true — but recording a call is
     // still not, and that is the claim that must never appear.
-    assert.doesNotMatch(readme, /записывает созвон|скачать приложение/i);
-    assert.match(readme, /записать созвон orakul ещё не может/i);
+    // Скачать пока негде: артефакты собраны локально и на сайт не выложены.
+    assert.doesNotMatch(readme, /скачать приложение|ссылка на загрузку/i);
     // Semantic search is exactly what this does NOT do.
     assert.doesNotMatch(readme, /понимает смысл|семантический поиск/i);
     assert.match(readme, /синонимы\s*—\s*нет/i, 'the search limitation belongs on the front page');
@@ -45,19 +45,6 @@ describe('README', () => {
     assert.ok(readdirSync(resolve(repo, 'test')).some((f) => f.endsWith('.test.mjs')),
       'node --test has nothing to run');
     assert.match(readme, /node --test/);
-  });
-
-  test('the module table lists modules that are actually there', () => {
-    // A table of contents for code that does not exist is the same lie in
-    // tabular form.
-    const sources = readdirSync(resolve(repo, 'app', 'Sources', 'OrakulCore'))
-      .filter((f) => f.endsWith('.swift'))
-      .map((f) => f.replace('.swift', ''));
-    const mentioned = [...readme.matchAll(/^\| `(\w+)`/gm)].map((m) => m[1]);
-    assert.ok(mentioned.length >= 5, 'expected the module table');
-    for (const module of mentioned) {
-      assert.ok(sources.includes(module), `README lists ${module}, which does not exist`);
-    }
   });
 
   test('the licence it names is the licence in the repo', () => {

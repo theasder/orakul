@@ -26,7 +26,7 @@ ROOT="$(cd "$(dirname "$0")" && pwd)"
 ARCH="${1:-${MEETGPT_ARCH:-arm64}}"
 case "$ARCH" in
     x86_64) APP_BASENAME="orakul-Intel"; PUBLISH_NAME="orakul-Intel" ;;
-    arm64|native) APP_BASENAME="Cruxwing"; PUBLISH_NAME="orakul-AppleSilicon" ;;
+    arm64|native) APP_BASENAME="orakul"; PUBLISH_NAME="orakul-AppleSilicon" ;;
     *) echo "!! unsupported arch '$ARCH' (use arm64 or x86_64)" >&2; exit 2 ;;
 esac
 

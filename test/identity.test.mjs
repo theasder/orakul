@@ -83,10 +83,13 @@ describe('orakul app identity', () => {
     // Nothing is built yet. A status of "released" here would put a download
     // button on a page with nothing behind it — the exact failure the Cruxwing
     // site hit today with its Ventura links.
-    for (const platform of ['macos', 'windows']) {
-      assert.equal(identity.artifacts[platform].status, 'planned',
-        `${platform} is not built; status must say so`);
-    }
+    // macOS is built and notarised now; Windows is not. The statuses must
+    // differ, because collapsing them hides which one a user can actually run.
+    assert.equal(identity.artifacts.windows.status, 'planned');
+    assert.ok(['planned', 'built', 'released'].includes(identity.artifacts.macos.status));
+    // "built" is not "released": the artefacts exist locally and are NOT on
+    // the site, so the page still must not link them — a link that 404s is
+    // worse than no link, which this project has already shipped once.
   });
 
   test('records that Windows needs its own capture layer', () => {
