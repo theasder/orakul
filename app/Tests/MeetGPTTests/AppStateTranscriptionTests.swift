@@ -93,7 +93,7 @@ struct AppStateTranscriptionTests {
 
         let restoredEntry = TranscriptEntry(source: .system, text: "restored meeting")
         let restored = SavedSession(
-            id: UUID(), title: "History", startedAt: Date(timeIntervalSince1970: 1_700_000_000),
+            id: UUID(), title: "История", startedAt: Date(timeIntervalSince1970: 1_700_000_000),
             savedAt: Date(), goal: "", entries: [restoredEntry], aiResponse: "", digest: ""
         )
         state.restoreSession(restored)

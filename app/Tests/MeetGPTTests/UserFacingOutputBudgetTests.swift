@@ -67,7 +67,7 @@ struct UserFacingOutputBudgetTests {
     func ordinaryAnswerAndFollowUp() async {
         let gateway = UserFacingBudgetGateway(response: "A complete visible answer.")
         let state = AppState(llm: gateway)
-        state.transcript = [TranscriptEntry(source: .mic, text: "Context")]
+        state.transcript = [TranscriptEntry(source: .mic, text: "Контекст")]
         state.runPrompt(.custom(icon: "✨", title: "Test", prompt: "Answer fully"))
         await settle(state)
 

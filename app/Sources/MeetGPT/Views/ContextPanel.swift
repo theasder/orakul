@@ -55,7 +55,7 @@ struct ContextSection: View {
             // exist. The token/credit rail under the prompts is where input size
             // actually matters.
             HStack(spacing: Space.s) {
-                SectionLabel("Context")
+                SectionLabel("Контекст")
                 Spacer()
                 if state.totalContextChars > 0 {
                     Button { state.clearAllContext() } label: {
@@ -64,7 +64,7 @@ struct ContextSection: View {
                     }
                     .buttonStyle(IconButtonStyle(size: 18))
                     .help("Clear all context (files and notes)")
-                    .accessibilityLabel("Clear all context")
+                    .accessibilityLabel("Очистить контекст")
                 }
             }
 
@@ -129,7 +129,7 @@ struct ContextSection: View {
     private var addSourceMenu: some View {
         Menu {
             Button { showImporter = true } label: { Label("Files…", systemImage: "paperclip") }
-            Button { showFolderImporter = true } label: { Label("Folder…", systemImage: "folder.badge.plus") }
+            Button { showFolderImporter = true } label: { Label("Папка…", systemImage: "folder.badge.plus") }
             Button { promptKind = .doc } label: { Label("Google Doc…", systemImage: "doc.richtext") }
             Button { promptKind = .sheet } label: { Label("Google Sheet…", systemImage: "tablecells") }
             Button { promptKind = .notion } label: { Label("Notion page…", systemImage: "note.text") }
@@ -150,12 +150,12 @@ struct ContextSection: View {
             }
             if state.googleConnected {
                 Button { Task { await state.pullAgenda() } } label: {
-                    Label("Calendar agenda", systemImage: "calendar")
+                    Label("Повестка из календаря", systemImage: "calendar")
                 }
                 .disabled(state.calendarImporting)
             }
         } label: {
-            Label("Add source", systemImage: "plus")
+            Label("Добавить источник", systemImage: "plus")
         }
         .menuStyle(.button)
         .buttonStyle(QuietButtonStyle(prominent: true))
@@ -172,8 +172,8 @@ struct ContextSection: View {
                 Divider()
                 ForEach(state.contextSets) { set in
                     Menu("\(set.name) · \(set.sourceCount)") {
-                        Button("Apply") { state.applyContextSet(id: set.id) }
-                        Button("Delete", role: .destructive) { state.deleteContextSet(id: set.id) }
+                        Button("Применить") { state.applyContextSet(id: set.id) }
+                        Button("Удалить", role: .destructive) { state.deleteContextSet(id: set.id) }
                     }
                 }
             }
@@ -224,8 +224,8 @@ private struct SourcePromptSheet: View {
                 .overlay(RoundedRectangle(cornerRadius: Radius.s, style: .continuous).strokeBorder(Theme.hairline, lineWidth: 1))
             HStack {
                 Spacer()
-                Button("Cancel") { dismiss() }.buttonStyle(QuietButtonStyle())
-                Button("Add") {
+                Button("Отмена") { dismiss() }.buttonStyle(QuietButtonStyle())
+                Button("Добавить") {
                     let url = link
                     dismiss()
                     Task {
@@ -284,8 +284,8 @@ private struct SaveSetSheet: View {
                 .overlay(RoundedRectangle(cornerRadius: Radius.s, style: .continuous).strokeBorder(Theme.hairline, lineWidth: 1))
             HStack {
                 Spacer()
-                Button("Cancel") { dismiss() }.buttonStyle(QuietButtonStyle())
-                Button("Save") { state.saveContextSet(name: name); dismiss() }
+                Button("Отмена") { dismiss() }.buttonStyle(QuietButtonStyle())
+                Button("Сохранить") { state.saveContextSet(name: name); dismiss() }
                     .buttonStyle(PrimaryButtonStyle())
                     .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
@@ -320,7 +320,7 @@ private struct FileChip: View {
             .buttonStyle(IconButtonStyle(size: 18))
             .opacity(hovering ? 1 : 0.4)
             .accessibilityLabel("Remove \(file.name)")
-            .help("Remove")
+            .help("Убрать")
         }
         .padding(.horizontal, Space.s)
         .padding(.vertical, 6)

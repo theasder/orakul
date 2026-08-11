@@ -37,7 +37,7 @@ struct TranscriptEnhancementTests {
 
         let grounding = [
             GroundingSnippet(serverName: "Notion", toolName: "notion-search",
-                             text: "Project Cruxwing ships Friday; owner Ada Lovelace.")
+                             text: "Project orakul ships Friday; owner Ada Lovelace.")
         ]
         let result = try await TranscriptEnhancementService.enhance(
             whisper: whisper,
@@ -48,7 +48,7 @@ struct TranscriptEnhancementTests {
             llm: llm,
             model: LLMCatalog.model(id: "gpt-5.4-mini") ?? LLMCatalog.defaultModel(for: .free))
 
-        #expect(llm.calls.contains(where: { $0.user.contains("SOURCE C") && $0.user.contains("Cruxwing") }))
+        #expect(llm.calls.contains(where: { $0.user.contains("SOURCE C") && $0.user.contains("orakul") }))
         #expect(result.entries.count == 2)
         #expect(result.entries[0].speaker == "Ada")
         #expect(result.entries[0].text == "We ship Friday.")

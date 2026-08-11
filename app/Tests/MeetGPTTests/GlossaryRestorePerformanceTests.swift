@@ -57,7 +57,7 @@ struct GlossaryRestorePerformanceTests {
         // The worst realistic vocabulary: ICP lexicon + the two packs this text
         // signals (payments and infrastructure) + a user glossary.
         let casingOnly = DomainLexicon.casingOnlyTerms(for: transcript)
-        let userTerms = ["Cruxwing", "Wheespr", "Priya Raman", "Acme Robotics"]
+        let userTerms = ["orakul", "Wheespr", "Priya Raman", "Acme Robotics"]
 
         var restored = ""
         let elapsed = fastest {

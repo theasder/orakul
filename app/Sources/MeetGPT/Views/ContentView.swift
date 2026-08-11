@@ -203,7 +203,7 @@ private struct MandatoryInformationOverlay: View {
                     .fixedSize(horizontal: false, vertical: true)
                 HStack {
                     Spacer()
-                    Button("Acknowledge") {
+                    Button("Понятно") {
                         state.debugClearMandatoryNotice(id: notice.id)
                     }
                     .buttonStyle(PrimaryButtonStyle())
@@ -244,7 +244,7 @@ private struct MeetingColumn: View {
         VStack(alignment: .leading, spacing: 0) {
             header
             HStack(spacing: Space.s) {
-                SectionLabel("Transcript")
+                SectionLabel("Транскрипт")
                 Spacer()
                 downloadTranscriptButton
                 diarizeControl
@@ -286,7 +286,7 @@ private struct MeetingColumn: View {
                         Image(systemName: "xmark").font(.system(size: 8, weight: .bold))
                     }
                     .buttonStyle(IconButtonStyle(size: 16))
-                    .help("Dismiss")
+                    .help("Скрыть")
                 }
             }
             HStack(spacing: Space.s) {
@@ -321,7 +321,7 @@ private struct MeetingColumn: View {
             .buttonStyle(IconButtonStyle(size: 22))
             .disabled(state.diarizing || state.enhancingTranscript)
             .help("Download the transcript as a text file")
-            .accessibilityLabel("Download transcript")
+            .accessibilityLabel("Скачать транскрипт")
         }
     }
 
@@ -331,8 +331,8 @@ private struct MeetingColumn: View {
             date: state.sessionDate,
             entries: state.transcript)
         let panel = NSSavePanel()
-        panel.title = "Download transcript"
-        panel.prompt = "Save"
+        panel.title = "Скачать транскрипт"
+        panel.prompt = "Сохранить"
         panel.canCreateDirectories = true
         panel.isExtensionHidden = false
         if let txt = UTType(filenameExtension: "txt") {
@@ -360,7 +360,7 @@ private struct MeetingColumn: View {
         } else if state.diarizing {
             HStack(spacing: Space.xs) {
                 BreathingDots(tint: Theme.accent)
-                Text("Diarizing…")
+                Text("Определяю говорящих…")
                     .font(Typo.caption)
                     .foregroundStyle(Theme.inkSecondary)
             }

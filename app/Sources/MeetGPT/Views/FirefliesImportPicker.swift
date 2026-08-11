@@ -30,14 +30,14 @@ struct FirefliesImportPicker: View {
     private var header: some View {
         HStack(alignment: .firstTextBaseline) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Import from Fireflies")
+                Text("Импорт из Fireflies")
                     .font(.system(size: 14, weight: .semibold))
                 Text("Its transcript opens as a saved call — ready for Blind Spots and questions.")
                     .font(.system(size: 11))
                     .foregroundStyle(Theme.inkTertiary)
             }
             Spacer()
-            Button("Done") { isPresented = false }
+            Button("Готово") { isPresented = false }
                 .keyboardShortcut(.cancelAction)
         }
     }
@@ -59,7 +59,7 @@ struct FirefliesImportPicker: View {
                 .font(.system(size: 12))
                 .foregroundStyle(Theme.inkSecondary)
                 .fixedSize(horizontal: false, vertical: true)
-            Button("Try again") { state.loadFirefliesMeetings() }
+            Button("Ещё раз") { state.loadFirefliesMeetings() }
         }
         .frame(maxHeight: .infinity, alignment: .center)
     }

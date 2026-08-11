@@ -67,7 +67,7 @@ struct PromptBudgetBarViewTests {
 
         #expect(throws: Never.self) { try view.inspect().find(text: "Notion") }
         #expect(throws: Never.self) { try view.inspect().find(text: "Linear") }
-        #expect(throws: Never.self) { try view.inspect().find(text: "Add apps") }
+        #expect(throws: Never.self) { try view.inspect().find(text: "Добавить приложения") }
         #expect(throws: (any Error).self) { try view.inspect().find(text: "Work apps") }
         #expect(throws: (any Error).self) { try view.inspect().find(text: "Team chat") }
         #expect(throws: (any Error).self) { try view.inspect().find(text: "Decisions") }
@@ -80,7 +80,7 @@ struct PromptBudgetBarViewTests {
         let inspected = try bar(state: state, mcp: mcp).inspect()
 
         #expect(throws: Never.self) { try inspected.find(text: "No apps connected") }
-        #expect(throws: Never.self) { try inspected.find(text: "Add apps") }
+        #expect(throws: Never.self) { try inspected.find(text: "Добавить приложения") }
         let toggle = try inspected.find(ViewType.Toggle.self)
         #expect(toggle.isDisabled())
         #expect(try toggle.isOn() == false)
@@ -168,7 +168,7 @@ struct PromptBudgetBarViewTests {
         let state = freshState()
         state.selectedSettingsTab = .general
         let mcp = MCPConnectionManager(tokenStore: InMemoryKeychain())
-        let button = try bar(state: state, mcp: mcp).inspect().find(button: "Add apps")
+        let button = try bar(state: state, mcp: mcp).inspect().find(button: "Добавить приложения")
 
         try button.tap()
 

@@ -44,7 +44,7 @@ struct FirefliesImportPickerTests {
         let view = try inspect(state)
         let text = try view.findAll(ViewType.Text.self).compactMap { try? $0.string() }
         #expect(text.contains { $0.contains("Couldn't reach Fireflies") })
-        #expect(throws: Never.self) { _ = try view.find(button: "Try again") }
+        #expect(throws: Never.self) { _ = try view.find(button: "Ещё раз") }
     }
 
     @Test("meetings render as rows")

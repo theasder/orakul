@@ -161,7 +161,7 @@ struct PromptBudgetBar: View {
                         .foregroundStyle(Theme.ink)
                         .fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: 0)
-                    Button("Sign in") { showSignIn = true }
+                    Button("Войти") { showSignIn = true }
                         .buttonStyle(QuietButtonStyle(prominent: true))
                     Button {
                         state.dismissSignedOutNotice()
@@ -183,7 +183,7 @@ struct PromptBudgetBar: View {
                         .font(Typo.caption)
                         .foregroundStyle(Theme.inkSecondary)
                     Spacer(minLength: 0)
-                    Button("Sign in") { showSignIn = true }
+                    Button("Войти") { showSignIn = true }
                         .buttonStyle(QuietButtonStyle(prominent: true))
                 }
                 .padding(.horizontal, 2)
@@ -430,7 +430,7 @@ private struct AddAppsLabel: View {
         HStack(spacing: 4) {
             Image(systemName: "plus")
                 .font(.system(size: 9, weight: .bold))
-            Text("Add apps")
+            Text("Добавить приложения")
                 .font(Typo.caption.weight(.medium))
         }
         .foregroundStyle(Theme.inkSecondary)
@@ -868,7 +868,7 @@ struct PromptBudgetDetails: View {
             // on day 2 than on day 29, and the reset was never shown at all.
             VStack(alignment: .leading, spacing: Space.xs) {
                 HStack(alignment: .firstTextBaseline) {
-                    Text("Compute credits")
+                    Text("Кредиты")
                         .font(Typo.headline)
                         .foregroundStyle(Theme.ink)
                     Spacer(minLength: Space.s)
@@ -906,7 +906,7 @@ struct PromptBudgetDetails: View {
                 .frame(height: 8)
 
             VStack(spacing: Space.s) {
-                BreakdownRow(label: "Transcript", tokens: estimate.transcriptTokens,
+                BreakdownRow(label: "Транскрипт", tokens: estimate.transcriptTokens,
                              detail: nil, color: Theme.accent)
                 BreakdownRow(label: "Attached context", tokens: estimate.contextTokens,
                              detail: nil, color: Theme.amber)
@@ -980,7 +980,7 @@ struct PromptBudgetDetails: View {
                     let remaining = max(0, usage.remaining.computeCredits)
                     VStack(alignment: .leading, spacing: Space.xs) {
                         HStack {
-                            Text("Compute credits")
+                            Text("Кредиты")
                                 .font(Typo.caption.weight(.semibold))
                                 .foregroundStyle(Theme.inkSecondary)
                             Spacer()
@@ -1040,7 +1040,7 @@ struct PromptBudgetDetails: View {
                 .foregroundStyle(Theme.inkSecondary)
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Compute credit balance unavailable")
+        .accessibilityLabel("Баланс кредитов недоступен")
     }
 }
 

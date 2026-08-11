@@ -57,7 +57,7 @@ struct OverlayView: View {
                     .font(Typo.mono)
                     .foregroundStyle(Theme.ink)
             } else {
-                Text("Cruxwing")
+                Text("orakul")
                     .font(Typo.mono)
                     .foregroundStyle(Theme.ink)
             }
@@ -139,7 +139,7 @@ private struct OverlaySuggestionRow: View {
             .buttonStyle(IconButtonStyle(size: 18))
             .opacity(hovering ? 1 : 0.35)
             .accessibilityLabel("Dismiss suggestion")
-            .help("Dismiss")
+            .help("Скрыть")
         }
         .padding(.horizontal, Space.s)
         .padding(.vertical, 5)

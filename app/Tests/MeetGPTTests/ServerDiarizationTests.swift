@@ -50,7 +50,7 @@ struct ServerDiarizationTests {
     @Test("failures explain what to do rather than leaking a status code")
     func readableFailures() {
         #expect(ServerDiarizationService.Failure.notSignedIn.errorDescription?
-            .contains("Sign in") == true)
+            .contains("Войти") == true)
         #expect(ServerDiarizationService.Failure.notConfigured.errorDescription?
             .contains("AssemblyAI") == true)
         // A server message is preferred over the bare code when present.

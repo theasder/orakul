@@ -195,7 +195,7 @@ struct ResponseView: View {
                     .foregroundStyle(Theme.accent)
             }
             VStack(spacing: Space.xs) {
-                Text("Ask the assistant")
+                Text("Спросить ассистента")
                     .font(Typo.headline)
                     .foregroundStyle(Theme.ink)
                 Text("Pick a prompt above to turn the live conversation into agendas, action items, answers, and more.")
@@ -221,7 +221,7 @@ struct ResponseView: View {
         } else if state.clarifying {
             HStack(spacing: Space.s) {
                 BreathingDots()
-                Text("Checking what you mean…")
+                Text("Уточняю вопрос…")
                     .font(Typo.callout)
                     .foregroundStyle(Theme.inkTertiary)
             }
@@ -245,12 +245,12 @@ private struct AnswerActionsRow: View {
             if !state.answerActions.isEmpty {
                 VStack(alignment: .leading, spacing: Space.s) {
                     // When the answer IS a list of things to do, a generic
-                    // "Do this" underneath reads as unrelated furniture. Naming
+                    // "Сделать" underneath reads as unrelated furniture. Naming
                     // the connection attaches the button to the list above it.
                     SectionLabel(AnswerChecklist.actionGroupTitle(
                         forAnswer: state.aiResponse,
                         hasTaskAction: state.answerActions.contains { $0.createsTask })
-                        ?? "Do this")
+                        ?? "Сделать")
                     FlowLayout(spacing: Space.s, lineSpacing: Space.s) {
                         ForEach(state.answerActions) { action in
                             actionChip(action)
@@ -285,7 +285,7 @@ private struct AnswerActionsRow: View {
                             .font(.system(size: 9, weight: .bold))
                     }
                     .buttonStyle(IconButtonStyle(size: 18))
-                    .accessibilityLabel("Dismiss")
+                    .accessibilityLabel("Скрыть")
                 }
                 .padding(Space.s)
                 .background(Theme.accentTint, in: RoundedRectangle(cornerRadius: Radius.s, style: .continuous))
@@ -401,7 +401,7 @@ private struct ArchivedExchangeBlock: View {
             // prompt left the previous answer with no way to act on it.
             if !exchange.answerActions.isEmpty {
                 VStack(alignment: .leading, spacing: Space.s) {
-                    SectionLabel("Do this")
+                    SectionLabel("Сделать")
                     FlowLayout(spacing: Space.s, lineSpacing: Space.s) {
                         ForEach(exchange.answerActions) { action in
                             Text(action.title)
@@ -582,7 +582,7 @@ struct WorkflowTracePanel: View {
 
     private static let localApp = WorkflowApp(
         id: "cruxwing",
-        name: "Cruxwing",
+        name: "orakul",
         symbol: "sparkles",
         kind: .local
     )
@@ -792,7 +792,7 @@ private struct AnswerFeedbackRow: View {
                         .textFieldStyle(.roundedBorder)
                         .font(.system(size: 11))
                         .lineLimit(1...4)
-                    Button("Save") { saveNote() }
+                    Button("Сохранить") { saveNote() }
                         .font(.system(size: 10))
                 }
             }

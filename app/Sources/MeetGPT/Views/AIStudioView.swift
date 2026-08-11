@@ -25,7 +25,7 @@ struct AIStudioView: View {
                 .padding(.top, kContentTopInset)
                 .padding(.bottom, Space.m)
 
-            SectionLabel("Prompts")
+            SectionLabel("Промпты")
                 .padding(.horizontal, Space.l)
                 .padding(.bottom, Space.s)
 
@@ -92,7 +92,7 @@ struct AIStudioView: View {
                 Image(systemName: "sparkles")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Theme.accent)
-                Text("Assistant")
+                Text("Ассистент")
                     .font(Typo.title)
                     .foregroundStyle(Theme.ink)
             }
@@ -157,7 +157,7 @@ struct AIStudioView: View {
                     Button {
                         copyResponse()
                     } label: {
-                        Label("Copy this answer", systemImage: "doc.on.doc")
+                        Label("Скопировать ответ", systemImage: "doc.on.doc")
                     }
                     .disabled(state.aiStreaming)
 
@@ -165,7 +165,7 @@ struct AIStudioView: View {
                         Button {
                             copyWholeDialog()
                         } label: {
-                            Label("Copy whole dialog", systemImage: "doc.on.doc.fill")
+                            Label("Скопировать весь диалог", systemImage: "doc.on.doc.fill")
                         }
                         .disabled(state.aiStreaming)
                     }
@@ -524,7 +524,7 @@ private struct AskComposer: View {
                 if state.attaching && !attachmentFeedback.hasImportingMedia {
                     HStack(spacing: Space.xs) {
                         ProgressView().controlSize(.small).scaleEffect(0.7)
-                        Text("Transcribing…").font(Typo.caption).foregroundStyle(Theme.inkTertiary)
+                        Text("Расшифровываю…").font(Typo.caption).foregroundStyle(Theme.inkTertiary)
                     }
                 }
             }
@@ -536,9 +536,9 @@ private struct AskComposer: View {
     private var attachMenu: some View {
         Menu {
             Button { open(.image) } label: { Label("Image", systemImage: "photo") }
-            Button { open(.file) }  label: { Label("File", systemImage: "doc") }
-            Button { open(.folder) } label: { Label("Folder…", systemImage: "folder.badge.plus") }
-            Button { open(.audio) } label: { Label("Audio", systemImage: "waveform") }
+            Button { open(.file) }  label: { Label("Создать", systemImage: "doc") }
+            Button { open(.folder) } label: { Label("Папка…", systemImage: "folder.badge.plus") }
+            Button { open(.audio) } label: { Label("Звук", systemImage: "waveform") }
             Button { open(.video) } label: { Label("Video", systemImage: "film") }
             Divider()
             Menu {
@@ -572,7 +572,7 @@ private struct AskComposer: View {
         }
         switch state.dictation.state {
         case .listening:    return "Listening — press again to stop"
-        case .transcribing: return "Transcribing…"
+        case .transcribing: return "Расшифровываю…"
         default:            return "Ask anything, attach, or start from a prompt…"
         }
     }
@@ -635,7 +635,7 @@ private struct AskComposer: View {
         }
         .buttonStyle(.plain)
         .disabled(!canSend)
-        .accessibilityLabel("Send")
+        .accessibilityLabel("Отправить")
         .help(attachmentFeedback.hasImportingItems
               ? "Wait for attachments to finish"
               : (canSend ? "Ask (↵)" : "Attach or type a message"))
@@ -735,7 +735,7 @@ struct ComposerAttachmentStatusChip: View {
     private var status: String {
         switch item.phase {
         case .importing:
-            if item.kind == .audio || item.kind == .video { return "Transcribing…" }
+            if item.kind == .audio || item.kind == .video { return "Расшифровываю…" }
             return item.kind == .folder ? "Indexing…" : "Importing…"
         case .ready:
             return "Ready"

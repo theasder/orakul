@@ -5,7 +5,7 @@ import SwiftUI
 ///
 /// Two rules shape the layout. It must be answerable in one glance and two
 /// clicks, because anything slower is worse than being answered wrongly and
-/// correcting. And "Answer anyway" is always present and never buried — a card
+/// correcting. And "Всё равно ответить" is always present and never buried — a card
 /// that can trap the user into answering a question they do not care about is a
 /// card they will learn to resent.
 struct ClarificationCard: View {
@@ -40,7 +40,7 @@ struct ClarificationCard: View {
             Image(systemName: "questionmark.bubble")
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(Theme.accentText)
-            SectionLabel("Before I answer")
+            SectionLabel("Прежде чем отвечу")
             Spacer(minLength: 0)
         }
     }
@@ -143,11 +143,11 @@ struct ClarificationCard: View {
 
     private var actions: some View {
         HStack(spacing: Space.s) {
-            Button("Answer anyway", action: onSkip)
+            Button("Всё равно ответить", action: onSkip)
                 .buttonStyle(QuietButtonStyle())
                 .help("Skip the questions and answer the original request as written.")
             Spacer(minLength: 0)
-            Button(anyAnswered ? "Continue" : "Continue without answering", action: submit)
+            Button(anyAnswered ? "Продолжить" : "Продолжить без ответа", action: submit)
                 .buttonStyle(PrimaryButtonStyle())
                 .keyboardShortcut(.return, modifiers: [.command])
         }

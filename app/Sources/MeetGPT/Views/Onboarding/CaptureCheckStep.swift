@@ -136,9 +136,9 @@ struct CaptureCheckStep: View {
                 .font(Typo.caption).foregroundStyle(Theme.inkTertiary)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: Space.s)
-            Button("Continue", action: onContinue)
+            Button("Продолжить", action: onContinue)
                 .buttonStyle(PrimaryButtonStyle())
-                .accessibilityLabel("Continue")
+                .accessibilityLabel("Продолжить")
         }
     }
 }
@@ -325,9 +325,9 @@ private struct ModelWarmupRow: View {
                     .foregroundStyle(Theme.speakerYou)
                     .labelStyle(.titleAndIcon)
             case .failed:
-                Button("Retry", action: retry).buttonStyle(QuietButtonStyle())
+                Button("Повторить", action: retry).buttonStyle(QuietButtonStyle())
             case .idle:
-                Button("Download", action: retry).buttonStyle(QuietButtonStyle())
+                Button("Скачать", action: retry).buttonStyle(QuietButtonStyle())
             }
         }
     }

@@ -41,13 +41,13 @@ struct AccessibilityOverlapTests {
                             .environment(\.colorScheme, dark ? .dark : .light)
                         let inspected = try view.inspect()
 
-                        #expect(throws: Never.self) { try inspected.find(text: "BEFORE I ANSWER") }
+                        #expect(throws: Never.self) { try inspected.find(text: "ПРЕЖДЕ ЧЕМ ОТВЕЧУ") }
                         #expect(throws: Never.self) { try inspected.find(text: "Which constraint matters most?") }
                         #expect(throws: Never.self) { try inspected.find(text: "SLA safety") }
                         #expect(throws: Never.self) { try inspected.find(text: "Delivery speed") }
-                        #expect(throws: Never.self) { try inspected.find(button: "Answer anyway") }
+                        #expect(throws: Never.self) { try inspected.find(button: "Всё равно ответить") }
                         #expect(throws: Never.self) {
-                            try inspected.find(button: "Continue without answering")
+                            try inspected.find(button: "Продолжить без ответа")
                         }
 
                         fingerprints.insert(

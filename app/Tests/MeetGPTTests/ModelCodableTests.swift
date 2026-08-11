@@ -39,7 +39,7 @@ struct SuggestionCodableTests {
 
     @Test("kind label and systemImage map each case")
     func kindPresentation() {
-        #expect(SuggestionKind.question.label == "Ask")
+        #expect(SuggestionKind.question.label == "Спросить")
         #expect(SuggestionKind.risk.label == "Risk")
         #expect(SuggestionKind.missingInfo.label == "Missing")
         #expect(SuggestionKind.advice.label == "Advice")

@@ -34,7 +34,7 @@ struct CapabilityRoutingTests {
     @Test("an unranked model sorts last rather than silently winning")
     func unrankedSortsLast() {
         let known = model("gpt-5.4-mini")
-        let unknown = LLMModel(id: "brand-new-model", label: "New", provider: .openAI,
+        let unknown = LLMModel(id: "brand-new-model", label: "Новый", provider: .openAI,
                                minTier: .free, supportsVision: false)
         #expect(LLMCatalog.strongest(in: [unknown, known])?.id == known.id)
     }

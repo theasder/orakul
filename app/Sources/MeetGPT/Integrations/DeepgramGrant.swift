@@ -51,7 +51,7 @@ enum DeepgramGrantError: Error, Equatable {
     var fallbackMessage: String {
         switch self {
         case .signInRequired:
-            return "Sign in to stream Deepgram from your Cruxwing credits."
+            return "Войти, чтобы использовать Deepgram по кредитам orakul."
         case .creditCap(let message), .notConfigured(let message):
             return message
         case .transient(let status):

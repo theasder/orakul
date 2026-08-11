@@ -125,7 +125,7 @@ struct ArtifactValidatorTests {
             openQuestions: nil, risks: nil,
             continuity: [.init(commitment: "c", status: "kept")], parkingLot: nil, nextMeeting: nil)
         #expect(summary.markdown.contains("## TL;DR"))
-        #expect(summary.markdown.contains("OPEN"))
+        #expect(summary.markdown.contains("НЕ УКАЗАНО"))
         #expect(summary.markdown.contains("[kept] c"))
         #expect(StructuredArtifact.tasks(tasks).csv != nil)
         #expect(StructuredArtifact.summary(summary).csv == nil)

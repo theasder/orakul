@@ -62,7 +62,7 @@ struct TranscriptView: View {
                 }
                 .animation(Motion.spring, value: state.hasTranscriptSelection)
                 // The AppKit context menu cannot reach AppState directly, so the
-                // "Ask about this" item posts and the view forwards it.
+                // "Спросить об этом" item posts and the view forwards it.
                 .onReceive(NotificationCenter.default.publisher(for: .transcriptAskAboutSelection)) { _ in
                     state.askAboutTranscriptSelection()
                 }
@@ -74,7 +74,7 @@ struct TranscriptView: View {
         )) {
             TextField("Name", text: $renameText)
             Button("Rename") { applyRename() }
-            Button("Cancel", role: .cancel) { renamingSpeaker = nil }
+            Button("Отмена", role: .cancel) { renamingSpeaker = nil }
         } message: {
             Text("Every \"\(renamingSpeaker ?? "")\" line becomes this name — in the transcript and in what the AI sees.")
         }
@@ -130,7 +130,7 @@ private struct TranscriptSelectionBar: View {
             Text("Selection")
                 .font(Typo.callout)
                 .foregroundStyle(Theme.inkSecondary)
-            Button("Ask about this", action: onAsk)
+            Button("Спросить об этом", action: onAsk)
                 .buttonStyle(PrimaryButtonStyle())
             Button {
                 onClear()
@@ -139,7 +139,7 @@ private struct TranscriptSelectionBar: View {
                     .font(.system(size: 10, weight: .bold))
             }
             .buttonStyle(IconButtonStyle(size: 20))
-            .accessibilityLabel("Clear selection")
+            .accessibilityLabel("Снять выделение")
         }
         .padding(.horizontal, Space.l)
         .padding(.vertical, Space.s)
@@ -221,9 +221,9 @@ private struct TranscriptRow: View {
             TapGesture().modifiers(.shift).onEnded { onSelect(true) }
         )
         .contextMenu {
-            Button("Ask about this line") { onSelect(false); onAskAbout() }
+            Button("Спросить об этой реплике") { onSelect(false); onAskAbout() }
             if isSelected {
-                Button("Ask about the selection") { onAskAbout() }
+                Button("Спросить о выделенном") { onAskAbout() }
             }
             Divider()
             Button(isSelected ? "Deselect line" : "Select line") { onSelect(false) }
@@ -279,7 +279,7 @@ private struct TranscribingRow: View {
                 .fill(Theme.recordRed.opacity(0.4))
                 .frame(width: 2.5, height: 16)
             BreathingDots(tint: Theme.recordRed)
-            Text("Transcribing…")
+            Text("Расшифровываю…")
                 .font(Typo.caption)
                 .foregroundStyle(Theme.inkTertiary)
             Spacer()

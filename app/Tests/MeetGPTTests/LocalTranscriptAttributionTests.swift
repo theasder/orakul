@@ -29,7 +29,7 @@ struct LocalTranscriptAttributionTests {
         #expect(rendered.segments.allSatisfy { $0.speaker == nil })
 
         // Anonymous does not mean unusable: body ranges and exact quotes stay
-        // available to the selection-driven "Ask about this" workflow.
+        // available to the selection-driven "Спросить об этом" workflow.
         #expect(rendered.segments.count == 2)
         let quote = TranscriptTextRenderer.quote(
             for: rendered.segments[1].bodyRange,

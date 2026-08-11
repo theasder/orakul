@@ -142,8 +142,8 @@ struct SummaryArtifact: Codable, Equatable {
         if let actions, !actions.isEmpty {
             lines.append("\n## Action items")
             for action in actions {
-                let owner = action.owner ?? "OPEN"
-                let due = action.due ?? "OPEN"
+                let owner = action.owner ?? "НЕ УКАЗАНО"
+                let due = action.due ?? "НЕ УКАЗАНО"
                 let mark = action.tracked == true ? "TRACKED" : "NEW"
                 lines.append("- \(action.task) — **\(owner)** · \(due) · \(mark)")
             }

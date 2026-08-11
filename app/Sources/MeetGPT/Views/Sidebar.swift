@@ -62,7 +62,7 @@ struct Sidebar: View {
     private var brand: some View {
         HStack(spacing: Space.s) {
             AppMark()
-            Text("Cruxwing")
+            Text("orakul")
                 .font(Typo.title)
                 .foregroundStyle(Theme.ink)
             Spacer()
@@ -146,14 +146,14 @@ struct NewCallButton: View {
                 HStack(spacing: Space.s) {
                     Image(systemName: "square.and.pencil")
                         .font(.system(size: 12, weight: .semibold))
-                    Text("New call")
+                    Text("Новый звонок")
                     Spacer(minLength: 0)
                 }
             }
             .buttonStyle(QuietButtonStyle(prominent: true))
             .frame(maxWidth: .infinity, alignment: .leading)
             .help("Leave this saved call — it stays in History, and the workspace goes blank")
-            .accessibilityLabel("New call")
+            .accessibilityLabel("Новый звонок")
             .accessibilityHint("Closes the meeting opened from History and clears the workspace")
             .transition(.opacity)
         }
@@ -179,7 +179,7 @@ private struct HistorySection: View {
         if !state.savedSessions.isEmpty || state.canImportFromFireflies {
             VStack(alignment: .leading, spacing: Space.s) {
                 HStack(spacing: Space.xs) {
-                    SectionLabel("History")
+                    SectionLabel("История")
                     Spacer()
                     // Opening a call from History used to be a one-way door: the
                     // only way back to a blank workspace was starting a
@@ -193,7 +193,7 @@ private struct HistorySection: View {
                     .foregroundStyle(state.canStartNewCall ? Theme.accentText : Theme.inkTertiary)
                     .help("Start a new empty call — the current one is saved to History first")
                     .disabled(!state.canStartNewCall)
-                    .accessibilityLabel("New call")
+                    .accessibilityLabel("Новый звонок")
                     // Next to New call: both answer "give me a different
                     // meeting to work on", one from this Mac and one from
                     // Fireflies.
@@ -209,7 +209,7 @@ private struct HistorySection: View {
                         .foregroundStyle(Theme.accentText)
                         .help("Import a past call from Fireflies — its transcript opens here, "
                               + "ready for Blind Spots and questions")
-                        .accessibilityLabel("Import from Fireflies")
+                        .accessibilityLabel("Импорт из Fireflies")
                         .accessibilityHint("Choose a past Fireflies meeting to open as a saved call")
                     }
                     Button { confirmClear = true } label: {
@@ -220,7 +220,7 @@ private struct HistorySection: View {
                     .foregroundStyle(Theme.inkTertiary)
                     .help("Remove all saved meetings")
                     .disabled(state.isRecording)
-                    .accessibilityLabel("Clear all history")
+                    .accessibilityLabel("Очистить историю")
                 }
                 if state.savedSessions.isEmpty {
                     Text("No saved calls yet. Import one from Fireflies to look for blind spots in it.")
@@ -242,7 +242,7 @@ private struct HistorySection: View {
             .confirmationDialog("Remove all history?", isPresented: $confirmClear) {
                 Button("Remove all \(state.savedSessions.count) meeting\(state.savedSessions.count == 1 ? "" : "s")",
                        role: .destructive) { state.clearAllHistory() }
-                Button("Cancel", role: .cancel) {}
+                Button("Отмена", role: .cancel) {}
             } message: {
                 Text("This permanently deletes every saved meeting on this Mac. It can't be undone.")
             }
@@ -313,7 +313,7 @@ private struct LedgerSection: View {
         if state.ledgerConfigured {
             VStack(alignment: .leading, spacing: Space.s) {
                 HStack(spacing: Space.s) {
-                    SectionLabel("Decision Ledger")
+                    SectionLabel("Журнал решений")
                     Spacer()
                     if state.ledgerLoading {
                         ProgressView().controlSize(.small).scaleEffect(0.6)
@@ -394,7 +394,7 @@ struct SidebarFooter: View {
                     Text(state.wheesprEmail ?? "Signed in").font(Typo.caption)
                     Text("Plan: \(state.currentTier.label)").font(Typo.caption)
                     Divider()
-                    Button("Sign out") { state.signOutWheespr() }
+                    Button("Выйти") { state.signOutWheespr() }
                 } label: {
                     Image(systemName: "person.crop.circle.badge.checkmark")
                 }
@@ -410,7 +410,7 @@ struct SidebarFooter: View {
                     Image(systemName: "person.crop.circle")
                 }
                 .buttonStyle(IconButtonStyle())
-                .accessibilityLabel("Sign in")
+                .accessibilityLabel("Войти")
                 .help("Sign in to your account")
             }
         }
@@ -426,7 +426,7 @@ struct SidebarFooter: View {
                 Image(systemName: "gearshape")
             }
             .buttonStyle(IconButtonStyle())
-            .accessibilityLabel("Settings")
+            .accessibilityLabel("Настройки")
             .help("Settings (⌘,)")
         } else {
             Button {
@@ -435,7 +435,7 @@ struct SidebarFooter: View {
                 Image(systemName: "gearshape")
             }
             .buttonStyle(IconButtonStyle())
-            .accessibilityLabel("Settings")
+            .accessibilityLabel("Настройки")
             .help("Settings (⌘,)")
         }
     }

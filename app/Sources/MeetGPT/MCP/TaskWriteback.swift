@@ -35,14 +35,14 @@ enum TaskWriteback {
     static func describe(_ item: TasksArtifact.Item) -> String {
         var lines: [String] = []
         if let owner = item.owner, !owner.contains("[OWNER?]"), !owner.isEmpty {
-            lines.append("Owner: \(owner)")
+            lines.append("Владелец: \(owner)")
         }
         if let due = item.due, !due.contains("[DUE?]"), !due.isEmpty {
-            lines.append("Due: \(due)")
+            lines.append("Срок: \(due)")
         }
-        if let check = item.doneCheck, !check.isEmpty { lines.append("Done when: \(check)") }
-        if let ref = item.sourceRef, !ref.isEmpty { lines.append("Source: \(ref)") }
-        lines.append("Filed from a Cruxwing meeting.")
+        if let check = item.doneCheck, !check.isEmpty { lines.append("Готово, когда: \(check)") }
+        if let ref = item.sourceRef, !ref.isEmpty { lines.append("Источник: \(ref)") }
+        lines.append("Заведено со звонка в orakul.")
         return lines.joined(separator: "\n")
     }
 

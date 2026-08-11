@@ -33,14 +33,14 @@ struct PaywallViewTests {
     func introStage() throws {
         let view = PaywallView().environmentObject(AppState(llm: MockLLMGateway(response: "")))
         let sut = try view.inspect()
-        #expect(throws: Never.self) { try sut.find(text: "Cruxwing plans") }
-        #expect(throws: Never.self) { try sut.find(text: "Continue with Free") }
+        #expect(throws: Never.self) { try sut.find(text: "Тарифы orakul") }
+        #expect(throws: Never.self) { try sut.find(text: "Остаться на бесплатном") }
         #expect(throws: Never.self) { try sut.find(text: "See plans") }
         // A benefit line is present; the pricing-stage title is not (still intro).
         #expect(throws: Never.self) {
             try sut.find(text: "Councils are explicit, on-demand actions")
         }
-        #expect(throws: (any Error).self) { try sut.find(text: "Choose your plan") }
+        #expect(throws: (any Error).self) { try sut.find(text: "Выберите тариф") }
         #expect(throws: Never.self) {
             _ = try sut.find(viewWithAccessibilityIdentifier: "paywall.see-plans")
         }

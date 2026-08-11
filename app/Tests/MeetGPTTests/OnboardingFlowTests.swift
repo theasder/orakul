@@ -1014,10 +1014,10 @@ struct CaptureCheckStepTests {
         let view = try inspected()
         let scroll = try view.find(ViewType.ScrollView.self)
         #expect(throws: (any Error).self, "Continue must NOT be inside the scroll") {
-            _ = try scroll.find(button: "Continue")
+            _ = try scroll.find(button: "Продолжить")
         }
         #expect(throws: Never.self, "Continue must still exist on the screen") {
-            _ = try view.find(button: "Continue")
+            _ = try view.find(button: "Продолжить")
         }
     }
 

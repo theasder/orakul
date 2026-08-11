@@ -58,7 +58,7 @@ struct PaywallView: View {
 
     private var intro: some View {
         VStack(alignment: .leading, spacing: Space.l) {
-            Label("Cruxwing plans", systemImage: "sparkles")
+            Label("Тарифы orakul", systemImage: "sparkles")
                 .font(Typo.title).foregroundStyle(Theme.ink)
             VStack(alignment: .leading, spacing: Space.s) {
                 benefit("waveform", "Every meeting transcribed — any app, even offline")
@@ -67,7 +67,7 @@ struct PaywallView: View {
                 benefit("person.2.wave.2", "Councils are explicit, on-demand actions")
             }
             HStack {
-                Button("Continue with Free") {
+                Button("Остаться на бесплатном") {
                     Task { await continueWithFree() }
                 }
                 .buttonStyle(QuietButtonStyle())
@@ -81,7 +81,7 @@ struct PaywallView: View {
 
     private var pricing: some View {
         VStack(alignment: .leading, spacing: Space.l) {
-            Label("Choose your plan", systemImage: "creditcard")
+            Label("Выберите тариф", systemImage: "creditcard")
                 .font(Typo.title).foregroundStyle(Theme.ink)
 
             if let offer = Self.featuredOffer(plans) {
@@ -90,11 +90,11 @@ struct PaywallView: View {
 
             Picker("", selection: $interval) {
                 Text("Monthly").tag("month")
-                Text("Annual · save 2+ months").tag("year")
+                Text("Год · два месяца в подарок").tag("year")
             }
             .pickerStyle(.segmented)
             .labelsHidden()
-            .accessibilityLabel("Billing interval")
+            .accessibilityLabel("Период оплаты")
 
             if loadingPlans {
                 HStack {
@@ -115,7 +115,7 @@ struct PaywallView: View {
 
             if !addOns.isEmpty {
                 VStack(alignment: .leading, spacing: Space.s) {
-                    SectionLabel("Add-ons")
+                    SectionLabel("Дополнения")
                     Text("Add compute, co-pilot time, or cloud transcription only when you need it. Support activates packs during early access.")
                         .font(Typo.caption).foregroundStyle(Theme.inkTertiary)
                     ForEach(Self.featuredAddOns(addOns)) { addOn in
@@ -134,7 +134,7 @@ struct PaywallView: View {
             promoField
 
             HStack {
-                Button("Not now") {
+                Button("Не сейчас") {
                     Config.paywallChoiceMade = true
                     dismiss()
                 }
@@ -212,7 +212,7 @@ struct PaywallView: View {
                 .background(Theme.surface, in: RoundedRectangle(cornerRadius: Radius.s, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: Radius.s, style: .continuous).strokeBorder(Theme.hairline, lineWidth: 1))
                 .disabled(codeSent)
-                .accessibilityLabel("Email address")
+                .accessibilityLabel("Адрес почты")
             if codeSent {
                 TextField("", text: $code, prompt: Text("6-digit code"))
                     .textFieldStyle(.plain).padding(Space.m)
@@ -224,7 +224,7 @@ struct PaywallView: View {
                 Text(signInError).font(Typo.caption).foregroundStyle(Theme.recordRed)
             }
             HStack {
-                Button("Back") { stage = .pricing }.buttonStyle(QuietButtonStyle())
+                Button("Назад") { stage = .pricing }.buttonStyle(QuietButtonStyle())
                 Spacer()
                 Button(signingIn ? "Working…" : (codeSent ? "Verify & continue" : "Send code")) {
                     Task { await signInStep() }
@@ -243,7 +243,7 @@ struct PaywallView: View {
                 .font(Typo.headline).foregroundStyle(Theme.ink)
             Text("This screen updates automatically once Stripe confirms.")
                 .font(Typo.caption).foregroundStyle(Theme.inkTertiary)
-            Button("Cancel") { stage = .pricing }.buttonStyle(QuietButtonStyle())
+            Button("Отмена") { stage = .pricing }.buttonStyle(QuietButtonStyle())
         }
         .frame(maxWidth: .infinity)
     }
@@ -273,12 +273,12 @@ struct PaywallView: View {
                 .font(Typo.title).foregroundStyle(Theme.recordRed)
             Text(message).font(Typo.callout).foregroundStyle(Theme.inkSecondary)
             HStack {
-                Button("Continue with Free") {
+                Button("Остаться на бесплатном") {
                     Task { await continueWithFree() }
                 }
                 .buttonStyle(QuietButtonStyle())
                 Spacer()
-                Button("Try again") { stage = .pricing }.buttonStyle(PrimaryButtonStyle())
+                Button("Ещё раз") { stage = .pricing }.buttonStyle(PrimaryButtonStyle())
             }
         }
     }

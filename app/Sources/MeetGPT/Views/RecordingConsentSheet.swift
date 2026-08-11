@@ -14,7 +14,7 @@ struct RecordingConsentSheet: View {
                 Image(systemName: "waveform.badge.exclamationmark")
                     .font(.system(size: 26, weight: .medium))
                     .foregroundStyle(Theme.accent)
-                Text("Before you record")
+                Text("Перед записью")
                     .font(Typo.title)
                     .foregroundStyle(Theme.ink)
             }
@@ -34,7 +34,7 @@ struct RecordingConsentSheet: View {
                 Link("Terms", destination: URL(string: "https://cruxwing.com/terms")!)
                     .font(Typo.caption)
                 Spacer()
-                Button("Not now") { dismiss() }
+                Button("Не сейчас") { dismiss() }
                     .buttonStyle(QuietButtonStyle())
                 Button("I understand — start recording") {
                     state.acceptRecordingConsent()

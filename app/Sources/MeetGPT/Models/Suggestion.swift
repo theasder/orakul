@@ -75,7 +75,7 @@ enum SuggestionKind: String, Codable {
 
     var label: String {
         switch self {
-        case .question:    return "Ask"
+        case .question:    return "Спросить"
         case .risk:        return "Risk"
         case .missingInfo: return "Missing"
         case .advice:      return "Advice"

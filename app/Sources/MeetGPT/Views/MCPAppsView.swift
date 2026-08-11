@@ -35,7 +35,7 @@ struct MCPAppsSection: View {
                             .foregroundStyle(Theme.inkTertiary)
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Clear search")
+                    .accessibilityLabel("Очистить поиск")
                     .accessibilityIdentifier("settings.connected.search.clear")
                 }
             }
@@ -58,7 +58,7 @@ struct MCPAppsSection: View {
                 Button {
                     showAddCustom = true
                 } label: {
-                    Label("Add custom server…", systemImage: "plus")
+                    Label("Добавить свой сервер…", systemImage: "plus")
                 }
                 .buttonStyle(QuietButtonStyle())
                 .accessibilityIdentifier("settings.connected.add-custom")
@@ -109,7 +109,7 @@ private struct MCPServerRow: View {
                     // because OAuth may rotate/save its token after this click.
                     // Name that destructive outcome honestly; a first-time
                     // attempt, which has no grant to lose, remains Cancel.
-                    let stopTitle = mcp.isAuthorized(server.id) ? "Disconnect" : "Cancel"
+                    let stopTitle = mcp.isAuthorized(server.id) ? "Отключить" : "Отмена"
                     Button(stopTitle) { Task { await mcp.disconnect(server) } }
                         .buttonStyle(QuietButtonStyle())
                         .accessibilityIdentifier(
@@ -121,11 +121,11 @@ private struct MCPServerRow: View {
                         .accessibilityIdentifier(
                             "settings.connected.provider.\(server.id).disconnecting")
                 case .connected:
-                    Button("Disconnect") { Task { await mcp.disconnect(server) } }
+                    Button("Отключить") { Task { await mcp.disconnect(server) } }
                         .buttonStyle(QuietButtonStyle())
                         .accessibilityIdentifier("settings.connected.provider.\(server.id).disconnect")
                 default:
-                    Button(mcp.isAuthorized(server.id) ? "Reconnect" : "Connect") {
+                    Button(mcp.isAuthorized(server.id) ? "Reconnect" : "Подключить") {
                         Task { await mcp.connect(server) }
                     }
                     .buttonStyle(QuietButtonStyle(prominent: true))
@@ -190,7 +190,7 @@ private struct MCPAddServerSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.l) {
-            Label("Add MCP server", systemImage: "puzzlepiece.extension")
+            Label("Добавить MCP-сервер", systemImage: "puzzlepiece.extension")
                 .font(Typo.title).foregroundStyle(Theme.ink)
             Text("Paste the Streamable HTTP endpoint of any MCP server (https). Cruxwing connects with standard OAuth — no keys needed if the server supports dynamic client registration.")
                 .font(Typo.callout).foregroundStyle(Theme.inkSecondary)
@@ -198,13 +198,13 @@ private struct MCPAddServerSheet: View {
                 .textFieldStyle(.plain).padding(Space.m)
                 .background(Theme.surface, in: RoundedRectangle(cornerRadius: Radius.s, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: Radius.s, style: .continuous).strokeBorder(Theme.hairline, lineWidth: 1))
-                .accessibilityLabel("Custom server name")
+                .accessibilityLabel("Имя своего сервера")
                 .accessibilityIdentifier("settings.connected.custom.name")
             TextField("", text: $urlString, prompt: Text("https://mcp.example.com/mcp"))
                 .textFieldStyle(.plain).padding(Space.m)
                 .background(Theme.surface, in: RoundedRectangle(cornerRadius: Radius.s, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: Radius.s, style: .continuous).strokeBorder(Theme.hairline, lineWidth: 1))
-                .accessibilityLabel("Custom server URL")
+                .accessibilityLabel("Адрес своего сервера")
                 .accessibilityIdentifier("settings.connected.custom.url")
             if invalid {
                 Text("Enter a name and a valid https:// URL.")
@@ -213,10 +213,10 @@ private struct MCPAddServerSheet: View {
             }
             HStack {
                 Spacer()
-                Button("Cancel") { dismiss() }
+                Button("Отмена") { dismiss() }
                     .buttonStyle(QuietButtonStyle())
                     .accessibilityIdentifier("settings.connected.custom.cancel")
-                Button("Add") {
+                Button("Добавить") {
                     if mcp.addCustomServer(name: name, urlString: urlString) {
                         dismiss()
                     } else {
@@ -260,7 +260,7 @@ struct MCPImportSheet: View {
                 .font(Typo.title).foregroundStyle(Theme.ink)
 
             Picker("App", selection: $serverID) {
-                Text("Choose…").tag("")
+                Text("Выбрать…").tag("")
                 ForEach(mcp.servers) { server in
                     Text(server.name).tag(server.id)
                 }
@@ -278,7 +278,7 @@ struct MCPImportSheet: View {
             if let server {
                 if mcp.isConnected(server.id) {
                     Picker("Tool", selection: $toolName) {
-                        Text("Choose…").tag("")
+                        Text("Выбрать…").tag("")
                         ForEach(tools, id: \.name) { tool in
                             Text(tool.name).tag(tool.name)
                         }
@@ -313,7 +313,7 @@ struct MCPImportSheet: View {
 
             HStack {
                 Spacer()
-                Button("Cancel") { dismiss() }
+                Button("Отмена") { dismiss() }
                     .buttonStyle(QuietButtonStyle())
                     .accessibilityIdentifier("connected-import.cancel")
                 Button(running ? "Running…" : "Import") { run() }

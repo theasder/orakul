@@ -29,7 +29,7 @@ struct MenuBarView: View {
             // The real app icon, not an SF Symbol standing in for it. This row is
             // the app's only brand moment while the main window is hidden behind a
             // meeting, and `brain.head.profile` is a generic glyph — it said "an AI
-            // thing", not "Cruxwing".
+            // thing", not "orakul".
             //
             // Read from the bundle rather than bundling an SVG: SwiftUI cannot load
             // SVG without a rasterisation step, and AppIcon.icns is already shipped
@@ -46,7 +46,7 @@ struct MenuBarView: View {
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(Theme.accentText)
             }
-            Text("Cruxwing")
+            Text("orakul")
                 .font(Typo.headline)
                 .foregroundStyle(Theme.ink)
             Spacer()

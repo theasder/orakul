@@ -34,10 +34,10 @@ struct SettingsView: View {
                 .tabItem { Label("AI", systemImage: "sparkles") }
                 .tag(SettingsTab.ai)
             ConnectedAppsTab()
-                .tabItem { Label("Connected Apps", systemImage: "app.connected.to.app.below.fill") }
+                .tabItem { Label("Рабочие приложения", systemImage: "app.connected.to.app.below.fill") }
                 .tag(SettingsTab.connectedApps)
             AccountPrivacyTab()
-                .tabItem { Label("Account & Privacy", systemImage: "person.badge.key") }
+                .tabItem { Label("Аккаунт и приватность", systemImage: "person.badge.key") }
                 .tag(SettingsTab.accountPrivacy)
         }
         .background(Theme.canvas)
@@ -62,7 +62,7 @@ private struct GeneralSettingsTab: View {
             SettingsSection(title: "Appearance",
                             caption: "Auto follows your Mac's appearance; Light and Dark override it.") {
                 SettingsRow {
-                    Label("Theme", systemImage: "circle.lefthalf.filled")
+                    Label("Оформление", systemImage: "circle.lefthalf.filled")
                         .labelStyle(SettingLabelStyle())
                     Spacer()
                     Picker("", selection: $appearance) {
@@ -70,11 +70,11 @@ private struct GeneralSettingsTab: View {
                     }
                     .labelsHidden().pickerStyle(.menu).fixedSize()
                     .onChange(of: appearance) { state.setAppearance($0) }
-                    .accessibilityLabel("Theme")
+                    .accessibilityLabel("Оформление")
                     .accessibilityIdentifier("settings.general.theme")
                 }
                 SettingsRow {
-                    Label("Reading text size", systemImage: "textformat.size")
+                    Label("Размер текста", systemImage: "textformat.size")
                         .labelStyle(SettingLabelStyle())
                     Spacer()
                     // Applies to the transcript and the assistant answer only.
@@ -88,7 +88,7 @@ private struct GeneralSettingsTab: View {
                     }
                     .labelsHidden().pickerStyle(.menu).fixedSize()
                     .onChange(of: readingScale) { state.readingTextScale = $0 }
-                    .accessibilityLabel("Reading text size")
+                    .accessibilityLabel("Размер текста")
                     .accessibilityIdentifier("settings.general.readingTextSize")
                 }
             }
@@ -105,7 +105,7 @@ private struct GeneralSettingsTab: View {
                     Label("Show the setup guide again", systemImage: "arrow.counterclockwise")
                         .labelStyle(SettingLabelStyle())
                     Spacer()
-                    Button("Show") { state.replayOnboarding() }
+                    Button("Показать") { state.replayOnboarding() }
                         .accessibilityIdentifier("settings.general.replayOnboarding")
                 }
             }
@@ -113,7 +113,7 @@ private struct GeneralSettingsTab: View {
             SettingsSection(title: "Profile",
                             caption: "Your role tailors every AI action's method — a PM's summary differs from a founder's. Pick one, or write your own. Also switchable from the sidebar chip.") {
                 SettingsRow {
-                    Label("Your role", systemImage: "person.text.rectangle")
+                    Label("Ваша роль", systemImage: "person.text.rectangle")
                         .labelStyle(SettingLabelStyle())
                     Spacer()
                     Picker("", selection: $state.userRoleID) {
@@ -127,7 +127,7 @@ private struct GeneralSettingsTab: View {
                     }
                     .labelsHidden().pickerStyle(.menu)
                     .frame(maxWidth: 240)
-                    .accessibilityLabel("Your role")
+                    .accessibilityLabel("Ваша роль")
                     .accessibilityIdentifier("settings.general.role")
                 }
                 if state.userRoleID == RoleSkillMatrix.customRoleID {
@@ -143,7 +143,7 @@ private struct GeneralSettingsTab: View {
                             .overlay(RoundedRectangle(cornerRadius: Radius.s, style: .continuous)
                                 .strokeBorder(Theme.hairline, lineWidth: 1))
                             .onChange(of: customRole) { Config.userCustomRole = $0 }
-                            .accessibilityLabel("Custom role")
+                            .accessibilityLabel("Своя роль")
                             .accessibilityIdentifier("settings.general.custom-role")
                     }
                 }
@@ -152,13 +152,13 @@ private struct GeneralSettingsTab: View {
             SettingsSection(title: "During calls",
                             caption: "Cruxwing can notice when a meeting app becomes active and offer to start recording.") {
                 SettingsRow {
-                    Label("Notify me about calls", systemImage: "bell.badge")
+                    Label("Сообщать о звонках", systemImage: "bell.badge")
                         .labelStyle(SettingLabelStyle())
                     Spacer()
                     Toggle("", isOn: $callDetection)
                         .labelsHidden().toggleStyle(.switch)
                         .onChange(of: callDetection) { Config.callDetectionEnabled = $0; state.applyCallDetectionSettings() }
-                        .accessibilityLabel("Notify me about calls")
+                        .accessibilityLabel("Сообщать о звонках")
                         .accessibilityIdentifier("settings.general.call-detection")
                 }
                 SettingsRow {
@@ -177,13 +177,13 @@ private struct GeneralSettingsTab: View {
             SettingsSection(title: "During calls",
                             caption: "A silent banner when a new blind spot lands and Cruxwing is in the background — text, never a sound.") {
                 SettingsRow {
-                    Label("Blind-spot banners", systemImage: "bell.badge")
+                    Label("Плашки слепых зон", systemImage: "bell.badge")
                         .labelStyle(SettingLabelStyle())
                     Spacer()
                     Toggle("", isOn: $blindSpotBanners)
                         .labelsHidden().toggleStyle(.switch)
                         .onChange(of: blindSpotBanners) { Config.blindSpotTextNotificationsEnabled = $0 }
-                        .accessibilityLabel("Blind-spot banners")
+                        .accessibilityLabel("Плашки слепых зон")
                         .accessibilityIdentifier("settings.general.blindSpotBanners")
                 }
             }
@@ -193,13 +193,13 @@ private struct GeneralSettingsTab: View {
                                 ? "Reminders fire ahead of calendar meetings."
                                 : "Reminders need Google Calendar — connect it in the Connected Apps tab.") {
                 SettingsRow {
-                    Label("Remind me before meetings", systemImage: "bell.and.waves.left.and.right")
+                    Label("Напоминать перед встречами", systemImage: "bell.and.waves.left.and.right")
                         .labelStyle(SettingLabelStyle())
                     Spacer()
                     Toggle("", isOn: $reminders)
                         .labelsHidden().toggleStyle(.switch)
                         .onChange(of: reminders) { Config.meetingRemindersEnabled = $0; state.applyReminderSettings() }
-                        .accessibilityLabel("Remind me before meetings")
+                        .accessibilityLabel("Напоминать перед встречами")
                         .accessibilityIdentifier("settings.general.reminders")
                 }
                 SettingsRow {
@@ -286,13 +286,13 @@ private struct TranscriptionSettingsTab: View {
                 SettingsSection(title: "Microphone",
                                 caption: "Optional Apple voice processing reduces echo and background noise, but can lower speaker playback while recording. Leave it off for unchanged volume; headphones avoid that trade-off. Applies on your next recording.") {
                     SettingsRow {
-                        Label("Apple noise & echo reduction", systemImage: "waveform.badge.mic")
+                        Label("Шумоподавление Apple", systemImage: "waveform.badge.mic")
                             .labelStyle(SettingLabelStyle())
                         Spacer()
                         Toggle("", isOn: $micNoiseSuppression)
                             .labelsHidden().toggleStyle(.switch)
                             .onChange(of: micNoiseSuppression) { Config.micNoiseSuppressionEnabled = $0 }
-                            .accessibilityLabel("Apple noise and echo reduction")
+                            .accessibilityLabel("Шумоподавление Apple")
                             .accessibilityIdentifier("settings.transcription.aec")
                     }
                 }
@@ -300,13 +300,13 @@ private struct TranscriptionSettingsTab: View {
                 SettingsSection(title: "Fireflies enhance",
                                 caption: "When Fireflies is connected, merge its cloud transcript with on-device Whisper after the call (and when you import Fireflies). The LLM also uses connected apps (Notion, CRM, trackers) to correct names and project terms — Whisper timing, Fireflies speakers, connector spellings.") {
                     SettingsRow {
-                        Label("Enhance transcript with Fireflies", systemImage: "flame")
+                        Label("Дополнять транскрипт из Fireflies", systemImage: "flame")
                             .labelStyle(SettingLabelStyle())
                         Spacer()
                         Toggle("", isOn: $firefliesEnhance)
                             .labelsHidden().toggleStyle(.switch)
                             .onChange(of: firefliesEnhance) { Config.firefliesTranscriptEnhanceEnabled = $0 }
-                            .accessibilityLabel("Enhance transcript with Fireflies")
+                            .accessibilityLabel("Дополнять транскрипт из Fireflies")
                             .accessibilityIdentifier("settings.transcription.fireflies-enhance")
                     }
                 }
@@ -334,13 +334,13 @@ private struct TranscriptionSettingsTab: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     SettingsRow {
-                        Label("Adaptive performance", systemImage: "speedometer")
+                        Label("Подстройка под машину", systemImage: "speedometer")
                             .labelStyle(SettingLabelStyle())
                         Spacer()
                         Toggle("", isOn: $adaptiveLocal)
                             .labelsHidden().toggleStyle(.switch)
                             .onChange(of: adaptiveLocal) { Config.adaptiveLocalWhisperEnabled = $0 }
-                            .accessibilityLabel("Adaptive transcription performance")
+                            .accessibilityLabel("Подстройка распознавания")
                             .accessibilityIdentifier("settings.transcription.adaptive")
                     }
                     Text("If captions repeatedly fall behind, Cruxwing selects the next lighter validated local model for the next recording. At Base, it can offer Deepgram, but never switches to cloud without your choice.")
@@ -353,13 +353,13 @@ private struct TranscriptionSettingsTab: View {
                     SettingsSection(title: "Post-call speaker labels",
                                     caption: "Optional AssemblyAI processing. Applies on your next recording: Cruxwing retains its remote audio track, then uploads only after you press Diarize—never as a live fallback.") {
                         SettingsRow {
-                            Label("Allow cloud diarization", systemImage: "person.2.wave.2")
+                            Label("Разрешить облачное определение говорящих", systemImage: "person.2.wave.2")
                                 .labelStyle(SettingLabelStyle())
                             Spacer()
                             Toggle("", isOn: $assemblyDiarization)
                                 .labelsHidden().toggleStyle(.switch)
                                 .onChange(of: assemblyDiarization) { Config.assemblyAIDiarizationEnabled = $0 }
-                                .accessibilityLabel("Allow cloud diarization")
+                                .accessibilityLabel("Разрешить облачное определение говорящих")
                                 .accessibilityIdentifier("settings.transcription.assembly-diarization")
                         }
                     }
@@ -389,7 +389,7 @@ private struct TranscriptionSettingsTab: View {
                             Config.transcriptionGlossary = $0
                             state.noteConnectedGlossaryManualEdit($0)
                         }
-                        .accessibilityLabel("Custom transcription vocabulary")
+                        .accessibilityLabel("Свой словарь распознавания")
                         .accessibilityIdentifier("settings.transcription.glossary")
                     if !glossary.isEmpty {
                         Text("\(Config.glossaryTerms.count) term\(Config.glossaryTerms.count == 1 ? "" : "s") active")
@@ -433,7 +433,7 @@ private struct TranscriptionSettingsTab: View {
                             Text("Connect a readable app first.")
                                 .font(Typo.caption).foregroundStyle(Theme.inkTertiary)
                             Spacer()
-                            Button("Connected Apps") { state.selectedSettingsTab = .connectedApps }
+                            Button("Рабочие приложения") { state.selectedSettingsTab = .connectedApps }
                                 .buttonStyle(.link)
                                 .accessibilityIdentifier("settings.transcription.glossary-suggestions.open-apps")
                         }
@@ -460,12 +460,12 @@ private struct TranscriptionSettingsTab: View {
                                         .fixedSize(horizontal: false, vertical: true)
                                 }
                                 Spacer(minLength: Space.s)
-                                Button("Dismiss") {
+                                Button("Скрыть") {
                                     state.rejectConnectedGlossarySuggestion(id: suggestion.id)
                                 }
                                 .buttonStyle(.borderless)
                                 .accessibilityLabel("Dismiss \(suggestion.term)")
-                                Button("Add") {
+                                Button("Добавить") {
                                     if state.acceptConnectedGlossarySuggestion(id: suggestion.id) {
                                         glossary = Config.transcriptionGlossary
                                     }
@@ -482,7 +482,7 @@ private struct TranscriptionSettingsTab: View {
                                     .font(Typo.caption).foregroundStyle(Theme.inkTertiary)
                             }
                             Spacer()
-                            Button("Dismiss all") {
+                            Button("Скрыть все") {
                                 state.rejectAllConnectedGlossarySuggestions()
                             }
                             .buttonStyle(.link)
@@ -561,61 +561,61 @@ private struct AISettingsTab: View {
                 ModelSelectionRows()
             }
 
-            SettingsSection(title: "Co-pilot",
+            SettingsSection(title: "Ко-пилот",
                             caption: "While recording, Brainstorm surfaces blind spots from your goal + transcript. Each scan uses Free 1 · Pro 3 · Premium 4 · Ultra 5 credits. Connected apps use the separate grounded-cycle allowance; larger context is size-metered. Optional watches share one hourly budget, so turning one off makes Blind Spot refresh sooner. Pro probes 2 workflows · Premium 3 · Ultra 4 per scan. Off stops the spend.") {
                 SettingsRow {
-                    Label("Brainstorm during calls", systemImage: "lightbulb")
+                    Label("Мозговой штурм на звонке", systemImage: "lightbulb")
                         .labelStyle(SettingLabelStyle())
                     Spacer()
                     Toggle("", isOn: Binding(
                         get: { state.blindSpotsEnabled },
                         set: { state.setBlindSpotsEnabled($0) }))
                         .labelsHidden().toggleStyle(.switch)
-                        .accessibilityLabel("Brainstorm during calls")
+                        .accessibilityLabel("Мозговой штурм на звонке")
                         .accessibilityIdentifier("settings.ai.brainstorm")
                 }
                 SettingsRow {
-                    Label("Agenda & framing checks", systemImage: "scope")
+                    Label("Повестка и рамка", systemImage: "scope")
                         .labelStyle(SettingLabelStyle())
                     Spacer()
                     Toggle("", isOn: Binding(
                         get: { state.agendaCheckingEnabled },
                         set: { state.setAgendaCheckingEnabled($0) }))
                         .labelsHidden().toggleStyle(.switch)
-                        .accessibilityLabel("Agenda and framing checks")
+                        .accessibilityLabel("Повестка и рамка")
                         .accessibilityIdentifier("settings.ai.agenda")
                 }
                 SettingsRow {
-                    Label("Fact-check during calls", systemImage: "checkmark.seal")
+                    Label("Проверка фактов на звонке", systemImage: "checkmark.seal")
                         .labelStyle(SettingLabelStyle())
                     Spacer()
                     Toggle("", isOn: Binding(
                         get: { state.liveFactCheckingEnabled },
                         set: { state.setFactCheckDuringCallsEnabled($0) }))
                         .labelsHidden().toggleStyle(.switch)
-                        .accessibilityLabel("Fact-check during calls")
+                        .accessibilityLabel("Проверка фактов на звонке")
                         .accessibilityIdentifier("settings.ai.fact-check")
                 }
                 SettingsRow {
-                    Label("Rhetoric watch during calls", systemImage: "text.badge.xmark")
+                    Label("Слежу за риторикой", systemImage: "text.badge.xmark")
                         .labelStyle(SettingLabelStyle())
                     Spacer()
                     Toggle("", isOn: Binding(
                         get: { state.rhetoricWatchEnabled },
                         set: { state.setRhetoricDuringCallsEnabled($0) }))
                         .labelsHidden().toggleStyle(.switch)
-                        .accessibilityLabel("Rhetoric watch during calls")
+                        .accessibilityLabel("Слежу за риторикой")
                         .accessibilityIdentifier("settings.ai.rhetoric")
                 }
                 SettingsRow {
-                    Label("Facilitation watch during calls", systemImage: "location.north.line")
+                    Label("Слежу за ходом звонка", systemImage: "location.north.line")
                         .labelStyle(SettingLabelStyle())
                     Spacer()
                     Toggle("", isOn: Binding(
                         get: { state.facilitationWatchEnabled },
                         set: { state.setFacilitationDuringCallsEnabled($0) }))
                         .labelsHidden().toggleStyle(.switch)
-                        .accessibilityLabel("Facilitation watch during calls")
+                        .accessibilityLabel("Слежу за ходом звонка")
                         .accessibilityIdentifier("settings.ai.facilitation")
                 }
             }
@@ -701,11 +701,11 @@ private struct OwnMCPCard: View {
                     copied = true
                     Task { try? await Task.sleep(nanoseconds: 1_500_000_000); copied = false }
                 } label: {
-                    Label(copied ? "Copied" : "Copy", systemImage: copied ? "checkmark" : "doc.on.doc")
+                    Label(copied ? "Copied" : "Скопировать", systemImage: copied ? "checkmark" : "doc.on.doc")
                         .font(Typo.caption.weight(.medium))
                 }
                 .buttonStyle(QuietButtonStyle())
-                .accessibilityLabel("Copy MCP URL")
+                .accessibilityLabel("Скопировать адрес MCP")
             }
 
             VStack(alignment: .leading, spacing: Space.xs) {
@@ -752,7 +752,7 @@ private struct AccountPrivacyTab: View {
 
                 if state.wheesprConnected {
                     SettingsRow {
-                        Label("Delete account", systemImage: "trash")
+                        Label("Удалить аккаунт", systemImage: "trash")
                             .labelStyle(SettingLabelStyle())
                         Spacer()
                         Button(deleting ? "Deleting…" : "Delete…", role: .destructive) {
@@ -782,13 +782,13 @@ private struct AccountPrivacyTab: View {
             SettingsSection(title: "Remove secrets before sending",
                             caption: "Card numbers, API keys, government ID numbers and labelled credentials are stripped from anything sent to an AI provider. Detection is structural — a card must pass a checksum, a key must carry a known prefix — so ordinary meeting numbers like dates, prices and room numbers are left alone. A request is never blocked: the secret is removed and the rest is sent.") {
                 SettingsRow {
-                    Label("Filter outbound requests", systemImage: "eye.slash")
+                    Label("Фильтровать исходящие запросы", systemImage: "eye.slash")
                         .labelStyle(SettingLabelStyle())
                     Spacer()
                     Toggle("", isOn: $outboundRedaction)
                         .labelsHidden()
                         .onChange(of: outboundRedaction) { Config.outboundRedactionEnabled = $0 }
-                        .accessibilityLabel("Filter outbound requests")
+                        .accessibilityLabel("Фильтровать исходящие запросы")
                         .accessibilityIdentifier("settings.privacy.outbound-redaction")
                 }
                 SettingsRow {
@@ -825,13 +825,13 @@ private struct AccountPrivacyTab: View {
             SettingsSection(title: "Usage analytics",
                             caption: "Anonymous, cookieless product events (which screens you reach, which actions you run) — no account, no meeting content, no cross-app tracking. Helps us see where the app helps or gets in the way. Turn off to send nothing.") {
                 SettingsRow {
-                    Label("Share anonymous usage data", systemImage: "chart.bar.xaxis")
+                    Label("Отправлять обезличенную статистику", systemImage: "chart.bar.xaxis")
                         .labelStyle(SettingLabelStyle())
                     Spacer()
                     Toggle("", isOn: $shareAnalytics)
                         .labelsHidden().toggleStyle(.switch)
                         .onChange(of: shareAnalytics) { Config.funnelOptOut = !$0 }
-                        .accessibilityLabel("Share anonymous usage data")
+                        .accessibilityLabel("Отправлять обезличенную статистику")
                         .accessibilityIdentifier("settings.privacy.analytics")
                 }
             }
@@ -840,7 +840,7 @@ private struct AccountPrivacyTab: View {
                 SettingsSection(title: "Developer",
                                 caption: "Dev builds only — dist builds bake this section out. The preview drives the real gates (model catalog, co-pilot hours, compute credits, grounded cycles), so the app behaves exactly as a user on that plan. \"Real entitlement\" returns to your actual plan.") {
                     SettingsRow {
-                        Label("Preview plan", systemImage: "wrench.and.screwdriver")
+                        Label("Посмотреть тариф", systemImage: "wrench.and.screwdriver")
                             .labelStyle(SettingLabelStyle())
                         Spacer()
                         Picker("", selection: $devTierPreview) {
@@ -852,7 +852,7 @@ private struct AccountPrivacyTab: View {
                         .labelsHidden()
                         .frame(width: 170)
                         .onChange(of: devTierPreview) { state.setDevTierOverride(Tier(rawValue: $0)) }
-                        .accessibilityLabel("Preview plan")
+                        .accessibilityLabel("Посмотреть тариф")
                         .accessibilityIdentifier("settings.developer.preview-plan")
                     }
                     if let preview = Tier(rawValue: devTierPreview) {
@@ -877,14 +877,14 @@ private struct AccountPrivacyTab: View {
         }
         .sheet(isPresented: $showSignIn) { SignInSheet() }
         .confirmationDialog("Delete your account?", isPresented: $confirmDelete) {
-            Button("Delete account and all data", role: .destructive) {
+            Button("Удалить аккаунт и все данные", role: .destructive) {
                 deleting = true
                 Task {
                     _ = await state.deleteAccount()
                     deleting = false
                 }
             }
-            Button("Cancel", role: .cancel) {}
+            Button("Отмена", role: .cancel) {}
         } message: {
             Text("This permanently removes your account, sessions, and plan from the server. Meetings saved on this Mac are not affected.")
         }
@@ -1017,14 +1017,14 @@ private struct GoogleSignInRow: View {
                 Spacer()
                 if state.googleConnecting {
                     ProgressView().controlSize(.small)
-                    Text("Connecting…")
+                    Text("Подключаюсь…")
                         .font(Typo.caption)
                         .foregroundStyle(Theme.inkSecondary)
-                    Button("Cancel") { state.cancelGoogleConnection() }
+                    Button("Отмена") { state.cancelGoogleConnection() }
                         .buttonStyle(QuietButtonStyle())
                         .accessibilityIdentifier("settings.connected.google.cancel")
                 } else if state.googleConnected {
-                    Button("Disconnect") { state.disconnectGoogle() }
+                    Button("Отключить") { state.disconnectGoogle() }
                         .buttonStyle(QuietButtonStyle())
                         .accessibilityIdentifier("settings.connected.google.disconnect")
                 } else {
@@ -1106,7 +1106,7 @@ private struct GoogleSignInButton: View {
             HStack(spacing: Space.s) {
                 Text("G").font(.system(size: 13, weight: .bold, design: .rounded))
                     .foregroundStyle(enabled ? Theme.accent : Theme.inkTertiary)
-                Text("Connect Google Calendar")
+                Text("Подключить Google Календарь")
                     .font(Typo.callout.weight(.semibold))
                     .foregroundStyle(enabled ? Theme.ink : Theme.inkTertiary)
             }
@@ -1146,11 +1146,11 @@ private struct WheesprAccountRow: View {
                 Text("Unavailable in this build")
                     .font(Typo.caption).foregroundStyle(Theme.inkTertiary)
             } else if state.wheesprConnected {
-                Button("Sign out") { state.signOutWheespr() }
+                Button("Выйти") { state.signOutWheespr() }
                     .buttonStyle(QuietButtonStyle())
                     .accessibilityIdentifier("settings.account.sign-out")
             } else {
-                Button("Sign in") { showSheet = true }
+                Button("Войти") { showSheet = true }
                     .buttonStyle(QuietButtonStyle(prominent: true))
                     .accessibilityIdentifier("settings.account.sign-in")
             }
@@ -1190,7 +1190,7 @@ struct SignInSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.l) {
-            Label("Sign in", systemImage: "person.crop.circle").font(Typo.title).foregroundStyle(Theme.ink)
+            Label("Войти", systemImage: "person.crop.circle").font(Typo.title).foregroundStyle(Theme.ink)
 
             if socialEnabled {
                 socialButtons
@@ -1202,7 +1202,7 @@ struct SignInSheet: View {
             }
 
             Picker("", selection: $method) {
-                Text("Email code").tag("code")
+                Text("Код из письма").tag("code")
                 Text("Password").tag("password")
                 Text("Phone").tag("phone")
             }
@@ -1218,7 +1218,7 @@ struct SignInSheet: View {
                 field($email, prompt: "you@company.com")
                 HStack {
                     Spacer()
-                    Button("Cancel") { dismiss() }.buttonStyle(QuietButtonStyle())
+                    Button("Отмена") { dismiss() }.buttonStyle(QuietButtonStyle())
                     Button(state.authWorking ? "Sending…" : "Send code") {
                         Task { await state.requestSignInCode(email: email) }
                     }
@@ -1230,7 +1230,7 @@ struct SignInSheet: View {
                     .font(Typo.callout).foregroundStyle(Theme.inkSecondary)
                 field($code, prompt: "123456")
                 HStack {
-                    Button("Back") { state.cancelSignIn(); code = "" }.buttonStyle(QuietButtonStyle())
+                    Button("Назад") { state.cancelSignIn(); code = "" }.buttonStyle(QuietButtonStyle())
                     Spacer()
                     Button(state.authWorking ? "Verifying…" : "Verify") {
                         Task { await state.verifySignIn(code: code) }
@@ -1314,8 +1314,8 @@ struct SignInSheet: View {
             }
             HStack {
                 Spacer()
-                Button("Cancel") { dismiss() }.buttonStyle(QuietButtonStyle())
-                Button(working ? "Working…" : (registering ? "Create account" : "Sign in")) {
+                Button("Отмена") { dismiss() }.buttonStyle(QuietButtonStyle())
+                Button(working ? "Working…" : (registering ? "Create account" : "Войти")) {
                     Task { await runProvider {
                         registering
                             ? try await WheesprAuth.registerPassword(email: email, password: password)
@@ -1340,10 +1340,10 @@ struct SignInSheet: View {
             }
             HStack {
                 if phoneCodeSent {
-                    Button("Back") { phoneCodeSent = false; code = "" }.buttonStyle(QuietButtonStyle())
+                    Button("Назад") { phoneCodeSent = false; code = "" }.buttonStyle(QuietButtonStyle())
                 }
                 Spacer()
-                Button("Cancel") { dismiss() }.buttonStyle(QuietButtonStyle())
+                Button("Отмена") { dismiss() }.buttonStyle(QuietButtonStyle())
                 Button(working ? "Working…" : (phoneCodeSent ? "Verify" : "Send SMS code")) {
                     Task {
                         if phoneCodeSent {

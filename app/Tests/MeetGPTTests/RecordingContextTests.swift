@@ -246,7 +246,7 @@ struct RecordingContextLifecycleTests {
     func detectionIsNotClaimedBeforeItRuns() {
         // The chip reads "Auto · Meeting" from the same default the detector
         // falls back to, so before the first probe it would present a guess as
-        // a finding. This flag is what lets the chip say "Auto-detect" instead.
+        // a finding. This flag is what lets the chip say "Определять автоматически" instead.
         let state = AppState(credentialStore: InMemoryKeychain())
         #expect(!state.hasDetectedRecordingContext)
 

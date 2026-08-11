@@ -41,10 +41,10 @@ struct OnboardingTests {
         // The check is the point of this screen: a granted permission and a
         // working capture are different things.
         #expect(throws: Never.self) { try sut.find(text: "Capture check") }
-        #expect(throws: Never.self) { try sut.find(button: "Continue") }
+        #expect(throws: Never.self) { try sut.find(button: "Продолжить") }
         // Sign-in has MOVED to the sidebar's setup card, so the account
         // decision lands after the user has seen what the co-pilot produces.
-        #expect(throws: (any Error).self) { try sut.find(text: "Sign in") }
+        #expect(throws: (any Error).self) { try sut.find(text: "Войти") }
     }
 
     @Test("the relaunch fix is offered as a button, not described in prose")
@@ -82,7 +82,7 @@ struct OnboardingTests {
         #expect(throws: Never.self) {
             try sut.find(textWhere: { s, _ in s.contains("Fictional call") })
         }
-        #expect(throws: Never.self) { try sut.find(button: "Skip") }
+        #expect(throws: Never.self) { try sut.find(button: "Пропустить") }
     }
 
     @Test("a tip retired elsewhere disappears without a relaunch")

@@ -111,7 +111,7 @@ struct ComposerImmediateFeedbackTests {
             try inspected.find(text: "The prior answer remains readable.")
         }
         #expect(throws: Never.self) {
-            try inspected.find(text: "Checking what you mean…")
+            try inspected.find(text: "Уточняю вопрос…")
         }
 
         for _ in 0..<500 {

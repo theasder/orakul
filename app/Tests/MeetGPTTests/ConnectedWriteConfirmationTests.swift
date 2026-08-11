@@ -51,7 +51,7 @@ struct ConnectedWriteConfirmationTests {
         state.pendingAnswerAction = staged
         let inspected = try AnswerActionConfirmSheet(pending: staged)
             .environmentObject(state).inspect()
-        try inspected.find(button: "Cancel").tap()
+        try inspected.find(button: "Отмена").tap()
         #expect(state.pendingAnswerAction == nil)
         #expect(state.runningAnswerAction == nil)
         #expect(state.answerActionResult == nil)

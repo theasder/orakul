@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// The prompt chip cloud — built-in Quick Prompts plus the user's own custom
-/// prompts, then a "New" chip to add one. Custom chips carry an edit/delete
+/// prompts, then a "Новый" chip to add one. Custom chips carry an edit/delete
 /// context menu. Disabled (dimmed) while a response streams.
 struct QuickPromptsBar: View {
     @EnvironmentObject var state: AppState
@@ -113,10 +113,10 @@ struct PromptChip: View {
     @ViewBuilder
     private var contextMenu: some View {
         if let onEdit {
-            Button { onEdit() } label: { Label("Edit", systemImage: "pencil") }
+            Button { onEdit() } label: { Label("Изменить", systemImage: "pencil") }
         }
         if let onDelete {
-            Button(role: .destructive) { onDelete() } label: { Label("Delete", systemImage: "trash") }
+            Button(role: .destructive) { onDelete() } label: { Label("Удалить", systemImage: "trash") }
         }
     }
 
@@ -132,7 +132,7 @@ private struct NewPromptChip: View {
         Button(action: action) {
             HStack(spacing: 4) {
                 Image(systemName: "plus").font(.system(size: 11, weight: .bold))
-                Text("New").font(Typo.callout.weight(.medium))
+                Text("Новый").font(Typo.callout.weight(.medium))
             }
             .foregroundStyle(hovering ? Theme.accentText : Theme.inkSecondary)
             .padding(.horizontal, Space.m)
@@ -258,7 +258,7 @@ struct PromptEditorView: View {
 
             HStack {
                 Spacer()
-                Button("Cancel") { dismiss() }
+                Button("Отмена") { dismiss() }
                     .buttonStyle(QuietButtonStyle())
                 Button("Save prompt") {
                     state.saveCustomPrompt(.custom(id: draft.id, icon: draft.icon, title: draft.title, prompt: draft.prompt))

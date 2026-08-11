@@ -399,7 +399,7 @@ final class TranscriptTextView: NSTextView {
         guard let coordinator else { return menu }
 
         if selectedRange().length > 0 {
-            let ask = NSMenuItem(title: "Ask about this",
+            let ask = NSMenuItem(title: "Спросить об этом",
                                  action: #selector(askAboutSelection), keyEquivalent: "")
             ask.target = self
             menu.insertItem(ask, at: 0)

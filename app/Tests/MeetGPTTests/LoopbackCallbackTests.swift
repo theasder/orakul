@@ -62,7 +62,7 @@ struct LoopbackCallbackTests {
     @Test("only GET is accepted")
     func rejectsOtherMethods() {
         // An authorization code arrives in a redirect, which is always a GET.
-        for method in ["POST", "PUT", "DELETE", "HEAD", "OPTIONS", "get"] {
+        for method in ["POST", "PUT", "УДАЛИТЬ", "HEAD", "OPTIONS", "get"] {
             #expect(parse("\(method) /callback?code=abc HTTP/1.1") == nil,
                     "\(method) was accepted")
         }
@@ -80,7 +80,7 @@ struct LoopbackCallbackTests {
 
     @Test("an error redirect is delivered too, not silently dropped")
     func deliversProviderErrors() throws {
-        // The user pressing "Cancel" comes back as ?error=access_denied. It has
+        // The user pressing "Отмена" comes back as ?error=access_denied. It has
         // to reach the flow so it can report a refusal rather than time out
         // after five minutes.
         let url = try #require(parse("GET /callback?error=access_denied&state=xyz HTTP/1.1"))

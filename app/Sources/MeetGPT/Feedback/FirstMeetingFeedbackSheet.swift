@@ -58,11 +58,11 @@ struct FirstMeetingFeedbackSheet: View {
             HStack {
                 // "Not now" is honest about what it does: the prompt will not
                 // come back either way, and a label implying otherwise is a lie.
-                Button("Not now") { dismiss() }
+                Button("Не сейчас") { dismiss() }
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
                 Spacer()
-                Button("Send") {
+                Button("Отправить") {
                     guard let rating else { return }
                     // Disk first, network second, and the sheet closes without
                     // waiting for either. Somebody who has just left a call

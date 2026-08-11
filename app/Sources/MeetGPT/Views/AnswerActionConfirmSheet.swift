@@ -132,7 +132,7 @@ struct AnswerActionConfirmSheet: View {
                 .font(Typo.caption)
                 .foregroundStyle(Theme.inkTertiary)
             Spacer()
-            Button("Cancel") { state.cancelAnswerAction() }
+            Button("Отмена") { state.cancelAnswerAction() }
                 .buttonStyle(QuietButtonStyle())
                 .keyboardShortcut(.cancelAction)
                 .accessibilityIdentifier("connected-write.cancel")

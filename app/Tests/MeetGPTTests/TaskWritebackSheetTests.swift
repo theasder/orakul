@@ -22,13 +22,13 @@ struct TaskWritebackSheetTests {
             .environmentObject(MCPConnectionManager())
         let sut = try view.inspect()
 
-        #expect(throws: Never.self) { try sut.find(text: "Send tasks to a tracker") }
+        #expect(throws: Never.self) { try sut.find(text: "Отправить задачи в трекер") }
         #expect(throws: Never.self) { try sut.find(text: "Ship the beta") }
         #expect(throws: Never.self) { try sut.find(text: "Write the RFC") }
-        #expect(throws: Never.self) { try sut.find(text: "Owner: Alex") }
+        #expect(throws: Never.self) { try sut.find(text: "Владелец: Alex") }
         // No connected tracker → the connect hint, not a filed state.
         #expect(throws: Never.self) {
-            try sut.find(textWhere: { s, _ in s.contains("Connect Linear, Jira, or Asana") })
+            try sut.find(textWhere: { s, _ in s.contains("Подключите Linear, Jira или Asana") })
         }
     }
 

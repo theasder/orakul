@@ -19,15 +19,15 @@ struct TaskWritebackSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Space.l) {
             HStack {
-                Label("Send tasks to a tracker", systemImage: "arrow.up.forward.app")
+                Label("Отправить задачи в трекер", systemImage: "arrow.up.forward.app")
                     .font(Typo.title).foregroundStyle(Theme.ink)
                 Spacer()
-                Button("Done") { dismiss() }.buttonStyle(QuietButtonStyle())
+                Button("Готово") { dismiss() }.buttonStyle(QuietButtonStyle())
             }
 
             if targets.isEmpty {
                 Label {
-                    Text("Connect Linear, Jira, or Asana in Settings → Connected Apps to file tasks. Each task is created only when you tap File.")
+                    Text("Подключите Linear, Jira или Asana в «Настройки → Рабочие приложения», чтобы заводить задачи. Задача создаётся только когда вы нажмёте «Создать».")
                         .font(Typo.callout).foregroundStyle(Theme.inkSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 } icon: {
@@ -93,7 +93,7 @@ private struct TaskRow: View {
                     .font(Typo.callout.weight(.medium)).foregroundStyle(Theme.ink)
                     .fixedSize(horizontal: false, vertical: true)
                 if let owner = item.owner, !owner.contains("[OWNER?]"), !owner.isEmpty {
-                    Text("Owner: \(owner)").font(Typo.caption).foregroundStyle(Theme.inkTertiary)
+                    Text("Владелец: \(owner)").font(Typo.caption).foregroundStyle(Theme.inkTertiary)
                 }
                 statusLine
             }

@@ -18,7 +18,7 @@ struct GlossaryReviewTests {
                                     sources: ["notion"])
     }
 
-    private func context(terms: [String] = ["Cruxwing"],
+    private func context(terms: [String] = ["orakul"],
                          isRecording: Bool = false,
                          reviewsDismissed: Bool = false) -> GlossaryReview.Context {
         GlossaryReview.Context(
@@ -57,9 +57,9 @@ struct GlossaryReviewTests {
         // is a decision they have not made, and the recognizer benefits either
         // way.
         let outcome = GlossaryReview.resolve(
-            candidates: [suggestion("Cruxwing"), suggestion("Deepgram")],
+            candidates: [suggestion("orakul"), suggestion("Deepgram")],
             reviewed: false, keeping: [])
-        #expect(outcome == ["Cruxwing", "Deepgram"])
+        #expect(outcome == ["orakul", "Deepgram"])
     }
 
     @Test("an explicit review applies only what the user kept")
@@ -67,9 +67,9 @@ struct GlossaryReviewTests {
         // Once they HAVE looked, their selection is the answer — including the
         // terms they unchecked.
         let outcome = GlossaryReview.resolve(
-            candidates: [suggestion("Cruxwing"), suggestion("Deepgram")],
-            reviewed: true, keeping: ["Cruxwing"])
-        #expect(outcome == ["Cruxwing"])
+            candidates: [suggestion("orakul"), suggestion("Deepgram")],
+            reviewed: true, keeping: ["orakul"])
+        #expect(outcome == ["orakul"])
     }
 
     @Test("a review where everything was unchecked applies nothing")
@@ -77,7 +77,7 @@ struct GlossaryReviewTests {
         // And this must not fall back to "apply everything" — an empty
         // selection after a review is a real answer, not a missing one.
         let outcome = GlossaryReview.resolve(
-            candidates: [suggestion("Cruxwing")], reviewed: true, keeping: [])
+            candidates: [suggestion("orakul")], reviewed: true, keeping: [])
         #expect(outcome.isEmpty)
     }
 

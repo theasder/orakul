@@ -93,7 +93,7 @@ struct SampleRunStep: View {
 
     private var transcript: some View {
         VStack(alignment: .leading, spacing: Space.s) {
-            Text("Transcript").font(Typo.label).foregroundStyle(Theme.inkTertiary)
+            Text("Транскрипт").font(Typo.label).foregroundStyle(Theme.inkTertiary)
             // The rows scroll inside their own box: eleven lines of replay
             // must never decide the height of the whole onboarding window,
             // and a bounded box can never push its border through a row.
@@ -142,7 +142,7 @@ struct SampleRunStep: View {
 
     private var copilot: some View {
         VStack(alignment: .leading, spacing: Space.s) {
-            Text("Co-pilot").font(Typo.label).foregroundStyle(Theme.inkTertiary)
+            Text("Ко-пилот").font(Typo.label).foregroundStyle(Theme.inkTertiary)
 
             if suggestionVisible {
                 SampleCard(tint: Theme.speakerThem) {
@@ -170,7 +170,7 @@ struct SampleRunStep: View {
 
             if decisionVisible {
                 SampleCard(tint: Theme.accent) {
-                    Text("Decision candidate")
+                    Text("Кандидат в решения")
                         .font(Typo.callout.weight(.medium)).foregroundStyle(Theme.ink)
                     Text(sample.preparedDecision.text)
                         .font(Typo.caption).foregroundStyle(Theme.inkSecondary)
@@ -206,11 +206,11 @@ struct SampleRunStep: View {
             }
             Spacer(minLength: Space.s)
             if finished {
-                Button("Set up my first call", action: finish)
+                Button("Настроить первый звонок", action: finish)
                     .buttonStyle(PrimaryButtonStyle())
-                    .accessibilityLabel("Set up my first call")
+                    .accessibilityLabel("Настроить первый звонок")
             } else {
-                Button("Skip", action: finish)
+                Button("Пропустить", action: finish)
                     .buttonStyle(QuietButtonStyle())
                     .accessibilityLabel("Skip the sample")
             }

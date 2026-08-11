@@ -20,7 +20,7 @@ struct FactCheckSheet: View {
                     .font(Typo.title).foregroundStyle(Theme.ink)
                 if state.factChecking { BreathingDots(tint: Theme.accent) }
                 Spacer()
-                Button("Done") { dismiss() }.buttonStyle(QuietButtonStyle())
+                Button("Готово") { dismiss() }.buttonStyle(QuietButtonStyle())
             }
             Text("Claims from the transcript, checked only against the context you added for this call.")
                 .font(Typo.caption).foregroundStyle(Theme.inkTertiary)
@@ -54,7 +54,7 @@ struct FactCheckSheet: View {
             if state.factChecking && state.factClaims.isEmpty {
                 centered {
                     ProgressView()
-                    Text("Checking claims against your context…")
+                    Text("Сверяю с вашим контекстом…")
                         .font(Typo.callout).foregroundStyle(Theme.inkSecondary)
                 }
             } else if let error = state.factCheckError, state.factClaims.isEmpty {

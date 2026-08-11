@@ -4,7 +4,7 @@ import AppKit
 /// Settings body for the token connectors + the channel watcher.
 ///
 /// Two tiers: a status list of the token connectors (configured in `mac/.env`,
-/// read-only at runtime) and an elevated "Channel watcher" card whose enable
+/// read-only at runtime) and an elevated "Слежу за каналом" card whose enable
 /// switch + keyword rules ARE editable live (UserDefaults-backed).
 struct TeamSourcesView: View {
     @ObservedObject private var watcher = TeamWatcher.shared
@@ -53,7 +53,7 @@ struct TeamSourcesView: View {
             HStack(spacing: Space.s) {
                 StatusDot(color: watcher.isRunning ? Theme.recordRed : Theme.inkTertiary,
                           live: watcher.isRunning, size: 8)
-                Text("Channel watcher")
+                Text("Слежу за каналом")
                     .font(Typo.headline)
                     .foregroundStyle(Theme.ink)
                 if watcher.isRunning {
@@ -104,7 +104,7 @@ struct TeamSourcesView: View {
                 Button {
                     revealAuditLog()
                 } label: {
-                    Label("Audit log", systemImage: "doc.text.magnifyingglass")
+                    Label("Журнал доступа", systemImage: "doc.text.magnifyingglass")
                         .font(Typo.caption.weight(.medium))
                 }
                 .buttonStyle(QuietButtonStyle())

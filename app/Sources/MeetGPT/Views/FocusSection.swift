@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Sidebar "Focus" section: unique upcoming reminders and active alerts.
+/// Sidebar "Фокус" section: unique upcoming reminders and active alerts.
 /// Recommendations live only in Co-pilot so users never see duplicate cards.
 struct FocusSection: View {
     @EnvironmentObject var state: AppState
@@ -11,7 +11,7 @@ struct FocusSection: View {
         if !items.isEmpty || !hidden.isEmpty || state.appliedMeetingContext != nil {
             VStack(alignment: .leading, spacing: Space.s) {
                 HStack(spacing: Space.s) {
-                    SectionLabel("Focus")
+                    SectionLabel("Фокус")
                     Spacer()
                     if !items.isEmpty {
                         Text("\(items.count)")
@@ -133,7 +133,7 @@ private struct HiddenMeetingsDisclosure: View {
                             .foregroundStyle(Theme.inkSecondary)
                             .lineLimit(1)
                         Spacer(minLength: Space.xs)
-                        Button("Show") { onRestore(meeting.id) }
+                        Button("Показать") { onRestore(meeting.id) }
                             .buttonStyle(.plain)
                             .font(Typo.caption.weight(.semibold))
                             .foregroundStyle(Theme.accentText)
@@ -240,7 +240,7 @@ private struct FocusRow: View {
 
     private var helpText: String {
         switch item.kind {
-        case .alert:    return "Dismiss"
+        case .alert:    return "Скрыть"
         case .reminder:
             return item.meetingID == nil
                 ? "Upcoming meeting"

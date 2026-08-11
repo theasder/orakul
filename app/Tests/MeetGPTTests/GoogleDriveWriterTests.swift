@@ -144,7 +144,7 @@ struct GoogleDriveWriterTests {
             fileID: "abc", createdByUs: true, accessToken: "t", session: DriveStub.session())
 
         #expect(DriveStub.lastRequest?.httpMethod == "PATCH")
-        #expect(DriveStub.lastRequest?.httpMethod != "DELETE")
+        #expect(DriveStub.lastRequest?.httpMethod != "УДАЛИТЬ")
         let body = String(decoding: DriveStub.lastBody ?? Data(), as: UTF8.self)
         #expect(body.contains("trashed"))
         #expect(DriveStub.lastRequest?.url?.absoluteString

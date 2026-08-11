@@ -315,7 +315,7 @@ struct DeepgramStreamerTests {
     @Test("every grant failure carries a user-facing fallback message")
     func fallbackMessages() {
         #expect(DeepgramGrantError.creditCap("Out of credits.").fallbackMessage == "Out of credits.")
-        #expect(DeepgramGrantError.signInRequired.fallbackMessage.contains("Sign in"))
+        #expect(DeepgramGrantError.signInRequired.fallbackMessage.contains("Войти"))
         #expect(DeepgramGrantError.transient(500).fallbackMessage.contains("500"))
     }
 }

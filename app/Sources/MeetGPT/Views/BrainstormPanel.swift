@@ -74,7 +74,7 @@ struct BlindSpotPanelPresentation: Equatable {
     }
 }
 
-/// Sidebar "Co-pilot" section: the call goal (the only thing the brainstormer
+/// Sidebar "Ко-пилот" section: the call goal (the only thing the brainstormer
 /// needs) plus the proactive blind-spot suggestions it surfaces during a call.
 struct BrainstormSection: View {
     @EnvironmentObject var state: AppState
@@ -90,7 +90,7 @@ struct BrainstormSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s) {
-            SectionLabel("Co-pilot")
+            SectionLabel("Ко-пилот")
 
             GoalField(text: $state.callGoal)
 
@@ -363,11 +363,11 @@ private struct RecordingContextChip: View {
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(Theme.accent)
                 // Until the detector has looked, the resolved label is only its
-                // fallback. Say "Auto-detect" rather than name a type the app
+                // fallback. Say "Определять автоматически" rather than name a type the app
                 // has no evidence for — this chip is read in the moment someone
                 // decides whether to override it.
                 Text(awaitingDetection
-                     ? "Auto-detect"
+                     ? "Определять автоматически"
                      : selection.isAutomatic
                      ? "Auto · \(state.effectiveRecordingContextLabel)"
                      : state.effectiveRecordingContextLabel)
@@ -397,7 +397,7 @@ private struct RecordingContextChip: View {
             }
             .disabled(RecordingContextSelection.sanitizeCustomLabel(customDraft) == nil)
             .accessibilityIdentifier("recording.context.custom-save")
-            Button("Cancel", role: .cancel) {}
+            Button("Отмена", role: .cancel) {}
         } message: {
             Text("This label guides summaries and answers for this recording only.")
         }
@@ -554,7 +554,7 @@ private struct ThemeChip: View {
             }
             Divider()
             Picker("Call theme", selection: $state.callThemeOverride) {
-                Label("Auto-detect", systemImage: "wand.and.stars")
+                Label("Определять автоматически", systemImage: "wand.and.stars")
                     .tag(CallTheme?.none)
                 Divider()
                 ForEach(CallTheme.allCases) { theme in
@@ -607,7 +607,7 @@ private struct RoleChip: View {
             let active = RoleSkillMatrix.position(id: state.userRoleID)
             let isCustom = state.userRoleID == RoleSkillMatrix.customRoleID
             Menu {
-                Picker("Your role", selection: $state.userRoleID) {
+                Picker("Ваша роль", selection: $state.userRoleID) {
                     Label("No role", systemImage: "person.crop.circle.dashed")
                         .tag(String?.none)
                     Divider()
@@ -709,7 +709,7 @@ private struct RhetoricNoteCard: View {
             }
             .buttonStyle(IconButtonStyle(size: 18))
             .opacity(hovering ? 1 : 0.35)
-            .help("Dismiss")
+            .help("Скрыть")
         }
         .padding(Space.s)
         .background(Theme.amber.opacity(0.08), in: RoundedRectangle(cornerRadius: Radius.s, style: .continuous))
@@ -749,7 +749,7 @@ private struct FacilitationNoteCard: View {
             }
             .buttonStyle(IconButtonStyle(size: 18))
             .opacity(hovering ? 1 : 0.35)
-            .help("Dismiss")
+            .help("Скрыть")
         }
         .padding(Space.s)
         .background(Theme.speakerThem.opacity(0.10), in: RoundedRectangle(cornerRadius: Radius.s, style: .continuous))
@@ -809,7 +809,7 @@ struct SuggestionCard: View {
                 }
                 .buttonStyle(IconButtonStyle(size: 18))
                 .opacity(hovering ? 1 : 0.35)
-                .help("Dismiss")
+                .help("Скрыть")
             }
             // The phrase this is about, shown BEFORE the comment on it. The
             // model already supplies it and it is verified against the
@@ -881,7 +881,7 @@ struct SuggestionCard: View {
                 Spacer()
                 // The primary action on a hunch is to say the test out loud, not
                 // to ask the assistant about it — so copying it is what the button
-                // does, and "Ask" stays available for the other kinds.
+                // does, and "Спросить" stays available for the other kinds.
                 if suggestion.isTestableHypothesis, let cheapTest = suggestion.cheapTest {
                     Button {
                         NSPasteboard.general.clearContents()
@@ -895,7 +895,7 @@ struct SuggestionCard: View {
                     .help("Copy the sentence that settles this")
                 }
                 Button { onAsk() } label: {
-                    Label("Ask", systemImage: "arrow.up.circle")
+                    Label("Спросить", systemImage: "arrow.up.circle")
                 }
                 .buttonStyle(QuietButtonStyle(prominent: true))
                 .help("Send to the assistant")

@@ -92,7 +92,7 @@ struct AnswerChecklistTests {
     @Test("keeps the default label when nothing creates tasks")
     func keepsDefaultWithoutTaskAction() {
         // Renaming above a "Draft an email" action would describe the wrong
-        // thing, so the caller keeps "Do this".
+        // thing, so the caller keeps "Сделать".
         let answer = "- [ ] One\n- [ ] Two"
         #expect(AnswerChecklist.actionGroupTitle(forAnswer: answer, hasTaskAction: false) == nil)
     }
