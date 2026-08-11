@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Opt-in hardened variant (MEETGPT_SANDBOX=1). Contains the app in the
+         App Sandbox with only the entitlements it actually needs. Screen
+         Recording + Microphone stay TCC-gated (not sandbox-gated).
+         VERIFY before relying on this: system-audio capture (ScreenCaptureKit),
+         mic capture, the loopback OAuth listener, and context-file import all
+         behave under the sandbox — none are exercised by a dev build. -->
+    <key>com.apple.security.app-sandbox</key>                    <true/>
+    <key>com.apple.security.device.audio-input</key>            <true/>
+    <key>com.apple.security.network.client</key>                <true/>
+    <key>com.apple.security.network.server</key>                <true/>
+    <key>com.apple.security.files.user-selected.read-write</key><true/>
+    <key>com.apple.developer.applesignin</key>
+    <array>
+        <string>Default</string>
+    </array>
+</dict>
+</plist>

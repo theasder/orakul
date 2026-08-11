@@ -1,0 +1,3247 @@
+{
+  "schemaVersion": 2,
+  "name": "Cruxwing end-to-end goal evidence map",
+  "target": 0.9,
+  "scope": {
+    "included": [
+      "cruxwing-app",
+      "cruxwing-api"
+    ],
+    "excluded": [
+      "cruxwing-web"
+    ]
+  },
+  "evidencePolicy": {
+    "maxAgeSeconds": 86400,
+    "liveHarnessPaths": [
+      "videotest.sh",
+      "testlib/make_meeting_video.py",
+      "testlib/meeting_script.json",
+      "testlib/prompt_schedule.py",
+      "testlib/score_transcript.py",
+      "testlib/response_quality.py",
+      "Sources/MeetGPT/Dev/LiveTestHooks.swift",
+      "Sources/MeetGPT/Audio/MicrophoneCapture.swift"
+    ],
+    "liveRequirements": [
+      "UI-STATE-LIVE-TERMINAL",
+      "CONC-LIVE-PROMPT-OVERLAP",
+      "VIDEO-INSTALLED-APP-PLAYBACK",
+      "VIDEO-CLEAN-CONDITION",
+      "VIDEO-NOISY-CONDITION",
+      "VIDEO-FAST-CONDITION",
+      "VIDEO-UNPREDICTABLE-PROMPT-TIMES",
+      "VIDEO-TRANSCRIPTION-CONCURRENT",
+      "VIDEO-DUPLEX-SPEAKER-ROUTE",
+      "VIDEO-DUPLEX-MIC-LIVENESS",
+      "VIDEO-DUPLEX-SYSTEM-LIVENESS",
+      "VIDEO-DISPLAY-METADATA",
+      "PROMPT-INTERACTIVE-POLL",
+      "PROMPT-MANDATORY-INFORMATION",
+      "PROMPT-CONTEXTUAL-QUESTION",
+      "PROMPT-FREEFORM-INPUT",
+      "PROMPT-QUICK-ACTION",
+      "PROMPT-INSTANCE-CORRELATION",
+      "TRANSCRIPT-WER",
+      "TRANSCRIPT-SPEAKER-ACCURACY",
+      "TRANSCRIPT-LATENCY-DISTRIBUTION",
+      "TRANSCRIPT-TECHNICAL-TERMS",
+      "TRANSCRIPT-BACKGROUND-NOISE",
+      "TRANSCRIPT-DUPLICATION",
+      "TRANSCRIPT-CROSS-TRACK-ECHO",
+      "RESPONSE-ALL-EXCHANGES",
+      "RESPONSE-NONERROR-COMPLETION",
+      "RESPONSE-MULTIPLE-COMPLETIONS",
+      "RESPONSE-LIFECYCLE-OVERLAP",
+      "RESPONSE-REQUIRED-IDS-TYPES-LATENCY",
+      "RESPONSE-RELEVANCE-GROUNDING",
+      "RESPONSE-TEMPORAL-GROUNDING",
+      "RESPONSE-PROMPT-FULFILLMENT",
+      "RESPONSE-COHERENCE-REPETITION",
+      "RESPONSE-UNSUPPORTED-NUMBERS",
+      "BLIND-SPOT-LIVE-END-TO-END",
+      "BLIND-SPOT-DEV-SYNTHETIC-EVIDENCE",
+      "OBS-STABLE-STATE-DUMPS",
+      "OBS-SECURE-RUN-ARTIFACTS",
+      "OBS-PROMPT-SCREENSHOTS",
+      "OBS-EVENT-TIMELINE",
+      "OBS-FLOW-COMPLETION-METRICS",
+      "OBS-PRIVACY-SAFE-NETWORK-LOG",
+      "OBS-REQUEST-CORRELATION",
+      "OBS-DEV-CALL-DIAGNOSTIC-JSONL",
+      "A11Y-LIVE-OS-STATE-CAPTURE",
+      "SETTINGS-LIVE-WINDOW-ALL-TABS",
+      "SETTINGS-LIVE-GENERAL-CONTROLS",
+      "SETTINGS-LIVE-WATCH-MATRIX",
+      "SETTINGS-LIVE-TRANSCRIPTION-MATRIX",
+      "SETTINGS-LIVE-CONNECTED-GROUNDING",
+      "SETTINGS-LIVE-ACCOUNT-PRIVACY",
+      "SETTINGS-LIVE-RESTORE-CAPTURE",
+      "SETTINGS-LIVE-PROMO-REDEMPTION",
+      "CONNECTED-TRANSCRIPTION-GLOSSARY-SUGGESTIONS"
+    ],
+    "commandChecks": {
+      "TRANSCRIPT-SCORER-SELFTEST": [
+        "python3",
+        "testlib/score_transcript.py",
+        "--selftest"
+      ],
+      "RESPONSE-THRESHOLD-SELFTEST": [
+        "python3",
+        "testlib/response_quality.py",
+        "--selftest"
+      ],
+      "CONNECTED-GROUNDED-RESPONSE-QUALITY": [
+        "python3",
+        "testlib/response_quality.py",
+        "--selftest"
+      ]
+    },
+    "coverageChecks": {
+      "COVERAGE-CRITICAL-90-GATE": {
+        "pathHint": "../cruxwing-api/coverage/critical/coverage-summary.json",
+        "minimum": 0.9,
+        "metrics": [
+          "statements",
+          "branches",
+          "functions",
+          "lines"
+        ]
+      }
+    }
+  },
+  "requirements": [
+    {
+      "id": "UI-STATE-ALL-32",
+      "category": "ui-state",
+      "priority": "critical",
+      "description": "Exercise the complete 2^5 workspace flag product for recording, transcript, answer, history, and title state.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/CombinatorialStateTests.swift",
+          "contains": "for hasTitle in [false, true]"
+        },
+        {
+          "path": "Tests/MeetGPTTests/CombinatorialStateTests.swift",
+          "contains": "every reachable state agrees on whether a new call is possible"
+        }
+      ]
+    },
+    {
+      "id": "UI-STATE-RESET-INVARIANTS",
+      "category": "ui-state",
+      "priority": "high",
+      "description": "A new call clears transcript, answer, title, and interrupting quota state across every eligible workspace state.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/CombinatorialStateTests.swift",
+          "contains": "starting a new call empties every axis it claims to clear"
+        }
+      ]
+    },
+    {
+      "id": "UI-STATE-ERROR-NOT-EXPORTABLE",
+      "category": "ui-state",
+      "priority": "high",
+      "description": "An error body remains inspectable but cannot masquerade as an exportable assistant answer.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/CombinatorialStateTests.swift",
+          "contains": "an error body is never exportable, though it is still copyable"
+        }
+      ]
+    },
+    {
+      "id": "UI-STATE-LIVE-TERMINAL",
+      "category": "ui-state",
+      "priority": "critical",
+      "description": "Every in-video prompt flow reaches a captured non-streaming terminal UI state within a bounded wait.",
+      "proof": [
+        {
+          "path": "videotest.sh",
+          "contains": "overlapping Summary reached successful terminal state"
+        },
+        {
+          "path": "videotest.sh",
+          "contains": "prompt-terminal-latency="
+        }
+      ]
+    },
+    {
+      "id": "UI-COMPOSER-PROMPT-ECHO-IMMEDIATE",
+      "category": "ui-state",
+      "priority": "critical",
+      "description": "Submitting a free-form request synchronously renders the new user turn before clarification, grounding, or provider work completes, without pairing the prior answer with the new prompt.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/ComposerImmediateFeedbackTests.swift",
+          "contains": "COMPOSER-PROMPT-ECHO-IMMEDIATE"
+        },
+        {
+          "path": "Tests/MeetGPTTests/ComposerImmediateFeedbackTests.swift",
+          "contains": "COMPOSER-PROMPT-SUPERSEDES-CLARIFICATION"
+        },
+        {
+          "path": "Tests/MeetGPTTests/ComposerImmediateFeedbackTests.swift",
+          "contains": "COMPOSER-QUICK-PROMPT-SUPERSEDES-CLARIFICATION"
+        }
+      ]
+    },
+    {
+      "id": "UI-COMPOSER-ATTACHMENT-IMMEDIATE",
+      "category": "ui-state",
+      "priority": "high",
+      "description": "Every selected image, document, audio, or video is named in the composer synchronously before async import or transcription, then transitions to ready or visible failure feedback.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/ComposerImmediateFeedbackTests.swift",
+          "contains": "COMPOSER-ATTACHMENT-IMMEDIATE"
+        },
+        {
+          "path": "Tests/MeetGPTTests/ComposerImmediateFeedbackTests.swift",
+          "contains": "COMPOSER-ATTACHMENT-ERROR"
+        }
+      ]
+    },
+    {
+      "id": "UI-COMPOSER-FOLDER-IMMEDIATE",
+      "category": "context-folders",
+      "priority": "critical",
+      "description": "The chat composer exposes a directory picker, renders a named and cancellable Indexing state immediately, replaces success with a standing removable folder chip that survives later prompts, and keeps a failed attachment visibly removable.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/ComposerImmediateFeedbackTests.swift",
+          "contains": "COMPOSER-FOLDER-IMMEDIATE"
+        },
+        {
+          "path": "Tests/MeetGPTTests/ComposerImmediateFeedbackTests.swift",
+          "contains": "COMPOSER-FOLDER-ERROR"
+        },
+        {
+          "path": "Tests/MeetGPTTests/ChatFolderAttachmentSourceContractTests.swift",
+          "contains": "chat plus menu selects folders and indexes them asynchronously"
+        },
+        {
+          "path": "Tests/MeetGPTTests/ChatFolderAttachmentSourceContractTests.swift",
+          "contains": "standing folder chips render from AppState and can be removed"
+        }
+      ]
+    },
+    {
+      "id": "CONTEXT-FOLDER-TRAVERSAL-SAFETY",
+      "category": "context-folders",
+      "priority": "critical",
+      "description": "Recursive folder indexing runs off the UI actor and rejects symlink traversal, package and hidden descendants, ignored dependency/build trees, unsupported file types, and unreadable regular files.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/ContextFolderTests.swift",
+          "contains": "never follows a symlink outside the selected folder"
+        },
+        {
+          "path": "Tests/MeetGPTTests/ContextFolderTests.swift",
+          "contains": "never enters package descendants or hidden files"
+        },
+        {
+          "path": "Tests/MeetGPTTests/ContextFolderTests.swift",
+          "contains": "an unreadable regular file is never indexed"
+        },
+        {
+          "path": "Tests/MeetGPTTests/ChatFolderAttachmentSourceContractTests.swift",
+          "contains": "recursive scanning is cancellable, bounded, and off the UI actor"
+        }
+      ]
+    },
+    {
+      "id": "CONTEXT-FOLDER-RESOURCE-BOUNDS",
+      "category": "context-folders",
+      "priority": "critical",
+      "description": "Folder indexing enforces per-file and aggregate raw-byte ceilings before decoding, deterministic file-count and duplicate handling, per-file character truncation, and an aggregate indexed-character ceiling with explicit skipped-file evidence.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/ContextFolderTests.swift",
+          "contains": "rejects a raw file beyond the per-file byte cap"
+        },
+        {
+          "path": "Tests/MeetGPTTests/ContextFolderTests.swift",
+          "contains": "stays inside the aggregate raw byte read cap"
+        },
+        {
+          "path": "Tests/MeetGPTTests/ContextFolderTests.swift",
+          "contains": "deduplicates byte-identical files deterministically"
+        },
+        {
+          "path": "Tests/MeetGPTTests/ContextFolderTests.swift",
+          "contains": "caps the number of files and reports what it left out"
+        },
+        {
+          "path": "Tests/MeetGPTTests/ContextFolderTests.swift",
+          "contains": "truncates a single oversized file rather than dropping it"
+        },
+        {
+          "path": "Tests/MeetGPTTests/ContextFolderTests.swift",
+          "contains": "stays inside the total character budget"
+        }
+      ]
+    },
+    {
+      "id": "CONTEXT-FOLDER-CANCELLATION-ATOMIC",
+      "category": "context-folders",
+      "priority": "critical",
+      "description": "Canceling folder work publishes no partial index or persistent security grant, clears progress without a false global error, and folder failures never expose the selected raw path.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/ContextFolderTests.swift",
+          "contains": "a cancelled scan publishes no partial index"
+        },
+        {
+          "path": "Tests/MeetGPTTests/ContextFolderTests.swift",
+          "contains": "cancelled folder attachment is quiet and leaves no grant"
+        },
+        {
+          "path": "Tests/MeetGPTTests/ContextFolderTests.swift",
+          "contains": "folder errors never expose the selected raw path"
+        },
+        {
+          "path": "Sources/MeetGPT/Context/ContextFolder.swift",
+          "contains": "withTaskCancellationHandler"
+        }
+      ]
+    },
+    {
+      "id": "CONTEXT-FOLDER-RELEVANCE-RAPID-PROMPTS",
+      "category": "context-folders",
+      "priority": "critical",
+      "description": "Every prompt retrieves only bounded query-relevant folder excerpts, uses one small README fallback for an unmatched query instead of dumping the folder, preserves ordinary attached-file context, and keeps the folder attached while rapid unrelated prompts select different evidence.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/ContextFolderTests.swift",
+          "contains": "retrieval attaches only the relevant bounded project excerpts"
+        },
+        {
+          "path": "Tests/MeetGPTTests/ContextFolderTests.swift",
+          "contains": "a generic query gets one README fallback, not a folder dump"
+        },
+        {
+          "path": "Tests/MeetGPTTests/ContextFolderTests.swift",
+          "contains": "rapid prompt retrieval changes excerpts without detaching the folder"
+        },
+        {
+          "path": "Tests/MeetGPTTests/ChatFolderAttachmentSourceContractTests.swift",
+          "contains": "model pipelines use query-time folder retrieval"
+        }
+      ]
+    },
+    {
+      "id": "ASSISTANT-FOLLOWUP-BUTTON-PERSISTENCE",
+      "category": "ui-state",
+      "priority": "critical",
+      "description": "Starting a later assistant turn archives the prior answer's follow-up buttons, and the archived exchange continues to render those actionable buttons.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/AssistantDialogHistoryTests.swift",
+          "contains": "a second prompt archives the first answer's follow-up buttons"
+        },
+        {
+          "path": "Tests/MeetGPTTests/AssistantResponseViewTests.swift",
+          "contains": "an archived answer keeps its follow-up button visible"
+        }
+      ]
+    },
+    {
+      "id": "RECORDING-CONTEXT-AUTODETECT-MEDIA",
+      "category": "media-recording",
+      "priority": "critical",
+      "description": "Automatic recording classification gives media-host evidence priority over call words, distinguishes tutorials from unrelated YouTube video and other spoken-media formats, recognizes local media players, and preserves the compatible meeting default for unknown or ordinary call sources.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/RecordingContextTests.swift",
+          "contains": "media-host titles beat meeting words inside a tutorial title"
+        },
+        {
+          "path": "Tests/MeetGPTTests/RecordingContextTests.swift",
+          "contains": "an unrelated YouTube video remains generic video"
+        },
+        {
+          "path": "Tests/MeetGPTTests/RecordingContextTests.swift",
+          "contains": "non-browser media apps classify playback without relying on a title"
+        },
+        {
+          "path": "Tests/MeetGPTTests/RecordingContextTests.swift",
+          "contains": "specialized spoken formats are distinguished"
+        },
+        {
+          "path": "Tests/MeetGPTTests/RecordingContextTests.swift",
+          "contains": "unknown and ordinary call sources preserve the meeting default"
+        },
+        {
+          "path": "Sources/MeetGPT/Models/RecordingContext.swift",
+          "contains": "host markers take precedence over meeting words"
+        }
+      ]
+    },
+    {
+      "id": "RECORDING-CONTEXT-MANUAL-CHOICE",
+      "category": "media-recording",
+      "priority": "critical",
+      "description": "A visible recording-type menu offers Auto, every supported preset, and a bounded custom label; an explicit choice remains authoritative when later automatic guesses change.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/RecordingContextTests.swift",
+          "contains": "a manual preset always overrides a changing automatic guess"
+        },
+        {
+          "path": "Tests/MeetGPTTests/RecordingContextTests.swift",
+          "contains": "automatic follows the newest detected context"
+        },
+        {
+          "path": "Tests/MeetGPTTests/RecordingContextTests.swift",
+          "contains": "custom input collapses whitespace and is bounded"
+        },
+        {
+          "path": "Tests/MeetGPTTests/RecordingContextTests.swift",
+          "contains": "all presets provide a bounded label, symbol, and orientation"
+        },
+        {
+          "path": "Sources/MeetGPT/Views/BrainstormPanel.swift",
+          "contains": "recording.context.menu"
+        },
+        {
+          "path": "Sources/MeetGPT/Views/BrainstormPanel.swift",
+          "contains": "recording.context.custom-save"
+        }
+      ]
+    },
+    {
+      "id": "RECORDING-CONTEXT-MIDCALL-CONTINUITY",
+      "category": "media-recording",
+      "priority": "critical",
+      "description": "Changing the recording type while capture is active preserves recording state and session identity, ignores detector completions from an earlier session, and persists an explicit type with saved-session restore.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/RecordingContextTests.swift",
+          "contains": "manual type changes during recording without changing capture state"
+        },
+        {
+          "path": "Tests/MeetGPTTests/RecordingContextTests.swift",
+          "contains": "stale detector result from a previous call is ignored"
+        },
+        {
+          "path": "Tests/MeetGPTTests/RecordingContextTests.swift",
+          "contains": "saved sessions restore an explicit recording type"
+        },
+        {
+          "path": "Sources/MeetGPT/AppState.swift",
+          "contains": "func selectRecordingContext("
+        }
+      ]
+    },
+    {
+      "id": "RECORDING-CONTEXT-MEDIA-PROMPT-ECONOMY",
+      "category": "media-recording",
+      "priority": "critical",
+      "description": "Recording guidance is compact and precedes transcript/request text; media quick actions stay bounded, replace meeting-only artifact demands with source- and project-grounded analysis, and leave meeting shortcuts byte-for-byte compatible.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/RecordingContextTests.swift",
+          "contains": "tutorial guidance is compact and project-oriented"
+        },
+        {
+          "path": "Tests/MeetGPTTests/RecordingContextTests.swift",
+          "contains": "recording guidance is placed before transcript and request"
+        },
+        {
+          "path": "Tests/MeetGPTTests/RecordingContextTests.swift",
+          "contains": "meeting shortcuts remain byte-for-byte compatible"
+        },
+        {
+          "path": "Tests/MeetGPTTests/RecordingContextTests.swift",
+          "contains": "media shortcuts do not demand fictional meeting artifacts"
+        },
+        {
+          "path": "Tests/MeetGPTTests/RecordingContextTests.swift",
+          "contains": "summary and advice explicitly connect tutorials to project context"
+        },
+        {
+          "path": "Sources/MeetGPT/Models/RecordingContext.swift",
+          "contains": "selecting a type saves tokens"
+        }
+      ]
+    },
+    {
+      "id": "NAV-ALL-24-ACTION-ORDERS",
+      "category": "navigation",
+      "priority": "critical",
+      "description": "Enumerate all 4! non-linear action orders and require an identical final workspace state.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/CombinatorialStateTests.swift",
+          "contains": "All 24 orderings of the four actions."
+        },
+        {
+          "path": "Tests/MeetGPTTests/CombinatorialStateTests.swift",
+          "contains": "the same actions in any order reach the same workspace state"
+        }
+      ]
+    },
+    {
+      "id": "NAV-HISTORY-TO-NEW-CALL",
+      "category": "navigation",
+      "priority": "critical",
+      "description": "Opening History exposes the exit to a new call, and leaving History withdraws it.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/CombinatorialStateTests.swift",
+          "contains": "opening a saved call offers the way back out, and leaving withdraws it"
+        }
+      ]
+    },
+    {
+      "id": "NAV-NEW-CALL-ABSORBING",
+      "category": "navigation",
+      "priority": "high",
+      "description": "Every action ordering converges to the same empty workspace after starting a new call.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/CombinatorialStateTests.swift",
+          "contains": "a new call resets every ordering to the same empty workspace"
+        }
+      ]
+    },
+    {
+      "id": "NAV-RESTORE-CANCELS-ACTIVE-WORK",
+      "category": "navigation",
+      "priority": "high",
+      "description": "Rapidly restoring a saved call releases active AI and fact-check work instead of leaking stale completion into the restored view.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/SessionLifecycleTests.swift",
+          "contains": "restoring History synchronously releases a running AI and Fact Check"
+        }
+      ]
+    },
+    {
+      "id": "NAV-SESSION-CONTEXT-ISOLATION",
+      "category": "navigation",
+      "priority": "high",
+      "description": "Non-linear session switching replaces call-specific context and prevents artifacts from leaking between calls.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/SessionSwitchingTests.swift",
+          "contains": "per-call artifacts do not leak into the next call"
+        },
+        {
+          "path": "Tests/MeetGPTTests/SessionSwitchingTests.swift",
+          "contains": "opening a call replaces the context panel, not just the transcript"
+        }
+      ]
+    },
+    {
+      "id": "CONC-AI-CANCELLED-DELTA",
+      "category": "concurrency",
+      "priority": "critical",
+      "description": "A canceled model request cannot publish late deltas into the answer for a newer prompt.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/AppStateAIPipelineTests.swift",
+          "contains": "late deltas from a canceled prompt cannot contaminate the next answer"
+        }
+      ]
+    },
+    {
+      "id": "CONC-TRANSCRIPT-STALE-COMPLETION",
+      "category": "concurrency",
+      "priority": "critical",
+      "description": "A late transcription completion cannot resurrect a line after clear or History navigation.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/AppStateTranscriptionTests.swift",
+          "contains": "clearAll invalidates an in-flight chunk so it can't resurrect a line"
+        },
+        {
+          "path": "Tests/MeetGPTTests/AppStateTranscriptionTests.swift",
+          "contains": "restoring History rejects a late final chunk from the stopped meeting"
+        }
+      ]
+    },
+    {
+      "id": "CONC-BACKGROUND-SINGLE-FLIGHT",
+      "category": "concurrency",
+      "priority": "high",
+      "description": "Background model work is single-flight per key and duplicate in-flight reservations are dropped.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/BackgroundLLMQueueTests.swift",
+          "contains": "single-flight: a second reserve for an in-flight key is dropped"
+        }
+      ]
+    },
+    {
+      "id": "CONC-GLOBAL-BACKPRESSURE",
+      "category": "concurrency",
+      "priority": "high",
+      "description": "Simultaneous asynchronous background actions obey a global concurrency cap.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/BackgroundLLMQueueTests.swift",
+          "contains": "backpressure: no more than maxConcurrent runs across all keys"
+        }
+      ]
+    },
+    {
+      "id": "CONC-LIVE-PROMPT-OVERLAP",
+      "category": "concurrency",
+      "priority": "critical",
+      "description": "Model-backed prompt actions are intentionally overlapped while transcription and video playback continue.",
+      "proof": [
+        {
+          "path": "videotest.sh",
+          "contains": "send ai.cruxwing.livetest.runPrompt id \"whattoask\""
+        },
+        {
+          "path": "videotest.sh",
+          "contains": "check \"$cond model-backed prompt overlap evidence\""
+        }
+      ]
+    },
+    {
+      "id": "VIDEO-INSTALLED-APP-PLAYBACK",
+      "category": "video",
+      "priority": "critical",
+      "description": "Launch the installed application and play generated MP4 media through a dedicated ffplay window into the real ScreenCaptureKit system-audio path.",
+      "proof": [
+        {
+          "path": "videotest.sh",
+          "contains": "play_video \"$video\""
+        },
+        {
+          "path": "testlib/make_meeting_video.py",
+          "contains": "the app captures SYSTEM audio via"
+        }
+      ]
+    },
+    {
+      "id": "VIDEO-CLEAN-CONDITION",
+      "category": "video",
+      "priority": "high",
+      "description": "Execute video launch and playback under the clean-audio condition.",
+      "proof": [
+        {
+          "path": "videotest.sh",
+          "contains": "clean)   run_condition clean"
+        }
+      ]
+    },
+    {
+      "id": "VIDEO-NOISY-CONDITION",
+      "category": "video",
+      "priority": "critical",
+      "description": "Execute video playback with reproducible pink background noise.",
+      "proof": [
+        {
+          "path": "videotest.sh",
+          "contains": "noisy)   run_condition noisy --noise 0.25"
+        },
+        {
+          "path": "testlib/make_meeting_video.py",
+          "contains": "anoisesrc=color=pink:amplitude={noise}"
+        }
+      ]
+    },
+    {
+      "id": "VIDEO-FAST-CONDITION",
+      "category": "video",
+      "priority": "high",
+      "description": "Execute accelerated 1.25x video playback without changing the ground-truth timing model.",
+      "proof": [
+        {
+          "path": "videotest.sh",
+          "contains": "fast)    run_condition fast --tempo 1.25"
+        },
+        {
+          "path": "testlib/make_meeting_video.py",
+          "contains": "startSeconds\": round(offset / tempo, 2)"
+        }
+      ]
+    },
+    {
+      "id": "VIDEO-UNPREDICTABLE-PROMPT-TIMES",
+      "category": "video",
+      "priority": "critical",
+      "description": "Derive prompt timestamps from a reproducible run seed and distribute them unpredictably through the middle 80% of playback.",
+      "proof": [
+        {
+          "path": "testlib/prompt_schedule.py",
+          "contains": "rng = random.Random(seed)"
+        },
+        {
+          "path": "testlib/prompt_schedule.py",
+          "contains": "low_tick = math.ceil(duration * 0.12 * 10)"
+        }
+      ]
+    },
+    {
+      "id": "VIDEO-TRANSCRIPTION-CONCURRENT",
+      "category": "video",
+      "priority": "critical",
+      "description": "Recording and real-time transcription remain active while video plays and prompt surfaces are injected.",
+      "proof": [
+        {
+          "path": "videotest.sh",
+          "contains": "start_recording_and_wait() {"
+        },
+        {
+          "path": "videotest.sh",
+          "contains": "Inject five DISTINCT prompt surfaces mid-playback"
+        }
+      ]
+    },
+    {
+      "id": "VIDEO-DUPLEX-SPEAKER-ROUTE",
+      "category": "video",
+      "priority": "critical",
+      "description": "Require unmuted built-in speaker output at a usable volume for the Zoom-like hardware fixture.",
+      "proof": [
+        {
+          "path": "videotest.sh",
+          "contains": "check \"$cond built-in speaker output\""
+        },
+        {
+          "path": "Sources/MeetGPT/Audio/MicrophoneCapture.swift",
+          "contains": "static func describeOutputLevel() -> String"
+        }
+      ]
+    },
+    {
+      "id": "VIDEO-DUPLEX-MIC-LIVENESS",
+      "category": "video",
+      "priority": "critical",
+      "description": "Prove the physical microphone remains live throughout speaker playback using buffer, RMS, and last-callback evidence rather than transcript text.",
+      "proof": [
+        {
+          "path": "Sources/MeetGPT/Dev/LiveTestHooks.swift",
+          "contains": "let micCaptureBufferCount: Int"
+        },
+        {
+          "path": "videotest.sh",
+          "contains": "check \"$cond live microphone track\""
+        },
+        {
+          "path": "Tests/MeetGPTTests/LiveDuplexDiagnosticsTests.swift",
+          "contains": "capture diagnostics prove liveness, signal, timing, and reset"
+        }
+      ]
+    },
+    {
+      "id": "VIDEO-DUPLEX-SYSTEM-LIVENESS",
+      "category": "video",
+      "priority": "critical",
+      "description": "Prove ScreenCaptureKit continues receiving non-silent remote/system buffers through the complete playback.",
+      "proof": [
+        {
+          "path": "Sources/MeetGPT/Dev/LiveTestHooks.swift",
+          "contains": "let systemCaptureBufferCount: Int"
+        },
+        {
+          "path": "videotest.sh",
+          "contains": "check \"$cond live remote/system track\""
+        }
+      ]
+    },
+    {
+      "id": "VIDEO-DISPLAY-METADATA",
+      "category": "video",
+      "priority": "normal",
+      "description": "Capture window dimensions and backing scale factor so device/display conditions accompany each state artifact.",
+      "proof": [
+        {
+          "path": "Sources/MeetGPT/Dev/LiveTestHooks.swift",
+          "contains": "let backingScaleFactor: Double?"
+        },
+        {
+          "path": "Sources/MeetGPT/Dev/LiveTestHooks.swift",
+          "contains": "keyWindowWidth: keyWindow.map"
+        }
+      ]
+    },
+    {
+      "id": "VIDEO-INTEL-LIVE-PLAYBACK",
+      "category": "video",
+      "priority": "normal",
+      "description": "Repeat real ScreenCaptureKit video playback on Intel Mac hardware.",
+      "manual": true,
+      "manualReason": "The current automation host cannot emulate Intel ScreenCaptureKit and audio-driver behavior.",
+      "proof": [
+        {
+          "path": "Tests/E2E/TEST_PLAN.md",
+          "contains": "Intel playback"
+        }
+      ]
+    },
+    {
+      "id": "PROMPT-INTERACTIVE-POLL",
+      "category": "video-prompts",
+      "priority": "critical",
+      "description": "Surface and capture an interactive poll during video playback, then clear it through the real prompt hook.",
+      "proof": [
+        {
+          "path": "videotest.sh",
+          "contains": "interactive poll surfaced"
+        },
+        {
+          "path": "Sources/MeetGPT/Dev/LiveTestHooks.swift",
+          "contains": "case \"poll\":"
+        }
+      ]
+    },
+    {
+      "id": "PROMPT-MANDATORY-INFORMATION",
+      "category": "video-prompts",
+      "priority": "critical",
+      "description": "Surface and capture a mandatory information notice during playback.",
+      "proof": [
+        {
+          "path": "videotest.sh",
+          "contains": "mandatory information surfaced"
+        },
+        {
+          "path": "Sources/MeetGPT/Dev/LiveTestHooks.swift",
+          "contains": "debugPresentMandatoryNotice("
+        }
+      ]
+    },
+    {
+      "id": "PROMPT-CONTEXTUAL-QUESTION",
+      "category": "video-prompts",
+      "priority": "critical",
+      "description": "Inject a contextual coaching question at a seeded in-video timestamp.",
+      "proof": [
+        {
+          "path": "videotest.sh",
+          "contains": "poll|mandatory|contextual)"
+        },
+        {
+          "path": "Sources/MeetGPT/Dev/LiveTestHooks.swift",
+          "contains": "case \"contextual\":"
+        }
+      ]
+    },
+    {
+      "id": "PROMPT-FREEFORM-INPUT",
+      "category": "video-prompts",
+      "priority": "high",
+      "description": "Submit a free-form risk-and-evidence question while video and transcription continue.",
+      "proof": [
+        {
+          "path": "testlib/prompt_schedule.py",
+          "contains": "What decision is most at risk and what evidence supports it?"
+        },
+        {
+          "path": "videotest.sh",
+          "contains": "text \"$value\" surfaceID \"$surface_id\""
+        }
+      ]
+    },
+    {
+      "id": "PROMPT-QUICK-ACTION",
+      "category": "video-prompts",
+      "priority": "high",
+      "description": "Run a gradeable quick-summary prompt after the asynchronous in-video interrupts.",
+      "proof": [
+        {
+          "path": "testlib/prompt_schedule.py",
+          "contains": "FINAL_SURFACE = (\"quick\", \"summary\")"
+        },
+        {
+          "path": "videotest.sh",
+          "contains": "id \"$value\" surfaceID \"$surface_id\""
+        }
+      ]
+    },
+    {
+      "id": "PROMPT-INSTANCE-CORRELATION",
+      "category": "video-prompts",
+      "priority": "critical",
+      "description": "Carry an identified surface through injection, state, screenshot, post-capture verification, and instance-owned cleanup.",
+      "proof": [
+        {
+          "path": "Sources/MeetGPT/Dev/LiveTestHooks.swift",
+          "contains": "liveTestActivePollSurfaceID"
+        },
+        {
+          "path": "videotest.sh",
+          "contains": "screenshot-state-race"
+        },
+        {
+          "path": "Tests/MeetGPTTests/LiveDuplexDiagnosticsTests.swift",
+          "contains": "mandatory notices are isolated and instance-owned"
+        }
+      ]
+    },
+    {
+      "id": "TRANSCRIPT-WER",
+      "category": "transcription-quality",
+      "priority": "critical",
+      "description": "Compute normalized Levenshtein word error rate against known ground truth and enforce condition-specific thresholds.",
+      "proof": [
+        {
+          "path": "testlib/score_transcript.py",
+          "contains": "def word_error_rate(truth_text, hyp_text):"
+        },
+        {
+          "path": "videotest.sh",
+          "contains": "check \"$cond WER\""
+        }
+      ]
+    },
+    {
+      "id": "TRANSCRIPT-SPEAKER-ACCURACY",
+      "category": "transcription-quality",
+      "priority": "critical",
+      "description": "Measure speaker identification accuracy under the optimal mapping of arbitrary diarizer labels to true speakers, grading only diarization-eligible Instant system/post-call rows while retaining missing labels on eligible rows as errors; request the provider's current streaming diarizer rather than its deprecated alias.",
+      "proof": [
+        {
+          "path": "testlib/score_transcript.py",
+          "contains": "def speaker_accuracy(pairs):"
+        },
+        {
+          "path": "testlib/score_transcript.py",
+          "contains": "def speaker_eligible_entries(entries):"
+        },
+        {
+          "path": "Tests/MeetGPTTests/DeepgramStreamerTests.swift",
+          "contains": "buildURL selects the latest streaming diarizer only when enabled"
+        },
+        {
+          "path": "videotest.sh",
+          "contains": "check \"$cond speaker attribution\""
+        }
+      ]
+    },
+    {
+      "id": "TRANSCRIPT-LATENCY-DISTRIBUTION",
+      "category": "transcription-quality",
+      "priority": "critical",
+      "description": "Measure median, p95, and maximum post-utterance transcript latency and enforce the p95 limit.",
+      "proof": [
+        {
+          "path": "testlib/score_transcript.py",
+          "contains": "report[\"latencySecondsP95\"]"
+        },
+        {
+          "path": "videotest.sh",
+          "contains": "check \"$cond transcript latency p95\""
+        }
+      ]
+    },
+    {
+      "id": "TRANSCRIPT-TECHNICAL-TERMS",
+      "category": "transcription-quality",
+      "priority": "critical",
+      "description": "Measure technical-term recall independently of WER using Falcon, backfill, Kubernetes, idempotent, Postgres, and SLA fixtures.",
+      "proof": [
+        {
+          "path": "testlib/meeting_script.json",
+          "contains": "\"Kubernetes\""
+        },
+        {
+          "path": "testlib/score_transcript.py",
+          "contains": "def term_recall(terms, hyp_text):"
+        },
+        {
+          "path": "videotest.sh",
+          "contains": "check \"$cond technical terms\""
+        }
+      ]
+    },
+    {
+      "id": "TRANSCRIPT-BACKGROUND-NOISE",
+      "category": "transcription-quality",
+      "priority": "critical",
+      "description": "Grade noisy playback against its own explicit WER bar rather than silently applying the clean threshold.",
+      "proof": [
+        {
+          "path": "videotest.sh",
+          "contains": "MAX_WER_NOISY"
+        },
+        {
+          "path": "videotest.sh",
+          "contains": "[ \"$cond\" = \"noisy\" ] && max_wer=\"$MAX_WER_NOISY\""
+        }
+      ]
+    },
+    {
+      "id": "TRANSCRIPT-DUPLICATION",
+      "category": "transcription-quality",
+      "priority": "high",
+      "description": "Measure repeated committed transcript lines and gate duplication regressions.",
+      "proof": [
+        {
+          "path": "testlib/score_transcript.py",
+          "contains": "def duplication_rate(lines):"
+        },
+        {
+          "path": "videotest.sh",
+          "contains": "check \"$cond system-track duplication\""
+        }
+      ]
+    },
+    {
+      "id": "TRANSCRIPT-CROSS-TRACK-ECHO",
+      "category": "transcription-quality",
+      "priority": "critical",
+      "description": "Keep system-only WER while separately gating exact visible duplication and near-duplicate speaker echo across system and mic tracks.",
+      "proof": [
+        {
+          "path": "testlib/score_transcript.py",
+          "contains": "def cross_track_echo_rate(entries, window_seconds=14.0):"
+        },
+        {
+          "path": "videotest.sh",
+          "contains": "check \"$cond cross-track speaker echo\""
+        }
+      ]
+    },
+    {
+      "id": "TRANSCRIPT-PRIVATE-ATTRIBUTION",
+      "category": "transcription-quality",
+      "priority": "critical",
+      "description": "Treat Local/private mic and system capture tracks as anonymous audio provenance rather than speaker identity across live rendering, prompts, export, and restored sessions, while preserving genuine Instant and post-call diarized labels.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/LocalTranscriptAttributionTests.swift",
+          "contains": "Local system and mic lines never invent You or Them labels"
+        },
+        {
+          "path": "Tests/MeetGPTTests/LocalTranscriptAttributionTests.swift",
+          "contains": "real diarized labels remain visible for Instant and post-call diarization"
+        },
+        {
+          "path": "Tests/MeetGPTTests/LocalTranscriptAttributionTests.swift",
+          "contains": "private prompts use neutral audio provenance"
+        },
+        {
+          "path": "Tests/MeetGPTTests/LocalTranscriptAttributionTests.swift",
+          "contains": "private export omits false speakers but keeps timestamps and text"
+        },
+        {
+          "path": "Tests/MeetGPTTests/LocalTranscriptAttributionTests.swift",
+          "contains": "restoring a saved Local session applies session provenance to legacy entries"
+        }
+      ]
+    },
+    {
+      "id": "TRANSCRIPT-CUMULATIVE-CROSS-TRACK-ECHO",
+      "category": "transcription-quality",
+      "priority": "critical",
+      "description": "Suppress Instant microphone hypotheses that cumulatively repeat several recent system/Speaker A finals\u2014including the reported long Russian block and ASR substitutions\u2014without hiding a genuinely novel user suffix, for both provisional and committed text.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/LocalTranscriptAttributionTests.swift",
+          "contains": "Instant cumulative mic final does not create a giant false You block"
+        },
+        {
+          "path": "Tests/MeetGPTTests/LocalTranscriptAttributionTests.swift",
+          "contains": "Instant cumulative mic interim is hidden, then exposes only novel speech"
+        },
+        {
+          "path": "Tests/MeetGPTTests/LocalTranscriptAttributionTests.swift",
+          "contains": "Instant cumulative final keeps only a genuinely novel user suffix"
+        },
+        {
+          "path": "Tests/MeetGPTTests/TranscriptDeduplicatorTests.swift",
+          "contains": "a Russian mic copy spanning several Speaker A finals is dropped"
+        },
+        {
+          "path": "Tests/MeetGPTTests/TranscriptDeduplicatorTests.swift",
+          "contains": "ASR substitutions inside a cumulative echo are tolerated"
+        },
+        {
+          "path": "Tests/MeetGPTTests/TranscriptDeduplicatorTests.swift",
+          "contains": "new user speech after the echoed prefix is preserved exactly"
+        }
+      ]
+    },
+    {
+      "id": "TRANSCRIPT-INSTANT-SCROLL-STABILITY",
+      "category": "ui-state",
+      "priority": "critical",
+      "description": "Keep the Instant transcript pinned at the live tail across a very large provisional-to-final replacement and later lines, preserve the exact viewport and selection after an explicit manual scroll-away, and let Latest re-engage even when text is unchanged.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/LiveScrollPolicyTests.swift",
+          "contains": "large Instant provisional becoming final stays pinned through later lines"
+        },
+        {
+          "path": "Tests/MeetGPTTests/LiveScrollPolicyTests.swift",
+          "contains": "manual scroll-away preserves viewport across interim and final replacement"
+        },
+        {
+          "path": "Tests/MeetGPTTests/LiveScrollPolicyTests.swift",
+          "contains": "Latest re-engages and anchors even when transcript text is unchanged"
+        },
+        {
+          "path": "Tests/MeetGPTTests/LiveScrollPolicyTests.swift",
+          "contains": "small explicit reader scroll wins over follow hysteresis"
+        }
+      ]
+    },
+    {
+      "id": "TRANSCRIPT-CROSSTALK-SPEAKER-RUNS",
+      "category": "transcription-quality",
+      "priority": "high",
+      "description": "Separate genuine crosstalk into speaker runs while merging one-word diarization noise islands.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/DeepgramStreamerTests.swift",
+          "contains": "diarized final splits crosstalk into per-speaker runs"
+        },
+        {
+          "path": "Tests/MeetGPTTests/DeepgramStreamerTests.swift",
+          "contains": "a one-word speaker island inside an utterance is diarization noise, not crosstalk"
+        }
+      ]
+    },
+    {
+      "id": "TRANSCRIPT-SILENCE-AND-QUIET-BOUNDARIES",
+      "category": "transcription-quality",
+      "priority": "high",
+      "description": "Exercise silence suppression and quiet system-audio admission at the voice-activity boundary.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/TranscriptionPipelineTests.swift",
+          "contains": "silent audio yields no chunks to transcribe (VAD on)"
+        },
+        {
+          "path": "Tests/MeetGPTTests/AudioChunkBufferTests.swift",
+          "contains": "system-audio VAD admits quiet meeting playback that the mic gate drops"
+        }
+      ]
+    },
+    {
+      "id": "TRANSCRIPT-PROVIDER-FALLBACK",
+      "category": "transcription-quality",
+      "priority": "high",
+      "description": "Classify cap, configuration, server, and network failures that degrade to the fallback transcription engine.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/ServerFallbackTranscriptionTests.swift",
+          "contains": "classifies which failures degrade the session"
+        },
+        {
+          "path": "Tests/MeetGPTTests/ServerFallbackTranscriptionTests.swift",
+          "contains": "degraded state is per-instance and sticky, and notifies exactly once"
+        }
+      ]
+    },
+    {
+      "id": "TRANSCRIPT-API-DIARIZED-SHAPE",
+      "category": "transcription-quality",
+      "priority": "high",
+      "description": "Verify the API maps vendor diarized segments to the client speaker/text/start contract and rejects unlabeled or empty segments.",
+      "proof": [
+        {
+          "path": "../cruxwing-api/test/diarize.test.js",
+          "contains": "maps segments to the shape the client already consumes"
+        },
+        {
+          "path": "../cruxwing-api/test/diarize.test.js",
+          "contains": "drops a segment with no speaker"
+        }
+      ]
+    },
+    {
+      "id": "TRANSCRIPT-SCORER-SELFTEST",
+      "category": "transcription-quality",
+      "priority": "critical",
+      "description": "Self-test the WER, terminology, speaker mapping, duplication, alignment, and latency measuring instrument before grading live output.",
+      "proof": [
+        {
+          "path": "testlib/score_transcript.py",
+          "contains": "scorer selftest: all checks passed"
+        },
+        {
+          "path": "videotest.sh",
+          "contains": "score_transcript.py\" --selftest"
+        }
+      ]
+    },
+    {
+      "id": "RESPONSE-ALL-EXCHANGES",
+      "category": "response-quality",
+      "priority": "critical",
+      "description": "Score every archived and current in-video AI exchange rather than only the last visible answer.",
+      "proof": [
+        {
+          "path": "videotest.sh",
+          "contains": "grade EVERY archived/current answer"
+        },
+        {
+          "path": "testlib/response_quality.py",
+          "contains": "all archived and current exchanges extracted"
+        }
+      ]
+    },
+    {
+      "id": "RESPONSE-NONERROR-COMPLETION",
+      "category": "response-quality",
+      "priority": "critical",
+      "description": "Require non-empty explicitly successful terminal answers; reject failed, cancelled, superseded, streaming, and error-text attempts from the completed response count.",
+      "proof": [
+        {
+          "path": "testlib/response_quality.py",
+          "contains": "nonErrorCompletion          a non-empty answer that is not an app/API error"
+        },
+        {
+          "path": "videotest.sh",
+          "contains": "--require-explicit-lifecycle"
+        }
+      ]
+    },
+    {
+      "id": "RESPONSE-MULTIPLE-COMPLETIONS",
+      "category": "response-quality",
+      "priority": "critical",
+      "description": "Require at least two completed model-backed in-video responses so a final summary alone cannot make overlapping prompt failures pass.",
+      "proof": [
+        {
+          "path": "videotest.sh",
+          "contains": "--min-responses 2"
+        },
+        {
+          "path": "videotest.sh",
+          "contains": "independent Advice reached successful terminal state"
+        }
+      ]
+    },
+    {
+      "id": "RESPONSE-LIFECYCLE-OVERLAP",
+      "category": "response-quality",
+      "priority": "critical",
+      "description": "Prove rapid model-backed overlap with stable exchange IDs, explicit superseded statuses, and shared replacement timestamps rather than source comments.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/AIExchangeLifecycleEvidenceTests.swift",
+          "contains": "superseded blank run is evidence, not a completed dialog answer"
+        },
+        {
+          "path": "testlib/verify_prompt_overlap.py",
+          "contains": "sharedBoundaryRequired"
+        },
+        {
+          "path": "videotest.sh",
+          "contains": "model-backed prompt overlap evidence"
+        }
+      ]
+    },
+    {
+      "id": "RESPONSE-REQUIRED-IDS-TYPES-LATENCY",
+      "category": "response-quality",
+      "priority": "critical",
+      "description": "Require independently successful Summary and Advice identities/types and gate per-exchange prompt-to-terminal latency.",
+      "proof": [
+        {
+          "path": "videotest.sh",
+          "contains": "--require-prompt-id summary --require-prompt-id advice"
+        },
+        {
+          "path": "videotest.sh",
+          "contains": "--max-response-latency \"$MAX_AI_RESPONSE_LATENCY\""
+        },
+        {
+          "path": "testlib/response_quality.py",
+          "contains": "injection-to-terminal latency is measured per response"
+        }
+      ]
+    },
+    {
+      "id": "RESPONSE-RELEVANCE-GROUNDING",
+      "category": "response-quality",
+      "priority": "critical",
+      "description": "Measure answer relevance and grounding against the spoken meeting evidence.",
+      "proof": [
+        {
+          "path": "testlib/response_quality.py",
+          "contains": "meetingRelevanceGrounding   lexical evidence plus unsupported-number checks"
+        },
+        {
+          "path": "videotest.sh",
+          "contains": "relevance={s['meetingRelevanceGrounding']:.3f}"
+        }
+      ]
+    },
+    {
+      "id": "RESPONSE-TEMPORAL-GROUNDING",
+      "category": "response-quality",
+      "priority": "critical",
+      "description": "Grade each response only against meeting turns completed before its identified prompt timestamp, excluding future facts.",
+      "proof": [
+        {
+          "path": "testlib/response_quality.py",
+          "contains": "def _truth_available_at(truth, cutoff_seconds):"
+        },
+        {
+          "path": "videotest.sh",
+          "contains": "--playback-start \"$playback_started\""
+        }
+      ]
+    },
+    {
+      "id": "RESPONSE-PROMPT-FULFILLMENT",
+      "category": "response-quality",
+      "priority": "critical",
+      "description": "Score prompt-specific summary, tasks, contextual, and free-form fulfillment.",
+      "proof": [
+        {
+          "path": "testlib/response_quality.py",
+          "contains": "promptFulfillment           category-specific summary/task/context/freeform"
+        },
+        {
+          "path": "videotest.sh",
+          "contains": "fulfillment={s['promptFulfillment']:.3f}"
+        }
+      ]
+    },
+    {
+      "id": "RESPONSE-COHERENCE-REPETITION",
+      "category": "response-quality",
+      "priority": "critical",
+      "description": "Score structural coherence and repeated content for each generated answer.",
+      "proof": [
+        {
+          "path": "testlib/response_quality.py",
+          "contains": "coherenceRepetition         structural coherence and repeated-content checks"
+        },
+        {
+          "path": "videotest.sh",
+          "contains": "coherence={s['coherenceRepetition']:.3f}"
+        }
+      ]
+    },
+    {
+      "id": "RESPONSE-UNSUPPORTED-NUMBERS",
+      "category": "response-quality",
+      "priority": "high",
+      "description": "Flag unsupported numeric claims that can otherwise look relevant while contradicting meeting facts.",
+      "proof": [
+        {
+          "path": "testlib/response_quality.py",
+          "contains": "unsupported numeric claim flagged"
+        }
+      ]
+    },
+    {
+      "id": "BLIND-SPOT-LIVE-END-TO-END",
+      "category": "blind-spot",
+      "priority": "critical",
+      "description": "During real installed-app speaker/microphone playback, run one goal-correlated Blind Spot scan to a managed-provider terminal state with a complete provider/cost trace, exact tariff charge, bounded cadence, full payload, and a visible clean-condition card.",
+      "proof": [
+        {
+          "path": "videotest.sh",
+          "contains": "Blind Spot one-shot cadence"
+        },
+        {
+          "path": "videotest.sh",
+          "contains": "Blind Spot provider trace"
+        },
+        {
+          "path": "videotest.sh",
+          "contains": "Blind Spot tariff charge"
+        },
+        {
+          "path": "testlib/verify_e2e_coverage.py",
+          "contains": "BLIND-SPOT-LIVE-END-TO-END"
+        }
+      ]
+    },
+    {
+      "id": "BLIND-SPOT-INACTIVE-PRESENTATION",
+      "category": "blind-spot",
+      "priority": "high",
+      "description": "Keep surfaced cards visible while Blind Spot is off or paused, but never describe an inactive or quota-latched watcher as live, listening, or automatically retrying.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/BlindSpotPanelPresentationTests.swift",
+          "contains": "Settings off with no cards is never presented as live or listening"
+        },
+        {
+          "path": "Tests/MeetGPTTests/BlindSpotPanelPresentationTests.swift",
+          "contains": "quota latch overrides stale retry status and pauses the feed"
+        }
+      ]
+    },
+    {
+      "id": "BLIND-SPOT-ASYNC-INVALIDATION",
+      "category": "blind-spot",
+      "priority": "critical",
+      "description": "Treat Blind Spot Settings writes idempotently and bind each asynchronous attempt to its call generation so OFF, snooze, Stop, and New Call reject a late non-cooperative provider result before it can merge, log success, or release a newer call's queue slot.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/BlindSpotSchedulerRaceTests.swift",
+          "contains": "same-value Settings writes do not restart the Blind Spot task"
+        },
+        {
+          "path": "Tests/MeetGPTTests/BlindSpotSchedulerRaceTests.swift",
+          "contains": "OFF, snooze, Stop, and new call reject a non-cooperative stale provider"
+        },
+        {
+          "path": "Tests/MeetGPTTests/BlindSpotSchedulerRaceTests.swift",
+          "contains": "disable during token lookup prevents the provider request"
+        }
+      ]
+    },
+    {
+      "id": "BLIND-SPOT-BACKPRESSURE-QUOTA",
+      "category": "blind-spot",
+      "priority": "critical",
+      "description": "Do not consume a transcript snapshot when global backpressure rejects admission, retry that exact material later, and terminate a real 429 under the quota message without claiming an automatic retry.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/BlindSpotSchedulerRaceTests.swift",
+          "contains": "backpressure does not consume the transcript baseline or miss the retry"
+        },
+        {
+          "path": "Tests/MeetGPTTests/BlindSpotSchedulerRaceTests.swift",
+          "contains": "a provider 429 latches quota and never promises an automatic retry"
+        }
+      ]
+    },
+    {
+      "id": "BLIND-SPOT-IDLE-NO-BUSY-LOOP",
+      "category": "blind-spot",
+      "priority": "critical",
+      "description": "After the funded cadence elapses, suspend cooperatively while the goal, transcript material, quota, or shared background queue is ineligible so Blind Spot cannot monopolize MainActor and freeze Settings, Stop Recording, or diagnostics.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/BackgroundSpendPolicyTests.swift",
+          "contains": "elapsed Blind Spot cadence yields while no new material is eligible"
+        },
+        {
+          "path": "Sources/MeetGPT/AI/BackgroundSpendPolicy.swift",
+          "contains": "static func pauseBeforeBlindSpotReevaluation("
+        },
+        {
+          "path": "videotest.sh",
+          "contains": "closing Settings keeps recording"
+        },
+        {
+          "path": "videotest.sh",
+          "contains": "independent Advice reached successful terminal state"
+        }
+      ]
+    },
+    {
+      "id": "BLIND-SPOT-DEV-SYNTHETIC-EVIDENCE",
+      "category": "blind-spot",
+      "priority": "critical",
+      "description": "For an explicitly authorized fixed synthetic dev call, save owner-only exact bounded goal, transcript, guidance, context, request JSON, connector workflow outcomes, response, provider/cost trace, and ordered stage timings while excluding bearer/access tokens; keep ordinary production logs metadata-only.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/BlindSpotSchedulerRaceTests.swift",
+          "contains": "authorized synthetic trace exactly reconstructs the bounded provider body"
+        },
+        {
+          "path": "videotest.sh",
+          "contains": "synthetic-evidence.jsonl"
+        },
+        {
+          "path": "testlib/verify_e2e_coverage.py",
+          "contains": "BLIND-SPOT-DEV-SYNTHETIC-EVIDENCE"
+        }
+      ]
+    },
+    {
+      "id": "BLIND-SPOT-MANAGED-FAILOVER-BILLING",
+      "category": "blind-spot",
+      "priority": "critical",
+      "description": "Recover an unfunded OpenAI Blind Spot generator or judge through an affordable funded route, sanitize attempt evidence, charge one cache miss, charge zero on a cache hit, and refund the exact reservation on terminal failure.",
+      "proof": [
+        {
+          "path": "../cruxwing-api/test/backgroundFeatureFailover.test.js",
+          "contains": "recovers OpenAI 402 through funded OpenRouter with sanitized evidence metadata"
+        },
+        {
+          "path": "../cruxwing-api/test/backgroundFeatureFailover.test.js",
+          "contains": "charges one successful miss and zero for its cache hit"
+        },
+        {
+          "path": "../cruxwing-api/test/backgroundFeatureFailover.test.js",
+          "contains": "releases exactly its one receipt when every provider fails"
+        }
+      ]
+    },
+    {
+      "id": "BLIND-SPOT-TOKEN-ECONOMY",
+      "category": "blind-spot",
+      "priority": "critical",
+      "description": "Bound the fully assembled Blind Spot prompt and generator-plus-judge COGS inside its tier reservation, keep grounding charge-neutral inside that request, and fund every maximum clipped scan promised by the advertised co-pilot allowance.",
+      "proof": [
+        {
+          "path": "../cruxwing-api/test/blindSpotTokenEconomy.test.js",
+          "contains": "Blind Spot maximum generator COGS"
+        },
+        {
+          "path": "../cruxwing-api/test/blindSpotTokenEconomy.test.js",
+          "contains": "meters grounded and ungrounded copies of the same prompt consistently"
+        },
+        {
+          "path": "../cruxwing-api/test/blindSpotTokenEconomy.test.js",
+          "contains": "funds every maximum clipped scan for every advertised co-pilot hour"
+        }
+      ]
+    },
+    {
+      "id": "BLIND-SPOT-CONNECTOR-SINGLE-CHARGE",
+      "category": "blind-spot",
+      "priority": "critical",
+      "description": "Pack connected-source evidence deterministically and source-aware inside the bounded brainstorm request, avoiding a preliminary generic-chat model call and its second user charge while retaining the separately limited grounded-cycle accounting.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/BlindSpotContextCompressorTests.swift",
+          "contains": "source-aware packing preserves bounded connector evidence without a generic chat call"
+        },
+        {
+          "path": "Tests/MeetGPTTests/BlindSpotContextCompressorTests.swift",
+          "contains": "packing distributes its cap across sources and ranks literal relevance first"
+        },
+        {
+          "path": "Tests/MeetGPTTests/BlindSpotContextCompressorTests.swift",
+          "contains": "mirrored connector facts are sent once even when source tags differ"
+        },
+        {
+          "path": "Tests/MeetGPTTests/GroundingContextPolicyTests.swift",
+          "contains": "Blind Spot grounding skips query-derivation gateway while interactive grounding retains it"
+        },
+        {
+          "path": "Tests/MeetGPTTests/GroundingContextPolicyTests.swift",
+          "contains": "maxSources one performs exactly one connector transport call"
+        }
+      ]
+    },
+    {
+      "id": "BLIND-SPOT-DEADLINE-DEV-TIER-PARITY",
+      "category": "blind-spot",
+      "priority": "high",
+      "description": "Give bespoke Brainstorm and Fact Check requests the same guarded dev-tier headers as the shared gateway, cap the server route at 70 seconds with 90-second client headroom, and skip or fail open the optional judge when its failover budget cannot fit.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/BackendGatewayTests.swift",
+          "contains": "bespoke background routes share guarded dev-tier headers and server-deadline headroom"
+        },
+        {
+          "path": "../cruxwing-api/test/brainstorm.test.js",
+          "contains": "skips the optional paid judge when its worst-case failover budget no longer fits"
+        },
+        {
+          "path": "../cruxwing-api/test/devTierOverride.test.js",
+          "contains": "is consumed by bespoke Brainstorm and Fact Check routes"
+        }
+      ]
+    },
+    {
+      "id": "BLIND-SPOT-PRODUCTION-LOG-PRIVACY",
+      "category": "blind-spot",
+      "priority": "critical",
+      "description": "Keep ordinary Blind Spot production logs metadata-only, including judge filtering, so call-derived titles, prompts, transcript text, and credentials never enter console/network diagnostics.",
+      "proof": [
+        {
+          "path": "../cruxwing-api/test/brainstorm.test.js",
+          "contains": "logs only judge counts, never call-derived suggestion titles"
+        },
+        {
+          "path": "videotest.sh",
+          "contains": "contentCanaryLeaks"
+        }
+      ]
+    },
+    {
+      "id": "RESPONSE-THRESHOLD-SELFTEST",
+      "category": "response-quality",
+      "priority": "critical",
+      "description": "Self-test positive and negative quality fixtures and machine-readable threshold failures before live grading.",
+      "proof": [
+        {
+          "path": "testlib/response_quality.py",
+          "contains": "good fixtures pass thresholds"
+        },
+        {
+          "path": "testlib/response_quality.py",
+          "contains": "empty response failure is machine readable"
+        },
+        {
+          "path": "videotest.sh",
+          "contains": "response_quality.py\" --selftest"
+        }
+      ]
+    },
+    {
+      "id": "OBS-STABLE-STATE-DUMPS",
+      "category": "observability",
+      "priority": "critical",
+      "description": "Capture complete stable JSON state at launch, recording start, every prompt interruption, and completion.",
+      "proof": [
+        {
+          "path": "videotest.sh",
+          "contains": "checkpoint launch ready"
+        },
+        {
+          "path": "videotest.sh",
+          "contains": "checkpoint \"$cond\" final"
+        },
+        {
+          "path": "Sources/MeetGPT/Dev/LiveTestHooks.swift",
+          "contains": "static func snapshotJSON("
+        }
+      ]
+    },
+    {
+      "id": "OBS-SECURE-RUN-ARTIFACTS",
+      "category": "observability",
+      "priority": "critical",
+      "description": "Authenticate dev-hook commands with a per-run nonce, confine writes to an owner-only fresh directory, refuse stale evidence targets, restore process-local test state on exit, and terminate only the exact app process launched by the harness if graceful cleanup cannot complete.",
+      "proof": [
+        {
+          "path": "Sources/MeetGPT/Dev/LiveTestHooks.swift",
+          "contains": "static func confinedDumpURL(_ rawPath: String) -> URL?"
+        },
+        {
+          "path": "videotest.sh",
+          "contains": "umask 077"
+        },
+        {
+          "path": "videotest.sh",
+          "contains": "refusing non-empty artifact directory (stale evidence risk)"
+        },
+        {
+          "path": "videotest.sh",
+          "contains": "send ai.cruxwing.livetest.restoreSettings finishRun true"
+        },
+        {
+          "path": "videotest.sh",
+          "contains": "kill -TERM \"$APP_PID\""
+        }
+      ]
+    },
+    {
+      "id": "OBS-PROMPT-SCREENSHOTS",
+      "category": "observability",
+      "priority": "critical",
+      "description": "Capture the application window, rather than the full desktop, at every prompt surface and final state.",
+      "proof": [
+        {
+          "path": "videotest.sh",
+          "contains": "/usr/sbin/screencapture -x -o -l \"$window\""
+        },
+        {
+          "path": "videotest.sh",
+          "contains": "scheduled_prompt_capture"
+        },
+        {
+          "path": "videotest.sh",
+          "contains": "$SCREENSHOT_DIR/$cond.$name.png"
+        }
+      ]
+    },
+    {
+      "id": "OBS-EVENT-TIMELINE",
+      "category": "observability",
+      "priority": "critical",
+      "description": "Write timestamped video, prompt, state, and flow events as replayable JSON Lines.",
+      "proof": [
+        {
+          "path": "videotest.sh",
+          "contains": "EVENTS_JSONL=\"$OUTDIR/events.jsonl\""
+        },
+        {
+          "path": "videotest.sh",
+          "contains": "\"at\": time.time(), \"kind\": kind"
+        }
+      ]
+    },
+    {
+      "id": "OBS-FLOW-COMPLETION-METRICS",
+      "category": "observability",
+      "priority": "critical",
+      "description": "Persist flow-terminal latency and final passed, failed, skipped, seed, and completion metrics.",
+      "proof": [
+        {
+          "path": "videotest.sh",
+          "contains": "prompt-terminal-latency=$ai_terminal_latency"
+        },
+        {
+          "path": "videotest.sh",
+          "contains": "\"passed\": int(passed), \"failed\": int(failed), \"skipped\": int(skipped)"
+        }
+      ]
+    },
+    {
+      "id": "OBS-PRIVACY-SAFE-NETWORK-LOG",
+      "category": "observability",
+      "priority": "critical",
+      "description": "Capture backend HTTP and transcription lifecycle logs without request bodies, bearer tokens, credentials, prompts, or transcript text.",
+      "proof": [
+        {
+          "path": "videotest.sh",
+          "contains": "network.log      privacy-safe backend HTTP/transcription lifecycle logs"
+        },
+        {
+          "path": "videotest.sh",
+          "contains": "bearer tokens, transcript text, and provider credentials are deliberately"
+        }
+      ]
+    },
+    {
+      "id": "OBS-REQUEST-CORRELATION",
+      "category": "observability",
+      "priority": "high",
+      "description": "Correlate each installed-app backend chat lifecycle under one request identifier from preparation through start and response-or-failure, with elapsed time on its single terminal record.",
+      "proof": [
+        {
+          "path": "Sources/MeetGPT/AI/BackendGateway.swift",
+          "contains": "event=backend_chat_prepare request_id="
+        },
+        {
+          "path": "Sources/MeetGPT/AI/BackendGateway.swift",
+          "contains": "event=backend_chat_start request_id="
+        },
+        {
+          "path": "Sources/MeetGPT/AI/BackendGateway.swift",
+          "contains": "event=backend_chat_response request_id="
+        },
+        {
+          "path": "Sources/MeetGPT/AI/BackendGateway.swift",
+          "contains": "event=backend_chat_complete request_id="
+        },
+        {
+          "path": "Sources/MeetGPT/AI/BackendGateway.swift",
+          "contains": "event=backend_chat_failed request_id="
+        },
+        {
+          "path": "Sources/MeetGPT/AI/BackendGateway.swift",
+          "contains": "elapsed_ms="
+        },
+        {
+          "path": "videotest.sh",
+          "contains": "r\"backend_chat_(prepare|start|response|complete|failed)\""
+        },
+        {
+          "path": "videotest.sh",
+          "contains": "if stages & {\"complete\", \"failed\"}"
+        },
+        {
+          "path": "videotest.sh",
+          "contains": "if \"start\" in stages and \"prepare\" in stages"
+        },
+        {
+          "path": "videotest.sh",
+          "contains": "closed-schema assistant and promo request lifecycles"
+        }
+      ]
+    },
+    {
+      "id": "OBS-DEV-CALL-DIAGNOSTIC-JSONL",
+      "category": "observability",
+      "priority": "critical",
+      "description": "When and only when an owner explicitly arms a nonce-confined dev run, persist one bounded 0600 JSONL trace per live call with correlated prompt, workflow, backend route, Blind Spot, response, and terminal events; recursively redact credentials, rotate old calls, and keep production/opt-out paths artifact-free.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/DevCallDiagnosticsTests.swift",
+          "contains": "production and opt-out gates create no diagnostic artifact"
+        },
+        {
+          "path": "Tests/MeetGPTTests/DevCallDiagnosticsTests.swift",
+          "contains": "authorized JSONL contains bounded workflow evidence with owner-only modes"
+        },
+        {
+          "path": "Tests/MeetGPTTests/DevCallDiagnosticsTests.swift",
+          "contains": "structured and embedded credentials are redacted before persistence"
+        },
+        {
+          "path": "Tests/MeetGPTTests/DevCallDiagnosticsTests.swift",
+          "contains": "long calls are bounded and old per-call logs rotate"
+        },
+        {
+          "path": "Tests/MeetGPTTests/DevCallDiagnosticsTests.swift",
+          "contains": "assistant pipeline emits assembled request, workflow, and terminal answer"
+        },
+        {
+          "path": "videotest.sh",
+          "contains": "check \"dev call prompt/workflow diagnostics\""
+        },
+        {
+          "path": "testlib/verify_e2e_coverage.py",
+          "contains": "OBS-DEV-CALL-DIAGNOSTIC-JSONL"
+        }
+      ]
+    },
+    {
+      "id": "OBS-TOKEN-COST-FRAMES",
+      "category": "observability",
+      "priority": "high",
+      "description": "Record per-feature/model token and USD cost frames through the durable API telemetry sink.",
+      "proof": [
+        {
+          "path": "../cruxwing-api/test/costMeter.test.js",
+          "contains": "calls the sink with the per-feature/model frame (tokens + cost)"
+        },
+        {
+          "path": "../cruxwing-api/test/chatCostFrame.test.js",
+          "contains": "a chat call produces a non-zero durable cost frame"
+        }
+      ]
+    },
+    {
+      "id": "NET-TIMEOUT-OFFLINE-DISTINCTION",
+      "category": "network-errors",
+      "priority": "critical",
+      "description": "Inject timeout and offline transport failures and require distinguishable error classifications.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/BackendGatewayTests.swift",
+          "contains": "timeout and offline transport errors remain distinguishable"
+        }
+      ]
+    },
+    {
+      "id": "NET-BOUNDED-REQUEST-TIMEOUT",
+      "category": "network-errors",
+      "priority": "high",
+      "description": "Propagate and verify the configured backend request timeout on the actual URL request.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/BackendGatewayTests.swift",
+          "contains": "POSTs the bounded chat payload, images, auth, and injected timeout"
+        },
+        {
+          "path": "Tests/MeetGPTTests/BackendGatewayTests.swift",
+          "contains": "#expect(request.timeoutInterval == 7.5)"
+        }
+      ]
+    },
+    {
+      "id": "NET-MALFORMED-SSE",
+      "category": "network-errors",
+      "priority": "critical",
+      "description": "Ignore malformed and notice SSE records while preserving valid deltas and the terminal DONE event.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/BackendGatewayTests.swift",
+          "contains": "streams deltas, ignores malformed and notice records, and stops at DONE"
+        }
+      ]
+    },
+    {
+      "id": "NET-MIDSTREAM-FAILURE",
+      "category": "network-errors",
+      "priority": "critical",
+      "description": "Terminate on a mid-stream upstream failure without discarding already-emitted response deltas.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/BackendGatewayTests.swift",
+          "contains": "a mid-stream error preserves emitted deltas and terminates the run"
+        }
+      ]
+    },
+    {
+      "id": "NET-HTTP-ERROR-SHAPES",
+      "category": "network-errors",
+      "priority": "critical",
+      "description": "Handle non-2xx string, nested, message, and capped plain-body API error responses.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/BackendGatewayTests.swift",
+          "contains": "non-2xx JSON errors unwrap string, nested, and message envelopes"
+        },
+        {
+          "path": "Tests/MeetGPTTests/BackendGatewayTests.swift",
+          "contains": "plain error bodies are retained but capped before reaching the UI"
+        }
+      ]
+    },
+    {
+      "id": "NET-USER-FACING-DISCONNECT",
+      "category": "network-errors",
+      "priority": "high",
+      "description": "Explain refused connections and no-network failures differently in user-facing UI copy.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/NewCallTests.swift",
+          "contains": "a refused connection names the backend and what to do"
+        },
+        {
+          "path": "Tests/MeetGPTTests/NewCallTests.swift",
+          "contains": "no network is reported as no network, not as a backend problem"
+        }
+      ]
+    },
+    {
+      "id": "INPUT-OUTPUT-TOKEN-BOUNDARIES",
+      "category": "network-errors",
+      "priority": "high",
+      "description": "Clamp requested output-token budgets at the minimum and maximum interface boundaries.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/BackendGatewayTests.swift",
+          "contains": "explicit output budgets are clamped at both boundaries"
+        }
+      ]
+    },
+    {
+      "id": "INPUT-IMAGE-COUNT-SIZE-BOUNDARIES",
+      "category": "network-errors",
+      "priority": "high",
+      "description": "Reject image-count and image-byte overflow before transport or base64 expansion.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/BackendGatewayTests.swift",
+          "contains": "more images than the tariff can quote are rejected before transport"
+        },
+        {
+          "path": "Tests/MeetGPTTests/BackendGatewayTests.swift",
+          "contains": "an oversized image is rejected before base64 expansion or transport"
+        }
+      ]
+    },
+    {
+      "id": "NET-OFFLINE-SAFETY",
+      "category": "network-errors",
+      "priority": "normal",
+      "description": "Use deterministic URL-protocol failure injection instead of disrupting the developer machine's network.",
+      "proof": [
+        {
+          "path": "videotest.sh",
+          "contains": "covered by injected URLProtocol failures; machine-wide network left intact"
+        },
+        {
+          "path": "Tests/MeetGPTTests/BackendGatewayTests.swift",
+          "contains": "timeout and offline transport errors remain distinguishable"
+        }
+      ]
+    },
+    {
+      "id": "A11Y-OVERLAP-16-PERMUTATIONS",
+      "category": "accessibility",
+      "priority": "critical",
+      "description": "Render the interrupting poll through all 16 combinations of large text, increased contrast, bold legibility, and light/dark appearance.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/AccessibilityOverlapTests.swift",
+          "contains": "poll controls survive every accessibility overlap"
+        },
+        {
+          "path": "Tests/MeetGPTTests/AccessibilityOverlapTests.swift",
+          "contains": "#expect(fingerprints.count == 16)"
+        }
+      ]
+    },
+    {
+      "id": "A11Y-POLL-CONTROLS-COMPLETE",
+      "category": "accessibility",
+      "priority": "high",
+      "description": "Verify poll question, options, answer-anyway, and continue-without-answer controls survive every accessibility overlap.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/AccessibilityOverlapTests.swift",
+          "contains": "try inspected.find(button: \"Continue without answering\")"
+        },
+        {
+          "path": "Tests/MeetGPTTests/AccessibilityOverlapTests.swift",
+          "contains": "try inspected.find(button: \"Answer anyway\")"
+        }
+      ]
+    },
+    {
+      "id": "A11Y-LIVE-OS-STATE-CAPTURE",
+      "category": "accessibility",
+      "priority": "high",
+      "description": "Record reduce-motion, increase-contrast, differentiate-without-color, and VoiceOver status beside each live screen artifact.",
+      "proof": [
+        {
+          "path": "Sources/MeetGPT/Dev/LiveTestHooks.swift",
+          "contains": "accessibilityReduceMotion: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion"
+        },
+        {
+          "path": "Sources/MeetGPT/Dev/LiveTestHooks.swift",
+          "contains": "accessibilityDifferentiateWithoutColor: NSWorkspace.shared.accessibilityDisplayShouldDifferentiateWithoutColor"
+        },
+        {
+          "path": "Sources/MeetGPT/Dev/LiveTestHooks.swift",
+          "contains": "accessibilityVoiceOverEnabled: NSWorkspace.shared.isVoiceOverEnabled"
+        }
+      ]
+    },
+    {
+      "id": "A11Y-SPOKEN-VOICEOVER",
+      "category": "accessibility",
+      "priority": "normal",
+      "description": "Listen to the poll and mandatory prompt flow using spoken VoiceOver output and verify reading order and announcements.",
+      "manual": true,
+      "manualReason": "Programmatic accessibility inspection cannot validate the audible VoiceOver experience or human-comprehensible reading cadence.",
+      "proof": [
+        {
+          "path": "Tests/E2E/TEST_PLAN.md",
+          "contains": "spoken VoiceOver output"
+        }
+      ]
+    },
+    {
+      "id": "ECON-TIER-INTERVAL-REGION-MATRIX",
+      "category": "token-economy",
+      "priority": "critical",
+      "description": "Exercise every paid tier across monthly and annual intervals, every default region, and global/unknown-region fallbacks.",
+      "proof": [
+        {
+          "path": "../cruxwing-api/test/tariffEconomyMatrix.test.js",
+          "contains": "covers every default region, interval, and paid tier with independently derived scaling"
+        }
+      ]
+    },
+    {
+      "id": "ECON-MONTHLY-ANNUAL-MARGINS",
+      "category": "token-economy",
+      "priority": "critical",
+      "description": "Compute full-utilization monthly and annual margins in every region, reject loss-making plans, and pin the exact current Pro/Premium floor exceptions pending an explicit commercial decision.",
+      "proof": [
+        {
+          "path": "../cruxwing-api/test/tariffEconomyMatrix.test.js",
+          "contains": "never sells at a loss and pins every floor exception pending an explicit price decision"
+        }
+      ]
+    },
+    {
+      "id": "ECON-ADDON-MARGIN",
+      "category": "token-economy",
+      "priority": "critical",
+      "description": "Require every compute-credit add-on to retain at least 50% gross margin at worst-case engine burn.",
+      "proof": [
+        {
+          "path": "../cruxwing-api/test/tariffEconomyMatrix.test.js",
+          "contains": "retains at least 50%% gross margin at worst-case compute-credit burn"
+        }
+      ]
+    },
+    {
+      "id": "ECON-PROVIDER-PRICE-CREDIT-PARITY",
+      "category": "token-economy",
+      "priority": "critical",
+      "description": "Keep the provider token-price table and tariffed model-credit table one-to-one and cost-monotonic.",
+      "proof": [
+        {
+          "path": "../cruxwing-api/test/tariffEconomyMatrix.test.js",
+          "contains": "has one internal token-price row for every tariffed model, and no orphan rows"
+        },
+        {
+          "path": "../cruxwing-api/test/tariffEconomyMatrix.test.js",
+          "contains": "never assigns fewer credits to a more expensive representative request"
+        }
+      ]
+    },
+    {
+      "id": "ECON-LARGE-INPUT-SURCHARGE",
+      "category": "token-economy",
+      "priority": "critical",
+      "description": "Verify large-input surcharges use the same per-model input rates as USD telemetry.",
+      "proof": [
+        {
+          "path": "../cruxwing-api/test/tariffEconomyMatrix.test.js",
+          "contains": "uses the same provider input rates for large-prompt surcharges and USD telemetry"
+        }
+      ]
+    },
+    {
+      "id": "ECON-TRANSCRIPTION-RATES",
+      "category": "token-economy",
+      "priority": "high",
+      "description": "Price self-hosted, OpenAI, AssemblyAI, Deepgram, and diarization transcription against the unified compute-credit pool.",
+      "proof": [
+        {
+          "path": "../cruxwing-api/test/transcriptionGateway.test.js",
+          "contains": "prices engines by what they cost us (chunks per credit)"
+        },
+        {
+          "path": "../cruxwing-api/test/diarize.test.js",
+          "contains": "diarization billing"
+        }
+      ]
+    },
+    {
+      "id": "ECON-CLIENT-SERVER-PRICE-MIRROR",
+      "category": "token-economy",
+      "priority": "critical",
+      "description": "Require the app's preflight model quote, server model charge, input surcharge, baseline, and vision charge to agree.",
+      "proof": [
+        {
+          "path": "../cruxwing-api/test/creditTariffMirror.test.js",
+          "contains": "client/server credit tariff mirror"
+        },
+        {
+          "path": "../cruxwing-api/test/creditTariffMirror.test.js",
+          "contains": "uses the same above-baseline input rates"
+        }
+      ]
+    },
+    {
+      "id": "ECON-ADVERTISED-ENFORCED-ALLOWANCES",
+      "category": "token-economy",
+      "priority": "critical",
+      "description": "Require plan-card compute credits, copilot hours, and grounded runs to match server-enforced allowances.",
+      "proof": [
+        {
+          "path": "../cruxwing-api/test/tokenEconomy.test.js",
+          "contains": "advertised allowances match enforced allowances"
+        }
+      ]
+    },
+    {
+      "id": "ECON-FREE-TIER-BOUND",
+      "category": "token-economy",
+      "priority": "high",
+      "description": "Bound maximum full-burn Free-tier acquisition cost and require paid tiers to improve both budgets.",
+      "proof": [
+        {
+          "path": "../cruxwing-api/test/tokenEconomy.test.js",
+          "contains": "free tier is a bounded acquisition cost, not an open one"
+        }
+      ]
+    },
+    {
+      "id": "ECON-APP-QUOTE-BOUNDARIES",
+      "category": "token-economy",
+      "priority": "high",
+      "description": "Exercise baseline, above-baseline, rounding, unknown-model, image-cap, and affordability boundaries in the user-facing credit quote.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/CreditCostEstimateTests.swift",
+          "contains": "a partial credit of surcharge rounds up, never down to free"
+        },
+        {
+          "path": "Tests/MeetGPTTests/CreditCostEstimateTests.swift",
+          "contains": "the image charge is capped, and a negative count cannot discount a prompt"
+        },
+        {
+          "path": "Tests/MeetGPTTests/CreditCostEstimateTests.swift",
+          "contains": "an unknown model falls back to a non-zero price on both terms"
+        }
+      ]
+    },
+    {
+      "id": "AI-USER-ANSWER-NO-SILENT-CUT",
+      "category": "response-quality",
+      "priority": "critical",
+      "description": "Give ordinary draft/refine answers, structured button draft/repair, and council chairman synthesis the bounded tariffed 8,000-token ceiling without widening silent follow-up, panel-member, background, or Blind Spot work; preserve that ceiling through Auto, Ensemble, managed orchestration, provider failover, reservation, cache identity, and the client/server tariff mirror.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/UserFacingOutputBudgetTests.swift",
+          "contains": "ordinary visible answers use 8k while their follow-up epilogue stays small"
+        },
+        {
+          "path": "Tests/MeetGPTTests/UserFacingOutputBudgetTests.swift",
+          "contains": "structured draft and targeted repair both reserve a complete artifact"
+        },
+        {
+          "path": "Tests/MeetGPTTests/UserFacingOutputBudgetTests.swift",
+          "contains": "council members stay small and only the chairman inherits 8k"
+        },
+        {
+          "path": "Tests/MeetGPTTests/AutoOrchestratorFailoverTests.swift",
+          "contains": "8k output surcharge participates in fallback tariff eligibility"
+        },
+        {
+          "path": "Tests/MeetGPTTests/RequestSelectionSnapshotTests.swift",
+          "contains": "provider-pinned Auto keeps its vendor snapshot and full visible-answer budget"
+        },
+        {
+          "path": "Tests/MeetGPTTests/BackendGatewayTests.swift",
+          "contains": "managed orchestration forwards the bounded chairman output ceiling"
+        },
+        {
+          "path": "../cruxwing-api/test/orchestrateHandler.test.js",
+          "contains": "clamps and reserves 8k for the chairman while panel members stay small"
+        },
+        {
+          "path": "../cruxwing-api/test/creditTariffMirror.test.js",
+          "contains": "uses the same output rates and bounded answer ceiling"
+        }
+      ]
+    },
+    {
+      "id": "COVERAGE-CRITICAL-90-GATE",
+      "category": "coverage-control",
+      "priority": "critical",
+      "description": "Fail the API critical commercial-core coverage command below 90% for statements, branches, functions, or lines.",
+      "proof": [
+        {
+          "path": "../cruxwing-api/package.json",
+          "contains": "test:coverage:critical"
+        },
+        {
+          "path": "../cruxwing-api/vitest.config.mjs",
+          "contains": "branches: 90"
+        },
+        {
+          "path": "../cruxwing-api/vitest.config.mjs",
+          "contains": "functions: 90"
+        }
+      ]
+    },
+    {
+      "id": "SETTINGS-LIVE-WINDOW-ALL-TABS",
+      "category": "settings-during-call",
+      "priority": "critical",
+      "description": "Open one identified Settings window during installed-app playback and capture General, AI, Transcription, Connected Apps, Account and Privacy, restoration, and close states without confusing it with the call window.",
+      "proof": [
+        {
+          "path": "videotest.sh",
+          "contains": "settings_during_call_capture() {"
+        },
+        {
+          "path": "videotest.sh",
+          "contains": "single Settings window with screenshots"
+        }
+      ]
+    },
+    {
+      "id": "SETTINGS-LIVE-GENERAL-CONTROLS",
+      "category": "settings-during-call",
+      "priority": "critical",
+      "description": "Change appearance, role, call detection, media filtering, meeting reminders, and reminder lead time while a call is recording, then restore every preference.",
+      "proof": [
+        {
+          "path": "videotest.sh",
+          "contains": "General preferences change safely during call"
+        },
+        {
+          "path": "videotest.sh",
+          "contains": "general_mutated.get(\"configuredCallDetection\") != general.get(\"configuredCallDetection\")"
+        }
+      ]
+    },
+    {
+      "id": "SETTINGS-LIVE-WATCH-MATRIX",
+      "category": "settings-during-call",
+      "priority": "critical",
+      "description": "For each of the five co-pilot watches, reconcile configured and task-active state through enable, idempotent enable, and disable both outside and during a recording.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/SettingsDuringCallTests.swift",
+          "contains": "every co-pilot switch reconciles exactly its own task in every call state"
+        },
+        {
+          "path": "videotest.sh",
+          "contains": "live co-pilot switches reconcile tasks"
+        }
+      ]
+    },
+    {
+      "id": "SETTINGS-LIVE-WATCH-ORDER-120",
+      "category": "settings-during-call",
+      "priority": "critical",
+      "description": "Exercise all 5! rapid co-pilot enable orders during a call and require every order to converge to all-on and cleanly back to all-off.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/SettingsDuringCallTests.swift",
+          "contains": "all 120 rapid enable orders converge and can be stopped cleanly"
+        },
+        {
+          "path": "Tests/MeetGPTTests/SettingsDuringCallTests.swift",
+          "contains": "for order in permutations(Watch.allCases)"
+        }
+      ]
+    },
+    {
+      "id": "SETTINGS-COPILOT-ACTIVE-INTERVALS",
+      "category": "settings-during-call",
+      "priority": "critical",
+      "description": "Bill the union of enabled co-pilot intervals rather than the switch's final value, including last-second, idempotent, and backwards-clock boundaries.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/SettingsDuringCallTests.swift",
+          "contains": "enable/disable segments bill their union rather than final state"
+        },
+        {
+          "path": "Tests/MeetGPTTests/SettingsDuringCallTests.swift",
+          "contains": "last-second changes cannot charge or erase the whole call"
+        },
+        {
+          "path": "Tests/MeetGPTTests/SettingsDuringCallTests.swift",
+          "contains": "idempotent writes and backwards clocks never double bill"
+        }
+      ]
+    },
+    {
+      "id": "SETTINGS-LIVE-TRANSCRIPTION-MATRIX",
+      "category": "settings-during-call",
+      "priority": "critical",
+      "description": "Change every always-visible transcription preference during playback while proving engine, language, local model, AEC, glossary, and diarization remain isolated to the active recording as documented.",
+      "proof": [
+        {
+          "path": "videotest.sh",
+          "contains": "all visible transcription preferences reconcile safely"
+        },
+        {
+          "path": "Tests/MeetGPTTests/SettingsDuringCallTests.swift",
+          "contains": "configured values are immutable for one recording"
+        }
+      ]
+    },
+    {
+      "id": "SETTINGS-ENGINE-PENDING-REVERT",
+      "category": "settings-during-call",
+      "priority": "high",
+      "description": "Report an engine selected during a call as pending for the next recording, and clear pending state when the user reverts to the active engine.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/SettingsDuringCallTests.swift",
+          "contains": "engine switch-away and revert report pending state honestly"
+        }
+      ]
+    },
+    {
+      "id": "SETTINGS-GLOSSARY-STREAMER-ISOLATION",
+      "category": "settings-during-call",
+      "priority": "high",
+      "description": "Keep the recording-start glossary in Local Whisper, direct Whisper, server Whisper, and Deepgram even if the Settings glossary changes mid-call.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/SettingsDuringCallTests.swift",
+          "contains": "all streamers retain glossary A after Config changes to B"
+        }
+      ]
+    },
+    {
+      "id": "SETTINGS-AI-MODEL-SNAPSHOT",
+      "category": "settings-during-call",
+      "priority": "critical",
+      "description": "Keep one response's draft, audit, and follow-up on its original model when Settings changes mid-generation, applying the new model only to the next answer.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/SettingsDuringCallTests.swift",
+          "contains": "a model change during generation applies only to the next answer"
+        },
+        {
+          "path": "Tests/MeetGPTTests/SettingsDuringCallTests.swift",
+          "contains": "provider-pinned Auto selection is immutable while an answer starts"
+        },
+        {
+          "path": "Tests/MeetGPTTests/RequestSelectionSnapshotTests.swift",
+          "contains": "fast-audit snapshot cannot fall through to a live Auto selection"
+        },
+        {
+          "path": "Tests/MeetGPTTests/RequestSelectionSnapshotTests.swift",
+          "contains": "background work is self-pinned and cannot inherit provider Auto"
+        }
+      ]
+    },
+    {
+      "id": "SETTINGS-LIVE-CONNECTED-GROUNDING",
+      "category": "settings-during-call",
+      "priority": "high",
+      "description": "Toggle connected-app grounding from its real Settings tab during a call without disconnecting providers or perturbing the active transcription snapshot.",
+      "proof": [
+        {
+          "path": "videotest.sh",
+          "contains": "connected-app grounding changes safely during call"
+        },
+        {
+          "path": "Tests/MeetGPTTests/PromptBudgetBarViewTests.swift",
+          "contains": "usage switch stops grounding without disconnecting apps"
+        }
+      ]
+    },
+    {
+      "id": "SETTINGS-LIVE-ACCOUNT-PRIVACY",
+      "category": "settings-during-call",
+      "priority": "high",
+      "description": "Open Account and Privacy during a recording, mutate only the reversible analytics preference, and leave destructive account controls untouched.",
+      "proof": [
+        {
+          "path": "videotest.sh",
+          "contains": "Account and Privacy tab remains safe during call"
+        },
+        {
+          "path": "videotest.sh",
+          "contains": "privacy_mutated.get(\"configuredShareAnalytics\")"
+        }
+      ]
+    },
+    {
+      "id": "SETTINGS-CONSENT-SIGNOUT-CONTINUITY",
+      "category": "settings-during-call",
+      "priority": "critical",
+      "description": "Defer recording-consent revocation to the next call and keep local microphone/system capture active when the user signs out during a call.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/SettingsDuringCallTests.swift",
+          "contains": "revoking consent during a call affects only the next recording"
+        },
+        {
+          "path": "Tests/MeetGPTTests/AccountSessionTests.swift",
+          "contains": "signing out must not terminate local audio capture"
+        }
+      ]
+    },
+    {
+      "id": "SETTINGS-LIVE-RESTORE-CAPTURE",
+      "category": "settings-during-call",
+      "priority": "critical",
+      "description": "Restore every mutated preference through production setters, close exactly the tracked Settings window, and prove microphone/system buffers and timestamps continue advancing throughout.",
+      "proof": [
+        {
+          "path": "videotest.sh",
+          "contains": "preferences restored during call"
+        },
+        {
+          "path": "videotest.sh",
+          "contains": "mic and system capture continue through Settings"
+        },
+        {
+          "path": "videotest.sh",
+          "contains": "closing Settings keeps recording"
+        }
+      ]
+    },
+    {
+      "id": "SETTINGS-LIVE-PROMO-REDEMPTION",
+      "category": "settings-during-call",
+      "priority": "critical",
+      "description": "Drive Settings \u2192 AI \u2192 Manage \u2192 See plans through macOS Accessibility, scroll to the promo field, redeem the exact DEV-UNLIMITED-LOCAL fixture, and fail closed unless a fresh nonce-correlated non-preview receipt, Founder/Ultra entitlement, screenshots, UI action timeline, and sanitized successful API lifecycle all agree.",
+      "proof": [
+        {
+          "path": "videotest.sh",
+          "contains": "promo_redemption_ui_capture() {"
+        },
+        {
+          "path": "Sources/MeetGPT/Dev/LiveTestHooks.swift",
+          "contains": "struct LiveTestPromoRedemptionReceipt"
+        },
+        {
+          "path": "Sources/MeetGPT/Views/Paywall/PaywallView.swift",
+          "contains": ".accessibilityIdentifier(\"paywall.promo-code\")"
+        },
+        {
+          "path": "Tests/MeetGPTTests/PaywallViewTests.swift",
+          "contains": "pricing stage exposes stable promo input and Redeem automation identities"
+        },
+        {
+          "path": "Tests/MeetGPTTests/PromoRedemptionReceiptTests.swift",
+          "contains": "exact code records one ordered Founder Ultra success without preview"
+        },
+        {
+          "path": "../cruxwing-api/test/auth.integration.test.js",
+          "contains": "redeems the exact local code through the real route into a Founder/Ultra session and profile"
+        }
+      ]
+    },
+    {
+      "id": "SETTINGS-AX-INVENTORY",
+      "category": "settings-during-call",
+      "priority": "critical",
+      "description": "Render all five Settings tabs and require stable automation identities for General, conditional custom role, Transcription engines/preferences, AI model/watches, connected providers/Google scopes, and reversible privacy controls.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/SettingsAccessibilityInventoryTests.swift",
+          "contains": "every always-visible General control has a stable automation identity"
+        },
+        {
+          "path": "Tests/MeetGPTTests/SettingsAccessibilityInventoryTests.swift",
+          "contains": "the conditional custom-role editor has a stable automation identity"
+        },
+        {
+          "path": "Tests/MeetGPTTests/SettingsAccessibilityInventoryTests.swift",
+          "contains": "Connected Apps exposes searchable provider and granular Google controls"
+        }
+      ]
+    },
+    {
+      "id": "SETTINGS-A11Y-16-OVERLAPS",
+      "category": "settings-during-call",
+      "priority": "high",
+      "description": "Render all live co-pilot Settings through the 16-way large-text, RTL, bold-legibility, and light/dark accessibility product.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/SettingsAccessibilityInventoryTests.swift",
+          "contains": "live co-pilot Settings survive all 16 accessibility overlaps"
+        },
+        {
+          "path": "Tests/MeetGPTTests/SettingsAccessibilityInventoryTests.swift",
+          "contains": "#expect(fingerprints.count == 16)"
+        }
+      ]
+    },
+    {
+      "id": "CONNECTED-PROVIDER-CONTRACT-INVENTORY",
+      "category": "connected-apps",
+      "priority": "critical",
+      "description": "Pin every known hosted provider id, endpoint, OAuth registration mode, and provider-specific research contract, including credential-gated providers even when credentials are absent.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/MCPCatalogTests.swift",
+          "contains": "provider contract inventory pins every known id, endpoint and OAuth mode"
+        },
+        {
+          "path": "Tests/MeetGPTTests/MCPCatalogTests.swift",
+          "contains": "every provider id has a connector-specific research contract"
+        }
+      ]
+    },
+    {
+      "id": "CONNECTED-CATALOG-DISCOVERY-GATING",
+      "category": "connected-apps",
+      "priority": "high",
+      "description": "Require unique HTTPS catalog entries, stable credential-gated descriptors, and alias discovery such as Jira behind Atlassian.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/MCPCatalogTests.swift",
+          "contains": "built-in catalog carries exactly the expected server ids"
+        },
+        {
+          "path": "Tests/MeetGPTTests/MCPCatalogTests.swift",
+          "contains": "credential-gated descriptors cannot drift from their audited contracts"
+        },
+        {
+          "path": "Tests/MeetGPTTests/AnswerActionTests.swift",
+          "contains": "Jira is findable, even though the row is called Atlassian"
+        }
+      ]
+    },
+    {
+      "id": "CONNECTED-OAUTH-LOOPBACK-KEYCHAIN",
+      "category": "connected-apps",
+      "priority": "critical",
+      "description": "Validate exact loopback callbacks and preserve OAuth-token isolation through save, restore, concurrent startup hydration, and disconnect cleanup.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/LoopbackCallbackTests.swift",
+          "contains": "a well-formed callback yields a URL carrying its query"
+        },
+        {
+          "path": "Tests/MeetGPTTests/KeychainStorageTests.swift",
+          "contains": "a post-OAuth clear is the final persisted operation after disconnect"
+        },
+        {
+          "path": "Tests/MeetGPTTests/KeychainStorageTests.swift",
+          "contains": "late startup restore cannot overwrite a newer credential mutation"
+        }
+      ]
+    },
+    {
+      "id": "CONNECTED-LEAST-PRIVILEGE-SCOPES",
+      "category": "connected-apps",
+      "priority": "critical",
+      "description": "Refuse broad Gmail mailbox/send scopes, Google Analytics writes, unrelated Atlassian writes, and unknown-only API scopes while retaining only required reads and explicit draft capability.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/GmailMCPTests.swift",
+          "contains": "never requests full-mailbox access, whatever the server offers"
+        },
+        {
+          "path": "Tests/MeetGPTTests/GoogleAnalyticsConnectorTests.swift",
+          "contains": "never requests the read-write analytics scope"
+        },
+        {
+          "path": "Tests/MeetGPTTests/KeychainStorageTests.swift",
+          "contains": "Atlassian OAuth scopes keep confirmed Jira filing but exclude unrelated writes"
+        },
+        {
+          "path": "../cruxwing-api/test/mcpServer.test.js",
+          "contains": "rejects an unknown-only scope request instead of granting every scope"
+        }
+      ]
+    },
+    {
+      "id": "CONNECTED-GOOGLE-GRANT-RACES",
+      "category": "connected-apps",
+      "priority": "critical",
+      "description": "Consume Google OAuth state once and prevent a delayed disconnect or token refresh from revoking or overwriting a concurrent replacement grant.",
+      "proof": [
+        {
+          "path": "../cruxwing-api/test/auth.integration.test.js",
+          "contains": "completes the real route/provider handoff, persists the grant, and burns state"
+        },
+        {
+          "path": "../cruxwing-api/test/providerGrants.test.js",
+          "contains": "a disconnect waiting on Google does not revoke a concurrent re-consent"
+        },
+        {
+          "path": "../cruxwing-api/test/providerGrants.test.js",
+          "contains": "a stale refresh cannot overwrite a replacement consent cache"
+        }
+      ]
+    },
+    {
+      "id": "CONNECTED-IMPORT-READONLY-FAIL-CLOSED",
+      "category": "connected-apps",
+      "priority": "critical",
+      "description": "Expose only unambiguously read-only tools in one-click context import and recheck the policy before connector execution.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/MCPImportSafetyTests.swift",
+          "contains": "write and destructive permutations are denied even when they also look readable"
+        },
+        {
+          "path": "Tests/MeetGPTTests/MCPImportSafetyTests.swift",
+          "contains": "execution rejects an unsafe tool before connecting or calling it"
+        }
+      ]
+    },
+    {
+      "id": "CONNECTED-GROUNDING-IDENTITY-ISOLATION",
+      "category": "connected-apps",
+      "priority": "critical",
+      "description": "Namespace connected evidence by account context so replacement, disconnect, and rapid account changes cannot reuse or publish stale cached results.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/MCPImportSafetyTests.swift",
+          "contains": "account replacement rotates evidence and invalidates workflow caches"
+        },
+        {
+          "path": "Tests/MeetGPTTests/MCPImportSafetyTests.swift",
+          "contains": "rapid account changes each create a distinct namespace"
+        }
+      ]
+    },
+    {
+      "id": "CONNECTED-CACHE-RESILIENCE",
+      "category": "connected-apps",
+      "priority": "high",
+      "description": "Exercise fresh/stale cache windows, query-specific keys, provider circuit breaking and recovery, source deadlines, and visible cache age.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/MCPResultCacheTests.swift",
+          "contains": "when the app is unreachable the last good answer is offered, labelled"
+        },
+        {
+          "path": "Tests/MeetGPTTests/MCPResultCacheTests.swift",
+          "contains": "a server that keeps failing is left alone for a cooldown"
+        },
+        {
+          "path": "Tests/MeetGPTTests/MCPResultCacheTests.swift",
+          "contains": "a hung app costs one source, not the whole grounding round"
+        }
+      ]
+    },
+    {
+      "id": "CONNECTED-SOURCE-TOKEN-ACCOUNTING",
+      "category": "connected-apps",
+      "priority": "high",
+      "description": "Count only authorized MCP sources and valid granted Google services, scale token potential with real source count, and ignore unknown or stale Google scope ids.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/ConnectedAppsBehaviorTests.swift",
+          "contains": "an authorized app is a researchable, counted source with non-zero token potential"
+        },
+        {
+          "path": "Tests/MeetGPTTests/ConnectedAppsBehaviorTests.swift",
+          "contains": "token potential scales with the number of connected apps"
+        },
+        {
+          "path": "Tests/MeetGPTTests/ConnectedAppsBehaviorTests.swift",
+          "contains": "unknown or stale Google scope ids cannot inflate source tokens"
+        }
+      ]
+    },
+    {
+      "id": "CONNECTED-CONTEXT-TOKEN-ECONOMY",
+      "category": "connected-apps",
+      "priority": "critical",
+      "description": "Rank and cap connected sources before network fan-out; share one tariff-aware cap across ledger, MCP/team, and Google; canonicalize cache-equivalent queries; and deduplicate and bound attached evidence without losing distinct source facts.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/GroundingContextPolicyTests.swift",
+          "contains": "tariff budgets are bounded and increase only with funded tiers"
+        },
+        {
+          "path": "Tests/MeetGPTTests/GroundingContextPolicyTests.swift",
+          "contains": "one default cap is shared by ledger, connectors, and Google"
+        },
+        {
+          "path": "Tests/MeetGPTTests/GroundingContextPolicyTests.swift",
+          "contains": "maxSources one performs exactly one connector transport call"
+        },
+        {
+          "path": "Tests/MeetGPTTests/GroundingContextPolicyTests.swift",
+          "contains": "duplicate facts are attached once while distinct sources survive"
+        },
+        {
+          "path": "Tests/MeetGPTTests/MCPResultCacheTests.swift",
+          "contains": "the key reuses harmless whitespace and terminal-punctuation variants"
+        }
+      ]
+    },
+    {
+      "id": "CONNECTED-TRANSCRIPTION-GLOSSARY-SUGGESTIONS",
+      "category": "connected-apps",
+      "priority": "critical",
+      "description": "Propose source-backed transcription glossary terms from bounded, credential-redacted connected-app excerpts without sending the live transcript; use cheap cached ranking with local fallback, require explicit per-term Add/Dismiss review, preserve the active call's immutable dictionary, and exercise the production proposal/review state through a network-free nonce-gated live fixture.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/ConnectedGlossarySuggestionTests.swift",
+          "contains": "bounded prompt strips credentials and cannot contain a live transcript"
+        },
+        {
+          "path": "Tests/MeetGPTTests/ConnectedGlossarySuggestionTests.swift",
+          "contains": "fast background model uses bounded tariff math and five-minute cache"
+        },
+        {
+          "path": "Tests/MeetGPTTests/ConnectedGlossarySuggestionTests.swift",
+          "contains": "approve and reject are explicit and never silently mutate the dictionary"
+        },
+        {
+          "path": "Tests/MeetGPTTests/ConnectedGlossarySuggestionTests.swift",
+          "contains": "accepting during a call defers the active engine dictionary"
+        },
+        {
+          "path": "Tests/MeetGPTTests/ConnectedGlossarySuggestionTests.swift",
+          "contains": "dev fixture exercises production proposal and review state without network"
+        },
+        {
+          "path": "Sources/MeetGPT/AppState.swift",
+          "contains": "func generateConnectedGlossarySuggestions(useFastModel: Bool = true) async"
+        },
+        {
+          "path": "Sources/MeetGPT/AI/ConnectedGlossarySuggestionService.swift",
+          "contains": "static let maxGroundingChars = maxSources * maxCharsPerSource"
+        },
+        {
+          "path": "Sources/MeetGPT/Dev/LiveTestHooks.swift",
+          "contains": "ai.cruxwing.livetest.glossarySuggestions"
+        },
+        {
+          "path": "videotest.sh",
+          "contains": "connectedGlossarySuggestionsDuringCall"
+        },
+        {
+          "path": "testlib/verify_e2e_coverage.py",
+          "contains": "CONNECTED-TRANSCRIPTION-GLOSSARY-SUGGESTIONS"
+        }
+      ]
+    },
+    {
+      "id": "CONNECTED-PROMPT-WORKFLOW-MATRIX",
+      "category": "connected-apps",
+      "priority": "critical",
+      "description": "Map custom and follow-up intents across calendar, documents, prior meetings, trackers, CRM, incidents, analytics, team chat, and custom MCP while preserving transcript-only fallback.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/PromptWorkflowTests.swift",
+          "contains": "custom and follow-up prompts infer every supported connected-source intent"
+        },
+        {
+          "path": "Tests/MeetGPTTests/PromptWorkflowTests.swift",
+          "contains": "built-in workflows declare the direct Google reads they may use"
+        }
+      ]
+    },
+    {
+      "id": "CONNECTED-PROVIDER-QUERY-RELEVANCE",
+      "category": "connected-apps",
+      "priority": "critical",
+      "description": "Give every provider a distinct bounded evidence query/read-for contract, prioritize it by meeting theme, and instruct analytics sources to challenge unsupported room claims.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/ConnectorProbeStrategyTests.swift",
+          "contains": "no two connectors are asked the same question"
+        },
+        {
+          "path": "Tests/MeetGPTTests/ConnectorProbeStrategyTests.swift",
+          "contains": "analytics connectors are told to contradict the room, not agree with it"
+        },
+        {
+          "path": "Tests/MeetGPTTests/ConnectorProbeStrategyTests.swift",
+          "contains": "every built-in connector has a probe strategy"
+        }
+      ]
+    },
+    {
+      "id": "CONNECTED-GOOGLE-WORKSPACE-READS",
+      "category": "connected-apps",
+      "priority": "critical",
+      "description": "Map granular Google grants and exercise Docs, Sheets, Drive discovery, Calendar agenda, upcoming-event, and error response shapes.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/GoogleAuthScopeTests.swift",
+          "contains": "maps a complete granular grant to the connected services"
+        },
+        {
+          "path": "Tests/MeetGPTTests/RESTClientTests.swift",
+          "contains": "Docs: extracts the title and concatenated paragraph text"
+        },
+        {
+          "path": "Tests/MeetGPTTests/RESTClientTests.swift",
+          "contains": "Sheets: merges the title request and the values grid (tab-joined)"
+        },
+        {
+          "path": "Tests/MeetGPTTests/RESTClientTests.swift",
+          "contains": "Workspace search discovers a Doc through Drive metadata, then reads its content"
+        },
+        {
+          "path": "Tests/MeetGPTTests/RESTClientTests.swift",
+          "contains": "Calendar: folds the nearest event into an agenda summary"
+        }
+      ]
+    },
+    {
+      "id": "CONNECTED-GOOGLE-DOCS-BOUNDED-WRITE",
+      "category": "connected-apps",
+      "priority": "critical",
+      "description": "Create exactly one app-owned Google Doc through authenticated multipart Drive upload, validate the resulting link, and reject provider errors or malformed successes.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/RESTClientTests.swift",
+          "contains": "Docs export: creates one bounded Drive file with authenticated multipart HTML"
+        },
+        {
+          "path": "Tests/MeetGPTTests/RESTClientTests.swift",
+          "contains": "Docs export: provider errors and malformed success bodies never look created"
+        }
+      ]
+    },
+    {
+      "id": "CONNECTED-CALENDAR-UX",
+      "category": "connected-apps",
+      "priority": "high",
+      "description": "Parse and rank current/upcoming meetings, agendas and attendees while excluding the user, past/all-day events, hidden meetings, and stale in-flight agenda completions.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/RESTClientTests.swift",
+          "contains": "Calendar: upcomingEvents keeps future timed events, skips all-day and past"
+        },
+        {
+          "path": "Tests/MeetGPTTests/InProgressMeetingTests.swift",
+          "contains": "parseEvent reads title, agenda and attendees from one event"
+        },
+        {
+          "path": "Tests/MeetGPTTests/MeetingAttendeeTests.swift",
+          "contains": "drops the user themselves \u2014 self is not someone you are meeting"
+        },
+        {
+          "path": "Tests/MeetGPTTests/DismissedMeetingSyncTests.swift",
+          "contains": "an agenda fetched before the dismissal never lands"
+        }
+      ]
+    },
+    {
+      "id": "CONNECTED-FIREFLIES-MATCH-ENHANCE",
+      "category": "connected-apps",
+      "priority": "critical",
+      "description": "Parse Fireflies timestamp/id/envelope permutations, select only the meeting near this call, and merge its speaker transcript with Whisper and connector terminology.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/FirefliesMeetingMatchTests.swift",
+          "contains": "every id spelling Fireflies uses is recognised"
+        },
+        {
+          "path": "Tests/MeetGPTTests/FirefliesMeetingMatchTests.swift",
+          "contains": "a bare array and every named envelope are all unwrapped"
+        },
+        {
+          "path": "Tests/MeetGPTTests/TranscriptEnhancementTests.swift",
+          "contains": "enhance maps Fireflies+Whisper JSON into timed TranscriptEntry rows"
+        },
+        {
+          "path": "Tests/MeetGPTTests/TranscriptEnhancementTests.swift",
+          "contains": "a match window rejects a call Fireflies never joined"
+        }
+      ]
+    },
+    {
+      "id": "CONNECTED-FIREFLIES-PAST-CALL-IMPORT",
+      "category": "connected-apps",
+      "priority": "high",
+      "description": "Import a PAST Fireflies meeting as an ordinary saved session \u2014 speakers and timing preserved, every line attributed to the remote side, sorted by when the meeting happened \u2014 so Blind Spots, the assistant and export operate on it unchanged. Distinct from CONNECTED-FIREFLIES-MATCH-ENHANCE, which matches the LIVE call. Refuses an import with no readable speech rather than creating a session that answers questions about nothing.",
+      "proof": [
+        {
+          "path": "Sources/MeetGPT/MCP/FirefliesPastCalls.swift",
+          "contains": "static func session(for meeting: MeetingSummary"
+        },
+        {
+          "path": "Sources/MeetGPT/MCP/MCPContextImport.swift",
+          "contains": "func firefliesRecentMeetings"
+        },
+        {
+          "path": "Sources/MeetGPT/MCP/MCPContextImport.swift",
+          "contains": "transcript had no readable speech"
+        },
+        {
+          "path": "Tests/MeetGPTTests/FirefliesPastCallsTests.swift",
+          "contains": "keeps who said each line"
+        },
+        {
+          "path": "Tests/MeetGPTTests/FirefliesPastCallsTests.swift",
+          "contains": "treats a huge offset as milliseconds, not seconds"
+        },
+        {
+          "path": "Tests/MeetGPTTests/FirefliesPastCallsTests.swift",
+          "contains": "attributes every line to the remote side"
+        },
+        {
+          "path": "Tests/MeetGPTTests/FirefliesPastCallsTests.swift",
+          "contains": "recognises names but not sentence openings"
+        },
+        {
+          "path": "Tests/MeetGPTTests/FirefliesPastCallsTests.swift",
+          "contains": "an imported session round-trips through the store"
+        }
+      ]
+    },
+    {
+      "id": "CONNECTED-TRACKER-WRITEBACK-SCHEMAS",
+      "category": "connected-apps",
+      "priority": "high",
+      "description": "Limit task filing to Linear, Jira, and Asana, map title/owner/due metadata to their live schemas, and disable filing when no tracker is connected.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/TaskWritebackTests.swift",
+          "contains": "supportsWriteback covers the tracker servers only"
+        },
+        {
+          "path": "Tests/MeetGPTTests/TaskWritebackTests.swift",
+          "contains": "uses summary as the title field when the schema has no title (Jira)"
+        },
+        {
+          "path": "Tests/MeetGPTTests/TaskWritebackSheetTests.swift",
+          "contains": "the File action is disabled when no tracker is connected"
+        }
+      ]
+    },
+    {
+      "id": "CONNECTED-WRITE-CONFIRMATION-UI",
+      "category": "connected-apps",
+      "priority": "critical",
+      "description": "Stage every external write behind a destination/tool/payload confirmation surface whose editable fields, cancel, and confirm controls are identifiable, with rendering and cancellation performing no write.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/ConnectedWriteConfirmationTests.swift",
+          "contains": "a connected write renders destination, tool, editable payload, cancel and confirm"
+        },
+        {
+          "path": "Tests/MeetGPTTests/ConnectedWriteConfirmationTests.swift",
+          "contains": "cancel dismisses the staged payload without needing a connector"
+        }
+      ]
+    },
+    {
+      "id": "CONNECTED-GMAIL-DRAFT-ONLY",
+      "category": "connected-apps",
+      "priority": "critical",
+      "description": "Permit Gmail follow-up drafts only after compose-scoped authorization while excluding broad mailbox, modify, send-only scopes, and all send tools.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/GmailMCPTests.swift",
+          "contains": "drafting a follow-up gets compose, and only compose"
+        },
+        {
+          "path": "Tests/MeetGPTTests/GmailMCPTests.swift",
+          "contains": "Gmail actions can create drafts but can never invoke a send tool"
+        }
+      ]
+    },
+    {
+      "id": "CONNECTED-ANSWER-ACTION-SAFETY",
+      "category": "connected-apps",
+      "priority": "high",
+      "description": "Offer only relevant fillable connected-app writes, refuse reads/destructive or hallucinated schemas, cap proposals, and name a meta-connector's actual destination.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/AnswerActionTests.swift",
+          "contains": "destructive tools are never offered, whatever the answer says"
+        },
+        {
+          "path": "Tests/MeetGPTTests/AnswerActionProposalTests.swift",
+          "contains": "a destructive proposal is refused even when the schema allows it"
+        },
+        {
+          "path": "Tests/MeetGPTTests/AnswerActionProposalTests.swift",
+          "contains": "the Zapier chip reads as the destination it writes to"
+        }
+      ]
+    },
+    {
+      "id": "CONNECTED-EXPORT-PAYLOADS",
+      "category": "connected-apps",
+      "priority": "high",
+      "description": "Carry the complete prompt/answer/blind-spot dialog into Notion and Google Docs exports and choose a compatible live Notion create-page schema.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/AnswerExportTargetsTests.swift",
+          "contains": "Notion markdown carries prompt, answer, and blind spots"
+        },
+        {
+          "path": "Tests/MeetGPTTests/AnswerExportTargetsTests.swift",
+          "contains": "create-page tool is picked from the live schema, with nested pages args"
+        },
+        {
+          "path": "Tests/MeetGPTTests/AssistantDOCXExporterTests.swift",
+          "contains": "the Google Docs HTML export carries the whole dialog too"
+        }
+      ]
+    },
+    {
+      "id": "CONNECTED-PROMPT-BAR-UI",
+      "category": "connected-apps",
+      "priority": "high",
+      "description": "Render real provider names and bounded overflow, represent granular Google scopes as one app, route Add Apps to Settings, and separate use-in-prompts from authorization.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/PromptBudgetBarViewTests.swift",
+          "contains": "shows real connected app names and removes old category controls"
+        },
+        {
+          "path": "Tests/MeetGPTTests/PromptBudgetBarViewTests.swift",
+          "contains": "Google renders as one app with its granted services in metadata"
+        },
+        {
+          "path": "Tests/MeetGPTTests/PromptBudgetBarViewTests.swift",
+          "contains": "Add apps routes Settings to Connected Apps"
+        }
+      ]
+    },
+    {
+      "id": "CONNECTED-CAPABILITY-DISCONNECT-REBUILD",
+      "category": "connected-apps",
+      "priority": "high",
+      "description": "Invalidate cached prompt routes and rebuild affected custom-button workflows when a connected capability disappears.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/PromptWorkflowDesignTests.swift",
+          "contains": "a capability disconnect invalidates cached routes and rebuilds affected buttons"
+        }
+      ]
+    },
+    {
+      "id": "CONNECTED-CUSTOM-MCP-LIFECYCLE",
+      "category": "connected-apps",
+      "priority": "high",
+      "description": "Fail closed on invalid or credential-bearing custom MCP URLs, persist/reload valid HTTPS servers, remove them cleanly, and never mutate the curated catalog.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/CustomMCPServerTests.swift",
+          "contains": "custom endpoints fail closed, persist, reload, and remove without touching catalog apps"
+        }
+      ]
+    },
+    {
+      "id": "CONNECTED-TEAM-WATCHER-ORDERING",
+      "category": "connected-apps",
+      "priority": "high",
+      "description": "Establish a quiet Slack/Confluence watcher baseline, deliver all unseen newest-first items chronologically, and prevent duplicates, older rows, or empty responses from rewinding the watermark.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/TeamWatcherTests.swift",
+          "contains": "first scan establishes a high-water mark without replaying channel history"
+        },
+        {
+          "path": "Tests/MeetGPTTests/TeamWatcherTests.swift",
+          "contains": "newest-first Slack pages deliver every unseen message in chronological order"
+        },
+        {
+          "path": "Tests/MeetGPTTests/TeamWatcherTests.swift",
+          "contains": "duplicates and older messages cannot retrigger after the high-water mark"
+        }
+      ]
+    },
+    {
+      "id": "CONNECTED-CRUXWING-MCP-SERVER",
+      "category": "connected-apps",
+      "priority": "critical",
+      "description": "Expose the six meeting/decision list/get/search tools through Cruxwing's own OAuth MCP server with per-tool scope, audience, input, refresh-replay, user, and team isolation.",
+      "proof": [
+        {
+          "path": "../cruxwing-api/test/mcpServer.test.js",
+          "contains": "lists the six tools"
+        },
+        {
+          "path": "../cruxwing-api/test/mcpServer.test.js",
+          "contains": "Cross-user isolation: Bob's token can't read Alice's meeting"
+        },
+        {
+          "path": "../cruxwing-api/test/mcpServer.test.js",
+          "contains": "Cross-user isolation: Bob is on no team with this decision."
+        },
+        {
+          "path": "../cruxwing-api/test/mcpServer.test.js",
+          "contains": "allows exactly one winner when the same refresh token is replayed concurrently"
+        }
+      ]
+    },
+    {
+      "id": "CONNECTED-TARIFF-GROUNDED-BUDGET",
+      "category": "connected-apps",
+      "priority": "critical",
+      "description": "Bind connected-source prompt potential to gateway input-credit metering, match grounded-run copy to enforced limits and pools, and pin rather than conceal current regional margin-floor exceptions.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/TariffAllowanceTests.swift",
+          "contains": "grounded research is allowed only below the monthly cycle limit"
+        },
+        {
+          "path": "Tests/MeetGPTTests/ConnectedAppsBehaviorTests.swift",
+          "contains": "token potential scales with the number of connected apps"
+        },
+        {
+          "path": "../cruxwing-api/test/tokenEconomy.test.js",
+          "contains": "advertised allowances match enforced allowances"
+        },
+        {
+          "path": "../cruxwing-api/test/tokenEconomy.test.js",
+          "contains": "grounded research runs on the card equal the metered allowance"
+        },
+        {
+          "path": "../cruxwing-api/test/tariffEconomyMatrix.test.js",
+          "contains": "meters connected-source prompt potential and grounded research against enforced pools"
+        },
+        {
+          "path": "../cruxwing-api/test/tariffEconomyMatrix.test.js",
+          "contains": "never sells at a loss and pins every floor exception pending an explicit price decision"
+        }
+      ]
+    },
+    {
+      "id": "CONNECTED-SETTINGS-CONNECTION-STATE-UI",
+      "category": "connected-apps",
+      "priority": "high",
+      "description": "Drive disconnected, authorizing, authorized, connected, reconnecting, disconnecting, failed, disconnect, and cancel-versus-late-completion states through the actual Connected Apps row controls; keep asynchronous teardown non-actionable and label grant-revoking reconnect stops honestly.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/MCPAppsConnectionStateViewTests.swift",
+          "contains": "transient errors preserve authorized Reconnect but use Connect without a token"
+        },
+        {
+          "path": "Tests/MeetGPTTests/MCPAppsConnectionStateViewTests.swift",
+          "contains": "Cancel wins over a late successful connection completion"
+        },
+        {
+          "path": "Tests/MeetGPTTests/MCPAppsConnectionStateViewTests.swift",
+          "contains": "authorized reconnect exposes Disconnect\u2014not misleading Cancel\u2014and late success cannot restore its grant"
+        },
+        {
+          "path": "Tests/MeetGPTTests/MCPAppsConnectionStateViewTests.swift",
+          "contains": "connected teardown hides Connect and rejects reconnect until asynchronous cleanup finishes"
+        }
+      ]
+    },
+    {
+      "id": "CONNECTED-WRITE-COMMIT-DISPATCH",
+      "category": "connected-apps",
+      "priority": "critical",
+      "description": "At the confirmation boundary, dispatch exactly one edited payload to an injected connected tool, surface success/failure, prevent rapid duplicates, bind the review to one connected-account generation, and pair the shared dispatch proof with production schema/policy tests for tracker, document, calendar, CRM, and Gmail-draft actions.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/ConnectedWriteCommitDispatchTests.swift",
+          "contains": "edited confirmation dispatches exactly once for document, CRM, calendar, and Gmail-draft shapes"
+        },
+        {
+          "path": "Tests/MeetGPTTests/ConnectedWriteCommitDispatchTests.swift",
+          "contains": "rapid duplicate confirms cannot call the connected tool twice"
+        },
+        {
+          "path": "Tests/MeetGPTTests/ConnectedWriteCommitDispatchTests.swift",
+          "contains": "connected-tool failure is surfaced and the write is not reported as successful"
+        },
+        {
+          "path": "Tests/MeetGPTTests/ConnectedWriteCommitDispatchTests.swift",
+          "contains": "an account change invalidates an already-reviewed connected write"
+        },
+        {
+          "path": "Tests/MeetGPTTests/ConnectedWriteCommitDispatchTests.swift",
+          "contains": "an account change between tracker items prevents every remaining write"
+        },
+        {
+          "path": "Tests/MeetGPTTests/TaskWritebackTests.swift",
+          "contains": "maps the title to the schema's string field and folds metadata into description"
+        },
+        {
+          "path": "Tests/MeetGPTTests/AnswerActionTests.swift",
+          "contains": "hosted Notion's nested pages schema is fillable"
+        },
+        {
+          "path": "Tests/MeetGPTTests/GmailMCPTests.swift",
+          "contains": "Gmail actions can create drafts but can never invoke a send tool"
+        },
+        {
+          "path": "Tests/MeetGPTTests/AnswerActionTests.swift",
+          "contains": "a calendar action appears only when the answer proposes meeting again"
+        }
+      ]
+    },
+    {
+      "id": "CONNECTED-ERROR-OBSERVABILITY",
+      "category": "connected-apps",
+      "priority": "critical",
+      "description": "Inject connector timeout, offline, 401, 429, 5xx, malformed result, and reconnect outcomes and emit privacy-safe provider/tool/cache/status/duration/request-correlation telemetry without imported content or credentials.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/ConnectorTelemetryTests.swift",
+          "contains": "timeout, offline, 401, 429, 5xx, and malformed connector results emit bounded status and retry telemetry"
+        },
+        {
+          "path": "Tests/MeetGPTTests/ConnectorTelemetryTests.swift",
+          "contains": "reconnect failure then success carries retry ordinal and eligibility"
+        },
+        {
+          "path": "Tests/MeetGPTTests/ConnectorTelemetryTests.swift",
+          "contains": "cache hits and stale fallbacks report result and age without cached content"
+        },
+        {
+          "path": "Tests/MeetGPTTests/ConnectorTelemetryTests.swift",
+          "contains": "connector telemetry records and log rendering exclude tokens, queries, imported content, arguments, tool names, and error text"
+        },
+        {
+          "path": "Sources/MeetGPT/MCP/ConnectorTelemetry.swift",
+          "contains": "event=connector_operation"
+        }
+      ]
+    },
+    {
+      "id": "CONNECTED-GROUNDED-RESPONSE-QUALITY",
+      "category": "connected-apps",
+      "priority": "critical",
+      "description": "Grade responses generated from connected evidence for source relevance, citation, contradiction handling, stale-account exclusion, unsupported claims, and coherence against deterministic ground truth.",
+      "proof": [
+        {
+          "path": "testlib/response_quality.py",
+          "contains": "connected source relevance and citation pass"
+        },
+        {
+          "path": "testlib/response_quality.py",
+          "contains": "connected contradiction is explicitly resolved"
+        },
+        {
+          "path": "testlib/response_quality.py",
+          "contains": "connected stale account and unsupported claims are excluded"
+        },
+        {
+          "path": "testlib/response_quality.py",
+          "contains": "bad connected answer fails machine-readable threshold gate"
+        }
+      ]
+    },
+    {
+      "id": "CONNECTED-LIVE-VENDOR-CREDENTIAL-MATRIX",
+      "category": "connected-apps",
+      "priority": "normal",
+      "description": "Perform real OAuth and representative read/write smoke checks for every configured hosted provider plus direct Google, Slack, Confluence, and a custom MCP server.",
+      "manual": true,
+      "manualReason": "Real third-party consent, tenant data, credentials, provider availability, and write destinations must be supplied and approved by an operator; deterministic tests pin the contracts without accessing those accounts.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/MCPCatalogTests.swift",
+          "contains": "provider contract inventory pins every known id, endpoint and OAuth mode"
+        }
+      ]
+    },
+    {
+      "id": "CONNECTED-CALENDAR-REMINDER-OS",
+      "category": "connected-apps",
+      "priority": "normal",
+      "description": "Observe an actual macOS pre-meeting notification scheduled from connected Calendar, verify lead time and click-through, then confirm disabling reminders removes it.",
+      "manual": true,
+      "manualReason": "The suite verifies reminder parsing, copy, ranking, and preference changes, but audible/visible UserNotifications delivery and click-through require an interactive signed-in macOS session.",
+      "proof": [
+        {
+          "path": "Tests/MeetGPTTests/CallNotificationCopyTests.swift",
+          "contains": "Scheduled reminder names the topic and its lead time"
+        }
+      ]
+    }
+  ]
+}

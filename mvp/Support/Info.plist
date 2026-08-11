@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleName</key>
+	<string>orakul</string>
+	<key>CFBundleDisplayName</key>
+	<string>orakul</string>
+	<key>CFBundleExecutable</key>
+	<string>orakul</string>
+	<!-- Совпадать с com.meetgpt.macapp нельзя: macOS привязывает разрешения на
+	     микрофон и запись экрана к bundle id, и две программы с одним
+	     идентификатором делят один доступ, который нельзя отозвать у одной. -->
+	<key>CFBundleIdentifier</key>
+	<string>ai.orakul.desktop</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.1</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>14.0</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<!-- Этот текст пользователь видит в системном окне запроса. Он объясняет,
+	     зачем доступ и что происходит со звуком, потому что «orakul хочет
+	     доступ к микрофону» не отвечает ни на один из этих вопросов. -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>orakul записывает созвон, чтобы вы могли потом спросить «что мы решили». Запись и расшифровка остаются на вашем компьютере.</string>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.productivity</string>
+</dict>
+</plist>

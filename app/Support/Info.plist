@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDisplayName</key>
+	<string>orakul</string>
+	<key>CFBundleExecutable</key>
+	<string>MeetGPT</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>CFBundleIconName</key>
+	<string>AppIcon</string>
+	<key>CFBundleIdentifier</key>
+	<string>ai.orakul.desktop</string>
+	<key>CFBundleName</key>
+	<string>orakul</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.1.0</string>
+	<key>CFBundleVersion</key>
+	<string>0.1.0</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.productivity</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>13.0</string>
+	<key>LSUIElement</key>
+	<false/>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSHumanReadableCopyright</key>
+	<string>© 2026 orakul</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>orakul записывает созвон, чтобы вы могли потом спросить «что мы решили». Запись и расшифровка остаются на вашем компьютере.</string>
+	<key>NSScreenCaptureUsageDescription</key>
+	<string>orakul пишет системный звук, чтобы расшифровать и собеседников тоже. Бот в звонок не заходит, видео не записывается.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>orakul распознаёт речь, чтобы показывать расшифровку по ходу разговора.</string>
+</dict>
+</plist>

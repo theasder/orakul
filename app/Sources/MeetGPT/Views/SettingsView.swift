@@ -1,0 +1,1398 @@
+import SwiftUI
+
+enum SettingsTab: String, Hashable, CaseIterable {
+    case general
+    case transcription
+    case ai
+    case connectedApps
+    case accountPrivacy
+}
+
+/// Settings, restructured from a single 820pt scroll into macOS-idiomatic tabs
+/// (see docs/ui-audit IA): General (app behavior) · Transcription · AI (models
+/// + co-pilot) · Connected Apps (Google, MCP, team sources) · Account &
+/// Privacy (sign-in, deletion, consent, data routing). Each tab sizes itself;
+/// the window adapts per tab as macOS users expect.
+struct SettingsView: View {
+    @EnvironmentObject var state: AppState
+
+    var body: some View {
+        // Reports which surfaces are actually reached — see
+        // cruxwing-api/docs/analytics-events.md.
+        trackedBody.trackSurface(.settings)
+    }
+
+    @ViewBuilder private var trackedBody: some View {
+        TabView(selection: $state.selectedSettingsTab) {
+            GeneralSettingsTab()
+                .tabItem { Label("General", systemImage: "gearshape") }
+                .tag(SettingsTab.general)
+            TranscriptionSettingsTab()
+                .tabItem { Label("Transcription", systemImage: "waveform") }
+                .tag(SettingsTab.transcription)
+            AISettingsTab()
+                .tabItem { Label("AI", systemImage: "sparkles") }
+                .tag(SettingsTab.ai)
+            ConnectedAppsTab()
+                .tabItem { Label("Connected Apps", systemImage: "app.connected.to.app.below.fill") }
+                .tag(SettingsTab.connectedApps)
+            AccountPrivacyTab()
+                .tabItem { Label("Account & Privacy", systemImage: "person.badge.key") }
+                .tag(SettingsTab.accountPrivacy)
+        }
+        .background(Theme.canvas)
+    }
+}
+
+// MARK: - Tab 1 · General (set-once app behavior)
+
+private struct GeneralSettingsTab: View {
+    @EnvironmentObject var state: AppState
+    @State private var appearance: AppAppearance = Config.appAppearance
+    @State private var readingScale: Double = Config.readingTextScale
+    @State private var callDetection: Bool = Config.callDetectionEnabled
+    @State private var ignoreMedia: Bool = Config.ignoreMediaApps
+    @State private var reminders: Bool = Config.meetingRemindersEnabled
+    @State private var blindSpotBanners: Bool = Config.blindSpotTextNotificationsEnabled
+    @State private var reminderMinutes: Int = Config.meetingReminderMinutes
+    @State private var customRole: String = Config.userCustomRole
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Space.xl) {
+            SettingsSection(title: "Appearance",
+                            caption: "Auto follows your Mac's appearance; Light and Dark override it.") {
+                SettingsRow {
+                    Label("Theme", systemImage: "circle.lefthalf.filled")
+                        .labelStyle(SettingLabelStyle())
+                    Spacer()
+                    Picker("", selection: $appearance) {
+                        ForEach(AppAppearance.allCases) { mode in Text(mode.label).tag(mode) }
+                    }
+                    .labelsHidden().pickerStyle(.menu).fixedSize()
+                    .onChange(of: appearance) { state.setAppearance($0) }
+                    .accessibilityLabel("Theme")
+                    .accessibilityIdentifier("settings.general.theme")
+                }
+                SettingsRow {
+                    Label("Reading text size", systemImage: "textformat.size")
+                        .labelStyle(SettingLabelStyle())
+                    Spacer()
+                    // Applies to the transcript and the assistant answer only.
+                    // Scaling the chrome as well would collide the controls at
+                    // the smallest supported window, and prose is what people
+                    // mean by "bigger text".
+                    Picker("", selection: $readingScale) {
+                        ForEach(ReadingTextScale.steps, id: \.self) { step in
+                            Text(ReadingTextScale.label(for: step)).tag(step)
+                        }
+                    }
+                    .labelsHidden().pickerStyle(.menu).fixedSize()
+                    .onChange(of: readingScale) { state.readingTextScale = $0 }
+                    .accessibilityLabel("Reading text size")
+                    .accessibilityIdentifier("settings.general.readingTextSize")
+                }
+            }
+
+            // The setup guide runs once and never returns, because the gate
+            // records the last step FINISHED. Someone who clicked past the
+            // capture check had no way back to it — and no way to re-run the
+            // six-second test that proves both audio sources are audible, which
+            // is the check that answers "why is the other side silent?" before a
+            // real call does.
+            SettingsSection(title: "Setup guide",
+                            caption: "Re-runs the permission pre-flight, the capture check, and the sample call. Nothing is reset except the guide itself.") {
+                SettingsRow {
+                    Label("Show the setup guide again", systemImage: "arrow.counterclockwise")
+                        .labelStyle(SettingLabelStyle())
+                    Spacer()
+                    Button("Show") { state.replayOnboarding() }
+                        .accessibilityIdentifier("settings.general.replayOnboarding")
+                }
+            }
+
+            SettingsSection(title: "Profile",
+                            caption: "Your role tailors every AI action's method — a PM's summary differs from a founder's. Pick one, or write your own. Also switchable from the sidebar chip.") {
+                SettingsRow {
+                    Label("Your role", systemImage: "person.text.rectangle")
+                        .labelStyle(SettingLabelStyle())
+                    Spacer()
+                    Picker("", selection: $state.userRoleID) {
+                        Text("Not set").tag(String?.none)
+                        Divider()
+                        ForEach(RoleSkillMatrix.positions) { position in
+                            Text(position.label).tag(String?.some(position.id))
+                        }
+                        Divider()
+                        Text("Write my own…").tag(String?.some(RoleSkillMatrix.customRoleID))
+                    }
+                    .labelsHidden().pickerStyle(.menu)
+                    .frame(maxWidth: 240)
+                    .accessibilityLabel("Your role")
+                    .accessibilityIdentifier("settings.general.role")
+                }
+                if state.userRoleID == RoleSkillMatrix.customRoleID {
+                    SettingsRow {
+                        TextField("e.g. Head of Growth at a B2B fintech startup",
+                                  text: $customRole)
+                            .textFieldStyle(.plain)
+                            .font(Typo.callout)
+                            .foregroundStyle(Theme.ink)
+                            .padding(.horizontal, Space.m)
+                            .frame(height: 30)
+                            .background(Theme.surfaceSunken, in: RoundedRectangle(cornerRadius: Radius.s, style: .continuous))
+                            .overlay(RoundedRectangle(cornerRadius: Radius.s, style: .continuous)
+                                .strokeBorder(Theme.hairline, lineWidth: 1))
+                            .onChange(of: customRole) { Config.userCustomRole = $0 }
+                            .accessibilityLabel("Custom role")
+                            .accessibilityIdentifier("settings.general.custom-role")
+                    }
+                }
+            }
+
+            SettingsSection(title: "During calls",
+                            caption: "Cruxwing can notice when a meeting app becomes active and offer to start recording.") {
+                SettingsRow {
+                    Label("Notify me about calls", systemImage: "bell.badge")
+                        .labelStyle(SettingLabelStyle())
+                    Spacer()
+                    Toggle("", isOn: $callDetection)
+                        .labelsHidden().toggleStyle(.switch)
+                        .onChange(of: callDetection) { Config.callDetectionEnabled = $0; state.applyCallDetectionSettings() }
+                        .accessibilityLabel("Notify me about calls")
+                        .accessibilityIdentifier("settings.general.call-detection")
+                }
+                SettingsRow {
+                    Label("Ignore music / video", systemImage: "music.note.tv")
+                        .labelStyle(SettingLabelStyle())
+                    Spacer()
+                    Toggle("", isOn: $ignoreMedia)
+                        .labelsHidden().toggleStyle(.switch)
+                        .disabled(!callDetection)
+                        .onChange(of: ignoreMedia) { Config.ignoreMediaApps = $0 }
+                        .accessibilityLabel("Ignore music and video")
+                        .accessibilityIdentifier("settings.general.ignore-media")
+                }
+            }
+
+            SettingsSection(title: "During calls",
+                            caption: "A silent banner when a new blind spot lands and Cruxwing is in the background — text, never a sound.") {
+                SettingsRow {
+                    Label("Blind-spot banners", systemImage: "bell.badge")
+                        .labelStyle(SettingLabelStyle())
+                    Spacer()
+                    Toggle("", isOn: $blindSpotBanners)
+                        .labelsHidden().toggleStyle(.switch)
+                        .onChange(of: blindSpotBanners) { Config.blindSpotTextNotificationsEnabled = $0 }
+                        .accessibilityLabel("Blind-spot banners")
+                        .accessibilityIdentifier("settings.general.blindSpotBanners")
+                }
+            }
+
+            SettingsSection(title: "Before meetings",
+                            caption: state.googleConnected
+                                ? "Reminders fire ahead of calendar meetings."
+                                : "Reminders need Google Calendar — connect it in the Connected Apps tab.") {
+                SettingsRow {
+                    Label("Remind me before meetings", systemImage: "bell.and.waves.left.and.right")
+                        .labelStyle(SettingLabelStyle())
+                    Spacer()
+                    Toggle("", isOn: $reminders)
+                        .labelsHidden().toggleStyle(.switch)
+                        .onChange(of: reminders) { Config.meetingRemindersEnabled = $0; state.applyReminderSettings() }
+                        .accessibilityLabel("Remind me before meetings")
+                        .accessibilityIdentifier("settings.general.reminders")
+                }
+                SettingsRow {
+                    Label("Lead time", systemImage: "clock")
+                        .labelStyle(SettingLabelStyle())
+                    Spacer()
+                    Picker("", selection: $reminderMinutes) {
+                        Text("1 min before").tag(1)
+                        Text("5 min before").tag(5)
+                        Text("10 min before").tag(10)
+                        Text("15 min before").tag(15)
+                        Text("30 min before").tag(30)
+                    }
+                    .labelsHidden().pickerStyle(.menu).fixedSize()
+                    .disabled(!reminders)
+                    .onChange(of: reminderMinutes) { Config.meetingReminderMinutes = $0; state.applyReminderSettings() }
+                    .accessibilityLabel("Meeting reminder lead time")
+                    .accessibilityIdentifier("settings.general.reminder-lead-time")
+                }
+            }
+        }
+        .padding(Space.xl)
+        .frame(width: 520)
+        .onAppear {
+            appearance = Config.appAppearance
+            callDetection = Config.callDetectionEnabled
+            ignoreMedia = Config.ignoreMediaApps
+            reminders = Config.meetingRemindersEnabled
+            blindSpotBanners = Config.blindSpotTextNotificationsEnabled
+            reminderMinutes = Config.meetingReminderMinutes
+            customRole = Config.userCustomRole
+        }
+    }
+}
+
+// MARK: - Tab 2 · Transcription
+
+private struct TranscriptionSettingsTab: View {
+    @EnvironmentObject var state: AppState
+    @State private var transcriptionLanguage: String = Config.transcriptionLanguage
+    @State private var glossary: String = Config.transcriptionGlossary
+    @State private var localModel: String = Config.localWhisperModel
+    @State private var micNoiseSuppression: Bool = Config.micNoiseSuppressionEnabled
+    @State private var adaptiveLocal: Bool = Config.adaptiveLocalWhisperEnabled
+    @State private var assemblyDiarization: Bool = Config.assemblyAIDiarizationEnabled
+    @State private var firefliesEnhance: Bool = Config.firefliesTranscriptEnhanceEnabled
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: Space.xl) {
+                SettingsSection(title: "Engine",
+                                caption: "Local keeps meeting audio on this Mac. Choosing Deepgram or Whisper sends audio to that cloud provider. During a call, engine changes take effect immediately.") {
+                    ForEach(TranscriptionEngine.selectableCases) { option in
+                        EngineChoiceRow(engine: option,
+                                        selected: state.selectedTranscriptionEngine == option,
+                                        available: Config.engineAvailable(option)) {
+                            // AppState owns the selected row because a WebSocket
+                            // handoff can still fail asynchronously after this
+                            // closure returns and must visibly roll back.
+                            state.selectTranscriptionEngine(option)
+                        }
+                    }
+                }
+
+                SettingsSection(title: "Language",
+                                caption: "Auto re-detects supported languages as the conversation changes. For Russian-only meetings, choose Russian: Auto can misdetect short or noisy local Whisper chunks. Use Auto for genuinely mixed-language calls. Applied on your next recording.") {
+                    SettingsRow {
+                        Label("Language", systemImage: "globe")
+                            .labelStyle(SettingLabelStyle())
+                        Spacer()
+                        Picker("", selection: $transcriptionLanguage) {
+                            ForEach(Config.transcriptionLanguageOptions, id: \.code) { option in
+                                Text(option.label).tag(option.code)
+                            }
+                        }
+                        .labelsHidden().pickerStyle(.menu)
+                        .frame(maxWidth: 220)
+                        .onChange(of: transcriptionLanguage) { Config.transcriptionLanguage = $0 }
+                        .accessibilityLabel("Transcription language")
+                        .accessibilityIdentifier("settings.transcription.language")
+                    }
+                }
+
+                SettingsSection(title: "Microphone",
+                                caption: "Optional Apple voice processing reduces echo and background noise, but can lower speaker playback while recording. Leave it off for unchanged volume; headphones avoid that trade-off. Applies on your next recording.") {
+                    SettingsRow {
+                        Label("Apple noise & echo reduction", systemImage: "waveform.badge.mic")
+                            .labelStyle(SettingLabelStyle())
+                        Spacer()
+                        Toggle("", isOn: $micNoiseSuppression)
+                            .labelsHidden().toggleStyle(.switch)
+                            .onChange(of: micNoiseSuppression) { Config.micNoiseSuppressionEnabled = $0 }
+                            .accessibilityLabel("Apple noise and echo reduction")
+                            .accessibilityIdentifier("settings.transcription.aec")
+                    }
+                }
+
+                SettingsSection(title: "Fireflies enhance",
+                                caption: "When Fireflies is connected, merge its cloud transcript with on-device Whisper after the call (and when you import Fireflies). The LLM also uses connected apps (Notion, CRM, trackers) to correct names and project terms — Whisper timing, Fireflies speakers, connector spellings.") {
+                    SettingsRow {
+                        Label("Enhance transcript with Fireflies", systemImage: "flame")
+                            .labelStyle(SettingLabelStyle())
+                        Spacer()
+                        Toggle("", isOn: $firefliesEnhance)
+                            .labelsHidden().toggleStyle(.switch)
+                            .onChange(of: firefliesEnhance) { Config.firefliesTranscriptEnhanceEnabled = $0 }
+                            .accessibilityLabel("Enhance transcript with Fireflies")
+                            .accessibilityIdentifier("settings.transcription.fireflies-enhance")
+                    }
+                }
+
+                if state.selectedTranscriptionEngine == .local {
+                    SettingsSection(title: "On-device model",
+                                    caption: "Larger models can be more accurate but download and run heavier. Model changes apply on your next recording.") {
+                    Picker("", selection: $localModel) {
+                        ForEach(LocalWhisperModel.options) { option in
+                            Text("\(option.title) — \(option.id)").tag(option.id)
+                        }
+                    }
+                    .labelsHidden().pickerStyle(.radioGroup)
+                    .onChange(of: localModel) {
+                        // An explicit pick is never rewritten by the default
+                        // correction that downgrades over-provisioned machines.
+                        Config.localModelChosenByUser = true
+                        Config.localWhisperModel = $0
+                    }
+                    .accessibilityLabel("On-device transcription model")
+                    .accessibilityIdentifier("settings.transcription.local-model")
+                    if let picked = LocalWhisperModel.options.first(where: { $0.id == localModel }) {
+                        Text(picked.caption)
+                            .font(Typo.caption).foregroundStyle(Theme.inkTertiary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    SettingsRow {
+                        Label("Adaptive performance", systemImage: "speedometer")
+                            .labelStyle(SettingLabelStyle())
+                        Spacer()
+                        Toggle("", isOn: $adaptiveLocal)
+                            .labelsHidden().toggleStyle(.switch)
+                            .onChange(of: adaptiveLocal) { Config.adaptiveLocalWhisperEnabled = $0 }
+                            .accessibilityLabel("Adaptive transcription performance")
+                            .accessibilityIdentifier("settings.transcription.adaptive")
+                    }
+                    Text("If captions repeatedly fall behind, Cruxwing selects the next lighter validated local model for the next recording. At Base, it can offer Deepgram, but never switches to cloud without your choice.")
+                        .font(Typo.caption).foregroundStyle(Theme.inkTertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+
+                if !Config.assemblyAIAPIKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    SettingsSection(title: "Post-call speaker labels",
+                                    caption: "Optional AssemblyAI processing. Applies on your next recording: Cruxwing retains its remote audio track, then uploads only after you press Diarize—never as a live fallback.") {
+                        SettingsRow {
+                            Label("Allow cloud diarization", systemImage: "person.2.wave.2")
+                                .labelStyle(SettingLabelStyle())
+                            Spacer()
+                            Toggle("", isOn: $assemblyDiarization)
+                                .labelsHidden().toggleStyle(.switch)
+                                .onChange(of: assemblyDiarization) { Config.assemblyAIDiarizationEnabled = $0 }
+                                .accessibilityLabel("Allow cloud diarization")
+                                .accessibilityIdentifier("settings.transcription.assembly-diarization")
+                        }
+                    }
+                }
+
+                SettingsSection(title: "Custom vocabulary",
+                                caption: "Product names, acronyms, people — one per line or comma-separated. Biases every engine toward the right spelling. Connected-app suggestions are review-only; accepted terms apply on your next recording, including when you review them during a call.") {
+                    TextEditor(text: $glossary)
+                        .font(.system(size: 12, design: .monospaced))
+                        .foregroundStyle(Theme.ink)
+                        .scrollContentBackground(.hidden)
+                        .padding(Space.s)
+                        .frame(height: 96)
+                        .background(Theme.surfaceSunken, in: RoundedRectangle(cornerRadius: Radius.s, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: Radius.s, style: .continuous)
+                            .strokeBorder(Theme.hairline, lineWidth: 1))
+                        .overlay(alignment: .topLeading) {
+                            if glossary.isEmpty {
+                                Text("Cruxwing, RICE, ARR, Kubernetes…")
+                                    .font(.system(size: 12, design: .monospaced))
+                                    .foregroundStyle(Theme.inkTertiary)
+                                    .padding(.horizontal, Space.s + 4).padding(.vertical, Space.s + 8)
+                                    .allowsHitTesting(false)
+                            }
+                        }
+                        .onChange(of: glossary) {
+                            Config.transcriptionGlossary = $0
+                            state.noteConnectedGlossaryManualEdit($0)
+                        }
+                        .accessibilityLabel("Custom transcription vocabulary")
+                        .accessibilityIdentifier("settings.transcription.glossary")
+                    if !glossary.isEmpty {
+                        Text("\(Config.glossaryTerms.count) term\(Config.glossaryTerms.count == 1 ? "" : "s") active")
+                            .font(Typo.caption).foregroundStyle(Theme.inkTertiary)
+                    }
+
+                    Divider().overlay(Theme.hairline)
+
+                    SettingsRow {
+                        Label("Use connected apps for suggestions", systemImage: "app.connected.to.app.below.fill")
+                            .labelStyle(SettingLabelStyle())
+                        Spacer()
+                        Toggle("", isOn: $state.useConnectedAppsInPrompts)
+                            .labelsHidden().toggleStyle(.switch)
+                            .accessibilityLabel("Use connected apps for transcription suggestions")
+                            .accessibilityIdentifier("settings.transcription.glossary-suggestions.enabled")
+                    }
+
+                    SettingsRow {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Find names and technical terms")
+                                .font(Typo.callout).foregroundStyle(Theme.ink)
+                            Text(connectedGlossaryCostCaption)
+                                .font(Typo.caption).foregroundStyle(Theme.inkTertiary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer()
+                        if state.connectedGlossarySuggestionStatus == .loading {
+                            ProgressView().controlSize(.small)
+                        }
+                        Button("Find terms") {
+                            Task { await state.generateConnectedGlossarySuggestions() }
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(!state.canGenerateConnectedGlossarySuggestions)
+                        .accessibilityIdentifier("settings.transcription.glossary-suggestions.generate")
+                    }
+
+                    if state.connectedGlossarySourceCount == 0 {
+                        HStack {
+                            Text("Connect a readable app first.")
+                                .font(Typo.caption).foregroundStyle(Theme.inkTertiary)
+                            Spacer()
+                            Button("Connected Apps") { state.selectedSettingsTab = .connectedApps }
+                                .buttonStyle(.link)
+                                .accessibilityIdentifier("settings.transcription.glossary-suggestions.open-apps")
+                        }
+                    }
+
+                    if let message = connectedGlossaryStatusMessage {
+                        Text(message)
+                            .font(Typo.caption)
+                            .foregroundStyle(connectedGlossaryStatusIsError
+                                ? Theme.danger : Theme.inkTertiary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("settings.transcription.glossary-suggestions.status")
+                    }
+
+                    if !state.connectedGlossarySuggestions.isEmpty {
+                        ForEach(state.connectedGlossarySuggestions) { suggestion in
+                            HStack(alignment: .top, spacing: Space.s) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(suggestion.term)
+                                        .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                                        .foregroundStyle(Theme.ink)
+                                    Text(suggestion.reason + sourceSuffix(suggestion.sources))
+                                        .font(Typo.caption).foregroundStyle(Theme.inkTertiary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                                Spacer(minLength: Space.s)
+                                Button("Dismiss") {
+                                    state.rejectConnectedGlossarySuggestion(id: suggestion.id)
+                                }
+                                .buttonStyle(.borderless)
+                                .accessibilityLabel("Dismiss \(suggestion.term)")
+                                Button("Add") {
+                                    if state.acceptConnectedGlossarySuggestion(id: suggestion.id) {
+                                        glossary = Config.transcriptionGlossary
+                                    }
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .controlSize(.small)
+                                .accessibilityLabel("Add \(suggestion.term) to transcription dictionary")
+                            }
+                            .padding(.vertical, 3)
+                        }
+                        HStack {
+                            if let metrics = state.connectedGlossarySuggestionMetrics {
+                                Text("\(metrics.sourceCount) source\(metrics.sourceCount == 1 ? "" : "s") · \(metrics.estimatedInputTokens) input tokens · ~\(metrics.estimatedComputeCredits) compute credits\(metrics.cached ? " · cached" : "")")
+                                    .font(Typo.caption).foregroundStyle(Theme.inkTertiary)
+                            }
+                            Spacer()
+                            Button("Dismiss all") {
+                                state.rejectAllConnectedGlossarySuggestions()
+                            }
+                            .buttonStyle(.link)
+                            .accessibilityIdentifier("settings.transcription.glossary-suggestions.dismiss-all")
+                        }
+                    }
+                }
+            }
+            .padding(Space.xl)
+        }
+        .frame(width: 520, height: 620)
+        .onAppear {
+            transcriptionLanguage = Config.transcriptionLanguage
+            glossary = Config.transcriptionGlossary
+            localModel = Config.localWhisperModel
+            micNoiseSuppression = Config.micNoiseSuppressionEnabled
+            adaptiveLocal = Config.adaptiveLocalWhisperEnabled
+            assemblyDiarization = Config.assemblyAIDiarizationEnabled
+            firefliesEnhance = Config.firefliesTranscriptEnhanceEnabled
+        }
+    }
+
+    private var connectedGlossaryCostCaption: String {
+        let model = LLMCatalog.background(for: Config.selectedModel)
+        let credits = CreditCostEstimate.credits(model: model.id, inputTokens: 0)
+        return "Reads up to \(ConnectedGlossarySuggestionService.maxSources) bounded app excerpts, then ranks locally extracted candidates with \(model.label) (\(credits) compute credits + 1 research cycle). No call transcript is sent."
+    }
+
+    private var connectedGlossaryStatusMessage: String? {
+        if let message = state.connectedGlossarySuggestionMessage { return message }
+        switch state.connectedGlossarySuggestionStatus {
+        case .idle, .loading, .ready: return nil
+        case .empty: return "No new connected-app terms are waiting for review."
+        case .unavailable(let message), .failed(let message): return message
+        }
+    }
+
+    private var connectedGlossaryStatusIsError: Bool {
+        switch state.connectedGlossarySuggestionStatus {
+        case .unavailable, .failed: return true
+        default: return false
+        }
+    }
+
+    private func sourceSuffix(_ sources: [String]) -> String {
+        sources.isEmpty ? "" : " · " + sources.joined(separator: ", ")
+    }
+}
+
+// MARK: - Tab 3 · AI (plan, model, co-pilot)
+
+private struct AISettingsTab: View {
+    @EnvironmentObject var state: AppState
+    @State private var showPaywall = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Space.xl) {
+            SettingsSection(title: "Plan",
+                            caption: "Your plan sets which models are available.") {
+                SettingsRow {
+                    Label("Plan", systemImage: "creditcard")
+                        .labelStyle(SettingLabelStyle())
+                    Text(state.tierStatus)
+                        .font(Typo.caption).foregroundStyle(Theme.inkTertiary)
+                        .lineLimit(1).truncationMode(.tail)
+                    Spacer()
+                    PlanBadge(tier: state.currentTier)
+                    Button("Manage…") { showPaywall = true }
+                        .buttonStyle(QuietButtonStyle())
+                        .accessibilityIdentifier("settings.ai.manage-plan")
+                }
+            }
+
+            SettingsSection(title: "Model",
+                            caption: "Pick a provider, then a version — or leave both on Auto and Cruxwing chooses per request.") {
+                ModelSelectionRows()
+            }
+
+            SettingsSection(title: "Co-pilot",
+                            caption: "While recording, Brainstorm surfaces blind spots from your goal + transcript. Each scan uses Free 1 · Pro 3 · Premium 4 · Ultra 5 credits. Connected apps use the separate grounded-cycle allowance; larger context is size-metered. Optional watches share one hourly budget, so turning one off makes Blind Spot refresh sooner. Pro probes 2 workflows · Premium 3 · Ultra 4 per scan. Off stops the spend.") {
+                SettingsRow {
+                    Label("Brainstorm during calls", systemImage: "lightbulb")
+                        .labelStyle(SettingLabelStyle())
+                    Spacer()
+                    Toggle("", isOn: Binding(
+                        get: { state.blindSpotsEnabled },
+                        set: { state.setBlindSpotsEnabled($0) }))
+                        .labelsHidden().toggleStyle(.switch)
+                        .accessibilityLabel("Brainstorm during calls")
+                        .accessibilityIdentifier("settings.ai.brainstorm")
+                }
+                SettingsRow {
+                    Label("Agenda & framing checks", systemImage: "scope")
+                        .labelStyle(SettingLabelStyle())
+                    Spacer()
+                    Toggle("", isOn: Binding(
+                        get: { state.agendaCheckingEnabled },
+                        set: { state.setAgendaCheckingEnabled($0) }))
+                        .labelsHidden().toggleStyle(.switch)
+                        .accessibilityLabel("Agenda and framing checks")
+                        .accessibilityIdentifier("settings.ai.agenda")
+                }
+                SettingsRow {
+                    Label("Fact-check during calls", systemImage: "checkmark.seal")
+                        .labelStyle(SettingLabelStyle())
+                    Spacer()
+                    Toggle("", isOn: Binding(
+                        get: { state.liveFactCheckingEnabled },
+                        set: { state.setFactCheckDuringCallsEnabled($0) }))
+                        .labelsHidden().toggleStyle(.switch)
+                        .accessibilityLabel("Fact-check during calls")
+                        .accessibilityIdentifier("settings.ai.fact-check")
+                }
+                SettingsRow {
+                    Label("Rhetoric watch during calls", systemImage: "text.badge.xmark")
+                        .labelStyle(SettingLabelStyle())
+                    Spacer()
+                    Toggle("", isOn: Binding(
+                        get: { state.rhetoricWatchEnabled },
+                        set: { state.setRhetoricDuringCallsEnabled($0) }))
+                        .labelsHidden().toggleStyle(.switch)
+                        .accessibilityLabel("Rhetoric watch during calls")
+                        .accessibilityIdentifier("settings.ai.rhetoric")
+                }
+                SettingsRow {
+                    Label("Facilitation watch during calls", systemImage: "location.north.line")
+                        .labelStyle(SettingLabelStyle())
+                    Spacer()
+                    Toggle("", isOn: Binding(
+                        get: { state.facilitationWatchEnabled },
+                        set: { state.setFacilitationDuringCallsEnabled($0) }))
+                        .labelsHidden().toggleStyle(.switch)
+                        .accessibilityLabel("Facilitation watch during calls")
+                        .accessibilityIdentifier("settings.ai.facilitation")
+                }
+            }
+        }
+        .padding(Space.xl)
+        .frame(width: 520)
+        .sheet(isPresented: $showPaywall) { PaywallView() }
+    }
+}
+
+// MARK: - Tab 4 · Connected Apps (Google · MCP · team sources)
+
+private struct ConnectedAppsTab: View {
+    @EnvironmentObject var state: AppState
+    @State private var teamSourcesExpanded = !TeamConnectors.configured.isEmpty
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: Space.xl) {
+                SettingsSection(title: "Google",
+                                caption: "Calendar, Docs, Sheets, and Drive use separate scopes you control. Search is read-only; exporting to a Google Doc or Sheet can create and manage only files Cruxwing creates.") {
+                    GoogleSignInRow()
+                }
+
+                SettingsSection(title: "Work apps",
+                                caption: "Hosted MCP servers connect with one click — standard OAuth in your browser, no API keys. Tokens stay in your Keychain. Salesforce, Affinity, and thousands more also connect through Zapier.") {
+                    MCPAppsSection()
+                }
+
+                SettingsSection(title: "Bring your meetings to your AI tools",
+                                caption: "Cruxwing is also an MCP server: your meetings and decision ledger, available inside Claude, ChatGPT, Cursor — any MCP-enabled tool.") {
+                    OwnMCPCard()
+                }
+
+                // Expanding block: collapsed by default unless connectors are
+                // configured — most users never need this section.
+                DisclosureGroup(isExpanded: $teamSourcesExpanded) {
+                    TeamSourcesView()
+                        .padding(.top, Space.s)
+                } label: {
+                    HStack(spacing: Space.s) {
+                        SectionLabel("Team sources")
+                        if !TeamConnectors.configured.isEmpty {
+                            Text("\(TeamConnectors.configured.count) configured")
+                                .font(Typo.caption)
+                                .foregroundStyle(Theme.inkTertiary)
+                        }
+                    }
+                }
+                .disclosureGroupStyle(.automatic)
+            }
+            .padding(Space.xl)
+        }
+        .frame(width: 560, height: 620)
+    }
+}
+
+/// The Granola-style "public MCP URL + three steps" card. The URL is the
+/// backend's /mcp endpoint; auth happens in the AI tool's own browser flow.
+private struct OwnMCPCard: View {
+    @State private var copied = false
+
+    private var mcpURL: String {
+        Config.backendBaseURL.trimmingCharacters(in: .whitespacesAndNewlines) + "/mcp"
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Space.m) {
+            HStack(spacing: Space.s) {
+                Text(mcpURL)
+                    .font(.system(size: 12, design: .monospaced))
+                    .foregroundStyle(Theme.ink)
+                    .textSelection(.enabled)
+                    .lineLimit(1)
+                    .padding(.horizontal, Space.m)
+                    .frame(height: 30)
+                    .background(Theme.surfaceSunken, in: RoundedRectangle(cornerRadius: Radius.s, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: Radius.s, style: .continuous)
+                        .strokeBorder(Theme.hairline, lineWidth: 1))
+                Button {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(mcpURL, forType: .string)
+                    copied = true
+                    Task { try? await Task.sleep(nanoseconds: 1_500_000_000); copied = false }
+                } label: {
+                    Label(copied ? "Copied" : "Copy", systemImage: copied ? "checkmark" : "doc.on.doc")
+                        .font(Typo.caption.weight(.medium))
+                }
+                .buttonStyle(QuietButtonStyle())
+                .accessibilityLabel("Copy MCP URL")
+            }
+
+            VStack(alignment: .leading, spacing: Space.xs) {
+                setupStep(1, "In your AI tool, add Cruxwing as a connector using the URL above.")
+                setupStep(2, "Authenticate in the browser with your Cruxwing account email.")
+                setupStep(3, "Chat, search, and work with your meeting context anywhere.")
+            }
+        }
+    }
+
+    private func setupStep(_ number: Int, _ text: String) -> some View {
+        HStack(alignment: .top, spacing: Space.s) {
+            Text("\(number)")
+                .font(Typo.caption.weight(.semibold))
+                .foregroundStyle(Theme.accent)
+                .frame(width: 14, height: 14)
+                .background(Circle().fill(Theme.accentSoft.opacity(0.5)))
+            Text(text)
+                .font(Typo.caption)
+                .foregroundStyle(Theme.inkSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+// MARK: - Tab 5 · Account & Privacy
+
+private struct AccountPrivacyTab: View {
+    @State private var outboundRedaction: Bool = Config.outboundRedactionEnabled
+    @State private var redactionTerms: String = Config.redactionTermsRaw
+    @ObservedObject private var redactionLog = OutboundRedactionLog.shared
+    @EnvironmentObject var state: AppState
+    @State private var showSignIn = false
+    @State private var confirmDelete = false
+    @State private var deleting = false
+    @State private var shareAnalytics: Bool = !Config.funnelOptOut
+    @State private var devTierPreview: String = Config.devTierOverride?.rawValue ?? "off"
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Space.xl) {
+            SettingsSection(title: "Account",
+                            caption: "Sign in to use managed AI models and sync your Decision Ledger.") {
+                WheesprAccountRow(showSheet: $showSignIn)
+
+                if state.wheesprConnected {
+                    SettingsRow {
+                        Label("Delete account", systemImage: "trash")
+                            .labelStyle(SettingLabelStyle())
+                        Spacer()
+                        Button(deleting ? "Deleting…" : "Delete…", role: .destructive) {
+                            confirmDelete = true
+                        }
+                        .disabled(deleting)
+                        .accessibilityIdentifier("settings.account.delete")
+                    }
+                }
+            }
+
+            SettingsSection(title: "Recording consent",
+                            caption: "You affirmed responsibility for participant consent before your first recording. Revoking shows the consent screen again next time.") {
+                SettingsRow {
+                    Label(Config.recordingConsentAccepted ? "Consent affirmed" : "Not yet affirmed",
+                          systemImage: Config.recordingConsentAccepted ? "checkmark.shield" : "shield")
+                        .labelStyle(SettingLabelStyle())
+                    Spacer()
+                    if Config.recordingConsentAccepted {
+                        Button("Revoke") { Config.recordingConsentAccepted = false }
+                            .buttonStyle(QuietButtonStyle())
+                            .accessibilityIdentifier("settings.privacy.revoke-recording-consent")
+                    }
+                }
+            }
+
+            SettingsSection(title: "Remove secrets before sending",
+                            caption: "Card numbers, API keys, government ID numbers and labelled credentials are stripped from anything sent to an AI provider. Detection is structural — a card must pass a checksum, a key must carry a known prefix — so ordinary meeting numbers like dates, prices and room numbers are left alone. A request is never blocked: the secret is removed and the rest is sent.") {
+                SettingsRow {
+                    Label("Filter outbound requests", systemImage: "eye.slash")
+                        .labelStyle(SettingLabelStyle())
+                    Spacer()
+                    Toggle("", isOn: $outboundRedaction)
+                        .labelsHidden()
+                        .onChange(of: outboundRedaction) { Config.outboundRedactionEnabled = $0 }
+                        .accessibilityLabel("Filter outbound requests")
+                        .accessibilityIdentifier("settings.privacy.outbound-redaction")
+                }
+                SettingsRow {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Label("Also remove these terms", systemImage: "text.badge.minus")
+                            .labelStyle(SettingLabelStyle())
+                        Text("Project code names, client names — one per line. Removed wherever they appear.")
+                            .font(Typo.caption)
+                            .foregroundStyle(Theme.inkTertiary)
+                        TextEditor(text: $redactionTerms)
+                            .font(Typo.mono)
+                            .frame(height: 64)
+                            .onChange(of: redactionTerms) { Config.redactionTermsRaw = $0 }
+                            .accessibilityIdentifier("settings.privacy.redaction-terms")
+                    }
+                }
+                // Only when something was actually removed. A marker on every
+                // session would train people to ignore it.
+                if let summary = redactionLog.summary {
+                    SettingsRow {
+                        Label(summary, systemImage: "checkmark.shield")
+                            .labelStyle(SettingLabelStyle())
+                            .foregroundStyle(Theme.inkSecondary)
+                        Spacer()
+                    }
+                }
+            }
+
+            SettingsSection(title: "Where your data goes",
+                            caption: "Transcription runs on this Mac by default. Transcript excerpts are sent to the AI provider behind your selected model only when you run an AI action — the provider list shows each model's vendor. Nothing is used for advertising or sold.") {
+                EmptyView()
+            }
+
+            SettingsSection(title: "Usage analytics",
+                            caption: "Anonymous, cookieless product events (which screens you reach, which actions you run) — no account, no meeting content, no cross-app tracking. Helps us see where the app helps or gets in the way. Turn off to send nothing.") {
+                SettingsRow {
+                    Label("Share anonymous usage data", systemImage: "chart.bar.xaxis")
+                        .labelStyle(SettingLabelStyle())
+                    Spacer()
+                    Toggle("", isOn: $shareAnalytics)
+                        .labelsHidden().toggleStyle(.switch)
+                        .onChange(of: shareAnalytics) { Config.funnelOptOut = !$0 }
+                        .accessibilityLabel("Share anonymous usage data")
+                        .accessibilityIdentifier("settings.privacy.analytics")
+                }
+            }
+
+            if Config.isDevBuild {
+                SettingsSection(title: "Developer",
+                                caption: "Dev builds only — dist builds bake this section out. The preview drives the real gates (model catalog, co-pilot hours, compute credits, grounded cycles), so the app behaves exactly as a user on that plan. \"Real entitlement\" returns to your actual plan.") {
+                    SettingsRow {
+                        Label("Preview plan", systemImage: "wrench.and.screwdriver")
+                            .labelStyle(SettingLabelStyle())
+                        Spacer()
+                        Picker("", selection: $devTierPreview) {
+                            Text("Real entitlement").tag("off")
+                            ForEach(Tier.allCases) { tier in
+                                Text(tier.label).tag(tier.rawValue)
+                            }
+                        }
+                        .labelsHidden()
+                        .frame(width: 170)
+                        .onChange(of: devTierPreview) { state.setDevTierOverride(Tier(rawValue: $0)) }
+                        .accessibilityLabel("Preview plan")
+                        .accessibilityIdentifier("settings.developer.preview-plan")
+                    }
+                    if let preview = Tier(rawValue: devTierPreview) {
+                        SettingsRow {
+                            Label("This plan gets", systemImage: "checklist")
+                                .labelStyle(SettingLabelStyle())
+                            Spacer()
+                            Text(Self.devTierSummary(preview))
+                                .font(Typo.caption)
+                                .foregroundStyle(Theme.inkSecondary)
+                                .multilineTextAlignment(.trailing)
+                        }
+                    }
+                }
+            }
+        }
+        .padding(Space.xl)
+        .frame(width: 520)
+        .onAppear {
+            shareAnalytics = !Config.funnelOptOut
+            devTierPreview = Config.devTierOverride?.rawValue ?? "off"
+        }
+        .sheet(isPresented: $showSignIn) { SignInSheet() }
+        .confirmationDialog("Delete your account?", isPresented: $confirmDelete) {
+            Button("Delete account and all data", role: .destructive) {
+                deleting = true
+                Task {
+                    _ = await state.deleteAccount()
+                    deleting = false
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This permanently removes your account, sessions, and plan from the server. Meetings saved on this Mac are not affected.")
+        }
+    }
+
+    /// What the previewed plan grants, in the same units the app enforces.
+    private static func devTierSummary(_ tier: Tier) -> String {
+        let allowance = TariffAllowance.forTier(tier)
+        let models = LLMCatalog.all.filter { $0.isAvailable(for: tier) }.count
+        return "\(models) models · \(allowance.copilotHours) h co-pilot · "
+            + "\(allowance.computeCredits) credits · \(allowance.groundedCycles) grounded cycles / mo"
+    }
+}
+
+// MARK: - Shared building blocks
+
+struct SettingsRow<Content: View>: View {
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        HStack(spacing: Space.m) { content }
+            .padding(.horizontal, Space.m)
+            .padding(.vertical, Space.s)
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: Radius.s, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Radius.s, style: .continuous).strokeBorder(Theme.hairline, lineWidth: 1))
+    }
+}
+
+struct SettingsSection<Content: View>: View {
+    let title: String
+    let caption: String
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Space.s) {
+            SectionLabel(title)
+            VStack(alignment: .leading, spacing: Space.s) { content }
+            Text(caption)
+                .font(Typo.caption)
+                .foregroundStyle(Theme.inkTertiary)
+                .padding(.top, Space.xxs)
+        }
+    }
+}
+
+/// One selectable transcription engine, presented by its core advantage.
+private struct EngineChoiceRow: View {
+    let engine: TranscriptionEngine
+    let selected: Bool
+    let available: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(alignment: .top, spacing: Space.m) {
+                Image(systemName: selected ? "largecircle.fill.circle" : "circle")
+                    .font(.system(size: 14))
+                    .foregroundStyle(selected ? Theme.accent : Theme.inkTertiary)
+                    .padding(.top, 1)
+                Image(systemName: engine.advantageSymbol)
+                    .font(.system(size: 13))
+                    .foregroundStyle(Theme.accent)
+                    .frame(width: 18)
+                    .padding(.top, 1)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(engine.advantageTitle)
+                        .font(Typo.callout.weight(.medium))
+                        .foregroundStyle(Theme.ink)
+                    Text(engine.advantageCaption)
+                        .font(Typo.caption)
+                        .foregroundStyle(Theme.inkTertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer()
+                if !available {
+                    Text("Not in this build")
+                        .font(Typo.caption)
+                        .foregroundStyle(Theme.inkTertiary)
+                }
+            }
+            .padding(.horizontal, Space.m)
+            .padding(.vertical, Space.s)
+            .background(selected ? Theme.accentSoft.opacity(0.4) : Theme.surface,
+                        in: RoundedRectangle(cornerRadius: Radius.s, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Radius.s, style: .continuous)
+                .strokeBorder(selected ? Theme.accent.opacity(0.5) : Theme.hairline, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .disabled(!available)
+        .opacity(available ? 1 : 0.55)
+        .accessibilityLabel("\(engine.advantageTitle) transcription engine")
+        .accessibilityValue(selected ? "Selected" : "Not selected")
+        .accessibilityIdentifier("settings.transcription.engine.\(engine.rawValue)")
+    }
+}
+
+// MARK: - Plan badge
+
+private struct PlanBadge: View {
+    let tier: Tier
+    var body: some View {
+        Text(tier.label.uppercased())
+            .font(Typo.label)
+            .foregroundStyle(Theme.accentText)
+            .padding(.horizontal, Space.s)
+            .padding(.vertical, 3)
+            .background(Capsule().fill(Theme.accentSoft))
+    }
+}
+
+// MARK: - Google sign-in
+
+private struct GoogleSignInRow: View {
+    @EnvironmentObject var state: AppState
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Space.s) {
+            HStack(spacing: Space.s) {
+                VStack(alignment: .leading, spacing: Space.xxs) {
+                    Label(state.googleConnected ? "Google Calendar connected" : "Google Calendar",
+                          systemImage: state.googleConnected ? "checkmark.seal.fill" : "calendar")
+                        .labelStyle(SettingLabelStyle())
+                    if state.googleConnected {
+                        let count = state.promptWorkflowCount(usingSourcePrefix: "google:")
+                        Text("\(count) prompt workflow\(count == 1 ? "" : "s") ready")
+                            .font(Typo.caption)
+                            .foregroundStyle(Theme.inkTertiary)
+                    }
+                }
+                Spacer()
+                if state.googleConnecting {
+                    ProgressView().controlSize(.small)
+                    Text("Connecting…")
+                        .font(Typo.caption)
+                        .foregroundStyle(Theme.inkSecondary)
+                    Button("Cancel") { state.cancelGoogleConnection() }
+                        .buttonStyle(QuietButtonStyle())
+                        .accessibilityIdentifier("settings.connected.google.cancel")
+                } else if state.googleConnected {
+                    Button("Disconnect") { state.disconnectGoogle() }
+                        .buttonStyle(QuietButtonStyle())
+                        .accessibilityIdentifier("settings.connected.google.disconnect")
+                } else {
+                    GoogleSignInButton(enabled: state.hasGoogleSignInClient) {
+                        Task { await state.connectGoogle() }
+                    }
+                }
+            }
+            .padding(.horizontal, Space.m).padding(.vertical, Space.s)
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: Radius.s, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Radius.s, style: .continuous).strokeBorder(Theme.hairline, lineWidth: 1))
+
+            // Granular authorization: each service is a separate scope in the
+            // OAuth grant — disabled ones are excluded from the token itself.
+            GoogleServiceToggles()
+
+            if !state.hasGoogleClientID {
+                Text("Add GOOGLE_CLIENT_ID in mac/.env and rebuild Cruxwing.")
+                    .font(Typo.caption).foregroundStyle(Theme.inkTertiary)
+            } else if !state.hasGoogleClientSecret {
+                Text("Add GOOGLE_CLIENT_SECRET for the same Google Desktop OAuth client, then rebuild Cruxwing.")
+                    .font(Typo.caption).foregroundStyle(Theme.inkTertiary)
+            } else if let error = state.googleConnectionError, !error.isEmpty {
+                Label(error, systemImage: "exclamationmark.triangle.fill")
+                    .font(Typo.caption)
+                    .foregroundStyle(Theme.danger)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if state.googleConnected,
+                      Config.googleScopeVersion < GoogleAuth.scopeVersion
+                        || Config.googleGrantedServices != Config.googleEnabledServices {
+                HStack(spacing: Space.s) {
+                    Text("Access or workflow search changed — reconnect to apply it.")
+                        .font(Typo.caption).foregroundStyle(Theme.accentText)
+                    Button("Reconnect now") { Task { await state.connectGoogle() } }
+                        .buttonStyle(QuietButtonStyle())
+                        .disabled(state.googleConnecting)
+                        .accessibilityIdentifier("settings.connected.google.reconnect")
+                }
+            }
+        }
+    }
+}
+
+/// Per-service switches controlling what the Google grant may cover.
+private struct GoogleServiceToggles: View {
+    @State private var enabled = Config.googleEnabledServices
+
+    var body: some View {
+        HStack(spacing: Space.l) {
+            ForEach(GoogleService.requestable) { service in
+                Toggle(service.label, isOn: Binding(
+                    get: { enabled.contains(service.rawValue) },
+                    set: { on in
+                        if on { enabled.insert(service.rawValue) }
+                        else { enabled.remove(service.rawValue) }
+                        Config.googleEnabledServices = enabled
+                    }
+                ))
+                .toggleStyle(.checkbox)
+                .font(Typo.caption)
+                .accessibilityIdentifier("settings.connected.google.service.\(service.rawValue)")
+            }
+            Spacer()
+        }
+        .padding(.horizontal, Space.m)
+        .padding(.vertical, 6)
+        .background(Theme.surfaceSunken, in: RoundedRectangle(cornerRadius: Radius.s, style: .continuous))
+    }
+}
+
+/// Google-styled sign-in button (white surface, colored "G", clear label).
+private struct GoogleSignInButton: View {
+    let enabled: Bool
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: Space.s) {
+                Text("G").font(.system(size: 13, weight: .bold, design: .rounded))
+                    .foregroundStyle(enabled ? Theme.accent : Theme.inkTertiary)
+                Text("Connect Google Calendar")
+                    .font(Typo.callout.weight(.semibold))
+                    .foregroundStyle(enabled ? Theme.ink : Theme.inkTertiary)
+            }
+            .padding(.horizontal, Space.m).padding(.vertical, 7)
+            .background(Capsule().fill(hovering && enabled ? Theme.surfaceHover : Theme.surface))
+            .overlay(Capsule().strokeBorder(Theme.hairlineStrong, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+        .onHover { hovering = $0 }
+        .help(enabled ? "Connect Google Calendar (and optional Docs/Sheets)" : "Google Calendar isn't available in this build")
+        .accessibilityIdentifier("settings.connected.google.connect")
+        .animation(Motion.quick, value: hovering)
+    }
+}
+
+// MARK: - Account row (sign in / out)
+
+private struct WheesprAccountRow: View {
+    @EnvironmentObject var state: AppState
+    @Binding var showSheet: Bool
+
+    private var title: String {
+        guard state.wheesprConnected else { return "Account" }
+        if let email = state.wheesprEmail, !email.isEmpty { return "Signed in · \(email)" }
+        return "Signed in"
+    }
+
+    var body: some View {
+        HStack(spacing: Space.s) {
+            Label(title, systemImage: state.wheesprConnected ? "checkmark.seal.fill" : "person.crop.circle")
+                .labelStyle(SettingLabelStyle())
+                .lineLimit(1)
+                .truncationMode(.middle)
+            Spacer()
+            if !state.wheesprAvailable {
+                Text("Unavailable in this build")
+                    .font(Typo.caption).foregroundStyle(Theme.inkTertiary)
+            } else if state.wheesprConnected {
+                Button("Sign out") { state.signOutWheespr() }
+                    .buttonStyle(QuietButtonStyle())
+                    .accessibilityIdentifier("settings.account.sign-out")
+            } else {
+                Button("Sign in") { showSheet = true }
+                    .buttonStyle(QuietButtonStyle(prominent: true))
+                    .accessibilityIdentifier("settings.account.sign-in")
+            }
+        }
+        .padding(.horizontal, Space.m).padding(.vertical, Space.s)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Radius.s, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Radius.s, style: .continuous).strokeBorder(Theme.hairline, lineWidth: 1))
+    }
+}
+
+/// Account sign-in: optional social (Apple / Google account) when the feature
+/// flag is on, plus first-party Email code / Password / Phone.
+struct SignInSheet: View {
+    @EnvironmentObject var state: AppState
+    @Environment(\.dismiss) private var dismiss
+    @State private var email = ""
+    @State private var code = ""
+    // Additional providers (password / phone)
+    @State private var method = "code"
+    @State private var password = ""
+    @State private var registering = false
+    @State private var phone = ""
+    @State private var phoneCodeSent = false
+    @State private var working = false
+    @State private var providerError: String?
+
+    private var codeStep: Bool { state.pendingAuthEmail != nil }
+    /// Judged per provider: Apple waits on App Store Connect verification,
+    /// Google only needs a configured client.
+    private var showsApple: Bool { SocialSignIn.showsApple() }
+    private var showsGoogle: Bool {
+        SocialSignIn.showsGoogle(hasClient: state.hasGoogleSignInClient)
+    }
+    private var socialEnabled: Bool {
+        SocialSignIn.showsDivider(apple: showsApple, google: showsGoogle)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Space.l) {
+            Label("Sign in", systemImage: "person.crop.circle").font(Typo.title).foregroundStyle(Theme.ink)
+
+            if socialEnabled {
+                socialButtons
+                HStack {
+                    Rectangle().fill(Theme.hairline).frame(height: 1)
+                    Text("or").font(Typo.caption).foregroundStyle(Theme.inkTertiary)
+                    Rectangle().fill(Theme.hairline).frame(height: 1)
+                }
+            }
+
+            Picker("", selection: $method) {
+                Text("Email code").tag("code")
+                Text("Password").tag("password")
+                Text("Phone").tag("phone")
+            }
+            .pickerStyle(.segmented).labelsHidden()
+
+            if method == "password" {
+                passwordFlow
+            } else if method == "phone" {
+                phoneFlow
+            } else if !codeStep {
+                Text("We'll email you a 6-digit code — no password.")
+                    .font(Typo.callout).foregroundStyle(Theme.inkSecondary)
+                field($email, prompt: "you@company.com")
+                HStack {
+                    Spacer()
+                    Button("Cancel") { dismiss() }.buttonStyle(QuietButtonStyle())
+                    Button(state.authWorking ? "Sending…" : "Send code") {
+                        Task { await state.requestSignInCode(email: email) }
+                    }
+                    .buttonStyle(PrimaryButtonStyle())
+                    .disabled(email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || state.authWorking)
+                }
+            } else {
+                Text("Enter the code sent to \(state.pendingAuthEmail ?? "").")
+                    .font(Typo.callout).foregroundStyle(Theme.inkSecondary)
+                field($code, prompt: "123456")
+                HStack {
+                    Button("Back") { state.cancelSignIn(); code = "" }.buttonStyle(QuietButtonStyle())
+                    Spacer()
+                    Button(state.authWorking ? "Verifying…" : "Verify") {
+                        Task { await state.verifySignIn(code: code) }
+                    }
+                    .buttonStyle(PrimaryButtonStyle())
+                    .disabled(code.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || state.authWorking)
+                }
+            }
+        }
+        .padding(Space.xl).frame(width: 420).background(Theme.canvas)
+        .onChange(of: state.wheesprConnected) { if $0 { dismiss() } }
+    }
+
+    // MARK: Social account login (equal prominence when enabled)
+
+    private var socialButtons: some View {
+        VStack(spacing: Space.s) {
+            if showsApple {
+                Button {
+                    Task { await state.signInWithApple() }
+                } label: {
+                    Label("Sign in with Apple", systemImage: "apple.logo")
+                        .font(Typo.callout.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                }
+                .buttonStyle(PrimaryButtonStyle())
+                .disabled(state.authWorking)
+            }
+
+            if showsGoogle {
+            Button {
+                Task { await state.signInWithGoogleAccount() }
+            } label: {
+                HStack(spacing: Space.s) {
+                    Text("G").font(.system(size: 13, weight: .bold, design: .rounded))
+                    Text(state.authWorking ? "Restart Google sign-in" : "Continue with Google")
+                        .font(Typo.callout.weight(.semibold))
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+            }
+            // The flow signs in with googleSignInClientID/Secret, so that is the
+            // credential the button's enabled state must reflect. Checking the
+            // connector client instead could offer a button that cannot run, or
+            // grey out one that can.
+            //
+            // Deliberately NOT disabled while authWorking: an abandoned browser
+            // window keeps the flow alive for two minutes, and a greyed-out
+            // button during that window was exactly the reported "wanted to
+            // sign in with a different account and the button was disabled".
+            // A click during a live flow cancels it and starts fresh (the
+            // Google picker then offers every Chrome profile again).
+            .buttonStyle(QuietButtonStyle(prominent: true))
+            .disabled(!state.hasGoogleSignInClient)
+            .help(state.authWorking
+                  ? "A sign-in window is already open — click to start over"
+                  : "Sign in to your Cruxwing account with Google")
+            }
+
+            Text("Account login is separate from Connect Google Calendar in Connected Apps.")
+                .font(Typo.caption)
+                .foregroundStyle(Theme.inkTertiary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    // MARK: Password provider
+
+    private var passwordFlow: some View {
+        VStack(alignment: .leading, spacing: Space.m) {
+            field($email, prompt: "you@company.com")
+            SecureField("", text: $password, prompt: Text("password (min 8 characters)"))
+                .textFieldStyle(.plain).padding(Space.m)
+                .background(Theme.surface, in: RoundedRectangle(cornerRadius: Radius.s, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: Radius.s, style: .continuous).strokeBorder(Theme.hairline, lineWidth: 1))
+            Toggle("Create a new account", isOn: $registering)
+                .toggleStyle(.checkbox).font(Typo.caption)
+            if let providerError {
+                Text(providerError).font(Typo.caption).foregroundStyle(Theme.recordRed)
+            }
+            HStack {
+                Spacer()
+                Button("Cancel") { dismiss() }.buttonStyle(QuietButtonStyle())
+                Button(working ? "Working…" : (registering ? "Create account" : "Sign in")) {
+                    Task { await runProvider {
+                        registering
+                            ? try await WheesprAuth.registerPassword(email: email, password: password)
+                            : try await WheesprAuth.loginPassword(email: email, password: password)
+                    } }
+                }
+                .buttonStyle(PrimaryButtonStyle())
+                .disabled(working || email.isEmpty || password.count < 8)
+            }
+        }
+    }
+
+    // MARK: Phone provider (SMS code)
+
+    private var phoneFlow: some View {
+        VStack(alignment: .leading, spacing: Space.m) {
+            field($phone, prompt: "+15551234567")
+                .disabled(phoneCodeSent)
+            if phoneCodeSent { field($code, prompt: "SMS code") }
+            if let providerError {
+                Text(providerError).font(Typo.caption).foregroundStyle(Theme.recordRed)
+            }
+            HStack {
+                if phoneCodeSent {
+                    Button("Back") { phoneCodeSent = false; code = "" }.buttonStyle(QuietButtonStyle())
+                }
+                Spacer()
+                Button("Cancel") { dismiss() }.buttonStyle(QuietButtonStyle())
+                Button(working ? "Working…" : (phoneCodeSent ? "Verify" : "Send SMS code")) {
+                    Task {
+                        if phoneCodeSent {
+                            await runProvider { try await WheesprAuth.verifyPhone(phone: phone, code: code) }
+                        } else {
+                            working = true; providerError = nil
+                            defer { working = false }
+                            do { try await WheesprAuth.requestPhoneCode(phone: phone); phoneCodeSent = true }
+                            catch { providerError = error.localizedDescription }
+                        }
+                    }
+                }
+                .buttonStyle(PrimaryButtonStyle())
+                .disabled(working || phone.isEmpty || (phoneCodeSent && code.isEmpty))
+            }
+        }
+    }
+
+    /// Run a provider sign-in through the shared `applySession` path.
+    private func runProvider(_ signIn: @escaping () async throws -> WheesprSession) async {
+        working = true
+        providerError = nil
+        defer { working = false }
+        do {
+            let session = try await signIn()
+            state.applySession(session)
+        } catch {
+            providerError = error.localizedDescription
+        }
+    }
+
+    private func field(_ text: Binding<String>, prompt: String) -> some View {
+        TextField("", text: text, prompt: Text(prompt))
+            .textFieldStyle(.plain).padding(Space.m)
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: Radius.s, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Radius.s, style: .continuous).strokeBorder(Theme.hairline, lineWidth: 1))
+    }
+}
+
+struct SettingLabelStyle: LabelStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(spacing: Space.s) {
+            configuration.icon
+                .font(.system(size: 12))
+                .foregroundStyle(Theme.accent)
+                .frame(width: 16)
+            configuration.title
+                .font(Typo.callout.weight(.medium))
+                .foregroundStyle(Theme.inkSecondary)
+        }
+    }
+}

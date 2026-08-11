@@ -1,0 +1,389 @@
+{
+  "addOns": [
+    {
+      "category": "compute",
+      "id": "compute-250",
+      "name": "250 compute credits",
+      "priceCents": 1900,
+      "quantity": 250,
+      "unit": "credits"
+    },
+    {
+      "category": "compute",
+      "id": "compute-750",
+      "name": "750 compute credits",
+      "priceCents": 4900,
+      "quantity": 750,
+      "unit": "credits"
+    },
+    {
+      "category": "compute",
+      "id": "compute-2000",
+      "name": "2,000 compute credits",
+      "priceCents": 13500,
+      "quantity": 2000,
+      "unit": "credits"
+    },
+    {
+      "category": "copilot",
+      "id": "copilot-10",
+      "name": "10 AI Copilot hours",
+      "priceCents": 500,
+      "quantity": 10,
+      "unit": "hours"
+    },
+    {
+      "category": "copilot",
+      "id": "copilot-50",
+      "name": "50 AI Copilot hours",
+      "priceCents": 1900,
+      "quantity": 50,
+      "unit": "hours"
+    },
+    {
+      "category": "copilot",
+      "id": "copilot-200",
+      "name": "200 AI Copilot hours",
+      "priceCents": 5900,
+      "quantity": 200,
+      "unit": "hours"
+    }
+  ],
+  "allowances": {
+    "free": {
+      "computeCredits": 15,
+      "copilotCredits": 210,
+      "copilotHours": 2,
+      "groundedCycles": 3
+    },
+    "premium": {
+      "computeCredits": 750,
+      "copilotCredits": 7360,
+      "copilotHours": 40,
+      "groundedCycles": 100
+    },
+    "pro": {
+      "computeCredits": 250,
+      "copilotCredits": 2880,
+      "copilotHours": 20,
+      "groundedCycles": 20
+    },
+    "ultra": {
+      "computeCredits": 1500,
+      "copilotCredits": 13440,
+      "copilotHours": 60,
+      "groundedCycles": 300
+    }
+  },
+  "callThemes": [
+    "sales",
+    "hiring",
+    "product",
+    "engineering",
+    "fundraising",
+    "customerSuccess",
+    "leadership",
+    "legal",
+    "strategy",
+    "standup",
+    "general"
+  ],
+  "creditPools": {
+    "cloud": [
+      "transcription",
+      "orchestrate",
+      "ledger",
+      "brief"
+    ],
+    "copilot": [
+      "brainstorm",
+      "factcheck",
+      "agenda",
+      "rhetoric",
+      "facilitation"
+    ]
+  },
+  "creditRates": {
+    "brainstormByTier": {
+      "free": 1,
+      "premium": 4,
+      "pro": 3,
+      "ultra": 5
+    },
+    "features": {
+      "agenda": 1,
+      "brainstorm": 1,
+      "facilitation": 1,
+      "factcheck": 1,
+      "ledger": 1,
+      "rhetoric": 1,
+      "transcription": 1
+    },
+    "models": {
+      "claude-opus-5": 7,
+      "claude-sonnet-5": 3,
+      "deepseek-v4-pro": 1,
+      "gemini-3.1-pro-preview": 3,
+      "gemini-3.5-flash": 2,
+      "glm-5.2": 2,
+      "gpt-4o-mini": 1,
+      "gpt-5.4": 4,
+      "gpt-5.4-mini": 2,
+      "gpt-5.5": 7,
+      "gpt-5.6-sol": 7,
+      "kimi-k2.6": 2,
+      "qwen3.7-max": 3
+    },
+    "orchestration": {
+      "free": 5,
+      "max": 24,
+      "medium": 15,
+      "ultra": 38
+    },
+    "transcription": {
+      "assemblyai": 80,
+      "deepgram": 40,
+      "openai-diarize": 60,
+      "openai-fallback": 60,
+      "self-hosted": 100
+    }
+  },
+  "funnelStages": [
+    "landing_view",
+    "cta_click",
+    "download_start",
+    "app_open",
+    "onboarding_complete",
+    "first_recording",
+    "first_ai_action",
+    "paywall_view",
+    "checkout_start",
+    "subscribe_success",
+    "promo_redeem",
+    "surface_opened",
+    "prompt_run",
+    "session_ended",
+    "recording_abandoned",
+    "feature_used",
+    "feature_failed"
+  ],
+  "goalFields": {
+    "close_deal": [
+      "next_step",
+      "pricing_state",
+      "objections",
+      "single_ask"
+    ],
+    "design_review": [
+      "proposal",
+      "tradeoffs",
+      "decision",
+      "dissent",
+      "revisit_trigger"
+    ],
+    "hiring": [
+      "evidence",
+      "missing_signals",
+      "scorecard"
+    ],
+    "incident": [
+      "timeline",
+      "mitigation",
+      "comms_plan"
+    ],
+    "one_on_one": [
+      "feedback",
+      "growth_areas",
+      "blockers",
+      "commitments"
+    ],
+    "planning": [
+      "commitments",
+      "cut_list",
+      "revisit_date"
+    ],
+    "product_feedback": [
+      "insights",
+      "follow_up_questions",
+      "jtbd"
+    ],
+    "retro": [
+      "kept",
+      "dropped",
+      "experiments",
+      "recurring_themes"
+    ],
+    "status_review": [
+      "metric_deltas",
+      "off_track",
+      "decisions_needed"
+    ],
+    "vendor_eval": [
+      "criteria_matrix",
+      "unknowns",
+      "recommendation"
+    ]
+  },
+  "goalTypes": [
+    "close_deal",
+    "product_feedback",
+    "hiring",
+    "incident",
+    "planning",
+    "vendor_eval",
+    "one_on_one",
+    "retro",
+    "status_review",
+    "design_review"
+  ],
+  "models": {
+    "claude-opus-5": {
+      "contextTokens": 200000,
+      "minTier": "premium",
+      "provider": "anthropic",
+      "supportsVision": true
+    },
+    "claude-sonnet-5": {
+      "contextTokens": 200000,
+      "minTier": "pro",
+      "provider": "anthropic",
+      "supportsVision": true
+    },
+    "deepseek-v4-pro": {
+      "minTier": "premium",
+      "provider": "deepseek",
+      "supportsVision": false
+    },
+    "gemini-3.1-pro-preview": {
+      "contextTokens": 1000000,
+      "minTier": "premium",
+      "provider": "google",
+      "supportsVision": true
+    },
+    "gemini-3.5-flash": {
+      "contextTokens": 1000000,
+      "minTier": "free",
+      "provider": "google",
+      "supportsVision": true
+    },
+    "glm-5.2": {
+      "minTier": "premium",
+      "provider": "zhipu",
+      "supportsVision": false
+    },
+    "gpt-5.4": {
+      "contextTokens": 400000,
+      "minTier": "pro",
+      "provider": "openai",
+      "supportsVision": true
+    },
+    "gpt-5.4-mini": {
+      "contextTokens": 400000,
+      "minTier": "free",
+      "provider": "openai",
+      "supportsVision": true
+    },
+    "gpt-5.5": {
+      "contextTokens": 400000,
+      "minTier": "premium",
+      "provider": "openai",
+      "supportsVision": true
+    },
+    "gpt-5.6-sol": {
+      "contextTokens": 400000,
+      "minTier": "premium",
+      "provider": "openai",
+      "supportsVision": true
+    },
+    "kimi-k2.6": {
+      "minTier": "pro",
+      "provider": "moonshot",
+      "supportsVision": false
+    },
+    "qwen3.7-max": {
+      "minTier": "premium",
+      "provider": "qwen",
+      "supportsVision": false
+    }
+  },
+  "plans": [
+    {
+      "id": "pro-monthly",
+      "interval": "month",
+      "name": "Pro",
+      "priceCents": 1900,
+      "tier": "pro"
+    },
+    {
+      "id": "pro-annual",
+      "interval": "year",
+      "name": "Pro · Annual",
+      "priceCents": 19000,
+      "tier": "pro"
+    },
+    {
+      "id": "premium-monthly",
+      "interval": "month",
+      "name": "Premium",
+      "priceCents": 4900,
+      "tier": "premium"
+    },
+    {
+      "id": "premium-annual",
+      "interval": "year",
+      "name": "Premium · Annual",
+      "priceCents": 49000,
+      "tier": "premium"
+    },
+    {
+      "id": "ultra-monthly",
+      "interval": "month",
+      "name": "Ultra",
+      "priceCents": 9900,
+      "tier": "ultra"
+    },
+    {
+      "id": "ultra-annual",
+      "interval": "year",
+      "name": "Ultra · Annual",
+      "priceCents": 99000,
+      "tier": "ultra"
+    }
+  ],
+  "tierFeatures": {
+    "free": [
+      "Unlimited on-device transcription",
+      "2 AI Copilot hours / month",
+      "15 compute credits / month",
+      "3 grounded research runs / month",
+      "Blind-spot co-pilot (1 credit / scan)",
+      "GPT-5.4 mini"
+    ],
+    "premium": [
+      "40 AI Copilot hours / month",
+      "750 compute credits / month",
+      "100 grounded research runs / month",
+      "Deeper blind-spot co-pilot (multi-workflow connector probes)",
+      "GPT-5.6 Sol, Opus, Gemini Pro, DeepSeek, Qwen, and GLM",
+      "Max council (from ~24 credits / run)"
+    ],
+    "pro": [
+      "20 AI Copilot hours / month",
+      "250 compute credits / month",
+      "20 grounded research runs / month",
+      "Deeper blind-spot co-pilot (rotating workflows + connectors)",
+      "Efficiency Engine: per-goal follow-up contracts + scored action items",
+      "GPT-5.4, Claude Sonnet, and Kimi",
+      "Medium council (from ~15 credits / run)"
+    ],
+    "ultra": [
+      "60 AI Copilot hours / month",
+      "1,500 compute credits / month",
+      "300 grounded research runs / month",
+      "Deeper blind-spot co-pilot (multi-workflow connector probes)",
+      "Every Premium model — no model is Ultra-only",
+      "Ultra council: a wider 4-model panel (from ~38 credits / run)"
+    ]
+  },
+  "version": "1.1.0"
+}

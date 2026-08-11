@@ -1,0 +1,80 @@
+# ── generated secrets ────────────────────────────────────────────────────────
+# build.sh reads .env and writes real provider keys into this file so they
+# compile into the app. It is generated on EVERY build; committing it publishes
+# live keys. In the monorepo this was ignored as mac/Sources/... — the path
+# moved when the repository was flattened.
+Sources/MeetGPT/Secrets.swift
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+
+# ── SwiftPM / Xcode ──────────────────────────────────────────────────────────
+.build/
+# swift test --build-path artifacts. Same class as .build/ — 13k vendored
+# files that a wildcard  will otherwise sweep into a commit.
+.build-test/
+.swiftpm/
+DerivedData/
+*.xcuserstate
+*.xcuserdatad/
+
+# ── distribution artifacts ───────────────────────────────────────────────────
+*.app
+*.dmg
+*.pkg
+*.zip
+dist/
+
+.contract-source/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Logs
+logs/
+*.log
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Backups and scratch
+*.bak
+*.backup
+*.tmp
+
+# Build output: build.sh stages a ~39MB Cruxwing.app here.
+build/
+dist/
+
+# ── test evidence: published vs regenerated ──────────────────────────────────
+# coverage/ is deliberately NOT ignored. The E2E gate reads swift-tests.xml and
+# swift-critical.json as evidence, and a coverage claim nobody can open is not
+# evidence — reviewing the run means reading the artifact that came out of it.
+#
+# Ignored below is the noise that same run drops: profiling raw data (rewritten
+# byte-for-byte differently every execution, unreadable without the matching
+# binary) and Python bytecode caches. Neither is evidence of anything; both
+# would churn every diff.
+default.profraw
+*.profraw
+*.profdata
+__pycache__/
+*.pyc

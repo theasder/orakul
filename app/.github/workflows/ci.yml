@@ -1,0 +1,86 @@
+name: ci
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - run: swift build
+      - name: Verify transcript and response measuring instruments
+        run: |
+          python3 testlib/score_transcript.py --selftest
+          python3 testlib/response_quality.py --selftest
+          python3 -m unittest -v testlib/test_verify_e2e_coverage.py
+      - run: |
+          mkdir -p coverage
+          swift test --enable-code-coverage \
+            --xunit-output coverage/swift-tests.xml
+      - name: Enforce goal-critical Swift line coverage
+        run: |
+          python3 testlib/verify_swift_critical_coverage.py \
+            --out coverage/swift-critical.json
+      - name: Upload Swift coverage evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: swift-coverage
+          path: |
+            .build/**/debug/codecov
+            coverage/swift-critical.json
+            coverage/swift-tests.xml
+          if-no-files-found: warn
+
+  contract-mirror:
+    # These tests assert the Swift copies of the goal taxonomy and credit table
+    # match the contract. They are JavaScript because they parse Swift as text —
+    # which is exactly what makes them survive the repository split.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20', cache: npm }
+      - run: npm ci
+      - run: npm test
+
+  contract-drift:
+    # The Mac app, landing page and extension all duplicate server truths — the
+    # goal taxonomy, tariff allowances, credit table, model catalog. Inside one
+    # repository those duplicates were pinned by tests that read Swift and HTML
+    # from JavaScript, and those pins caught real bugs. Across repositories that
+    # is impossible, so the pin becomes this: cruxwing-api publishes the
+    # contract, we vendor a copy, and this job fails when the copy falls behind.
+    #
+    # Deliberately FAILS when it cannot reach the source. A drift check that
+    # silently passes when the checkout fails reports "no drift" for the one
+    # reason that guarantees it cannot know — which is worse than no check.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require the contract source to be configured
+        # BEFORE the checkout: actions/checkout with an empty `repository`
+        # silently defaults to THIS repo, and the diff below would then compare
+        # the vendored file against itself and pass. Fail here instead.
+        run: |
+          if [ -z "${{ vars.CONTRACT_SOURCE_REPO }}" ]; then
+            echo "::error::CONTRACT_SOURCE_REPO is unset. Set it to the owner/name"
+            echo "::error::of the cruxwing-api repository (Settings > Variables)."
+            exit 1
+          fi
+      - name: Check out the published contract
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.CONTRACT_SOURCE_REPO }}
+          path: .contract-source
+          token: ${{ secrets.CONTRACT_READ_TOKEN || github.token }}
+      - name: Fail if our vendored copy has drifted
+        run: |
+          set -euo pipefail
+          test -f .contract-source/contract/contract.json \
+            || { echo "::error::no contract in the source repo checkout"; exit 1; }
+          if ! diff -u .contract-source/contract/contract.json contract/contract.json; then
+            echo "::error::contract/contract.json is behind cruxwing-api."
+            echo "::error::Copy the file above from cruxwing-api and re-run the suite."
+            exit 1
+          fi
+          echo "contract matches the published document"

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Local / ad-hoc / self-signed builds only. Omits restricted entitlements
+         (Sign in with Apple) that require an Apple-issued identity provisioned
+         for the App ID. Shipping those under MeetGPT Dev or ad-hoc signing
+         makes launchd SIGKILL the binary ("Не удается открыть программу",
+         RBSRequestErrorDomain Code=5 / exit 137). Dist builds use
+         MeetGPT.entitlements / MeetGPT.sandbox.entitlements instead. -->
+    <key>com.apple.security.app-sandbox</key>           <false/>
+    <key>com.apple.security.device.audio-input</key>    <true/>
+    <key>com.apple.security.network.client</key>        <true/>
+    <key>com.apple.security.files.user-selected.read-write</key><true/>
+</dict>
+</plist>

@@ -1,0 +1,10 @@
+{
+  "name": "cruxwing-app-contract-tests",
+  "private": true,
+  "type": "module",
+  "description": "Contract tests only. The app itself builds with `swift build`; these verify the Swift source against the API's published contract.json.",
+  "scripts": {
+    "test:contract": "vitest run --root . --dir Tests/contract"
+  },
+  "devDependencies": { "vitest": "^2.0.0" }
+}

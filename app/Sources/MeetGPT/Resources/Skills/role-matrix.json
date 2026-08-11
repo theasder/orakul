@@ -1,0 +1,1008 @@
+{
+ "positions": [
+  {
+   "id": "founder-ceo",
+   "label": "Founder / CEO",
+   "symbol": "star.circle",
+   "buttons": {
+    "agenda": {
+     "skills": [
+      "company-os",
+      "board-prep",
+      "decision-logger"
+     ],
+     "hint": "Tag each block with the decision altitude the CEO must hold — approve, delegate, or inform — per company-os meeting-pulse discipline. Pull carry-overs from the decision log, and flag any block missing a pre-read or a numbers owner the way board-prep would before a board meeting."
+    },
+    "brainstorm": {
+     "skills": [
+      "roast",
+      "product-discovery"
+     ],
+     "hint": "Run each surviving idea through a roast-style 5-angle panel (market, moat, capital, ops, timing) before it earns a bucket. Score Bold Bets by runway months consumed and reversibility; attach the riskiest assumption per product-discovery so the cheapest test targets it, not the easiest."
+    },
+    "unresolved": {
+     "skills": [
+      "decision-logger",
+      "strategic-alignment"
+     ],
+     "hint": "Cross-check each loop against previously logged decisions — flag reopened or contradicted ones explicitly (decision-logger). Mark loops with no exec-level owner as orphan goals per strategic-alignment, and escalate any loop blocking fundraising or board commitments to the top."
+    },
+    "whattoask": {
+     "skills": [
+      "office-hours",
+      "stress-test"
+     ],
+     "hint": "Filter assumptions through the office-hours six — problem, customer, distribution, defensibility, capital, founder fit — and pick the weakest axis. Prefer questions that stress-test the load-bearing business assumption (the one that kills the plan if false), not the most debatable one."
+    },
+    "factcheck": {
+     "skills": [
+      "statistical-analyst",
+      "cfo-review",
+      "competitive-intel"
+     ],
+     "hint": "For any metric claim, test statistical footing first: sample size, denominator, significance vs noise (statistical-analyst). Interrogate money numbers like a skeptical CFO — units, time window, cash vs accrual. Check competitor claims against tracked competitive-intel before accepting."
+    },
+    "rhetoric": {
+     "skills": [
+      "executive-mentor",
+      "grill-me"
+     ],
+     "hint": "Apply executive-mentor pressure: whose incentives shape this claim — would the speaker defend it to their own board? Flag optimism-by-narrative (hockey sticks, 'obvious' TAM) as its own class, then turn the weakest warrant into one grill-me question the CEO can ask live to force a concrete answer."
+    },
+    "answer": {
+     "skills": [
+      "board-prep",
+      "cfo-advisor"
+     ],
+     "hint": "Answer at board altitude: lead with the number and its trend, then the driver, then the ask — board-prep's numbers-cold discipline. If the question touches runway, burn, or unit economics, state the exact figure with its as-of date per cfo-advisor, or name which system holds it."
+    },
+    "dispute": {
+     "skills": [
+      "hard-call",
+      "boardroom",
+      "freeze"
+     ],
+     "hint": "When no option is good, run hard-call's 10/10/10: how does each choice look in 10 minutes, 10 months, 10 years? Present each side's strongest case in its own domain lens (boardroom isolation). If the call is irreversible and made under pressure, propose a freeze cooldown with a review date."
+    },
+    "risks": {
+     "skills": [
+      "challenge",
+      "scenario-war-room",
+      "stress-test"
+     ],
+     "hint": "Run a challenge-style pre-mortem: assume the plan failed 12 months out and work backwards to name the cause. Model compound scenarios — two SEV3s co-occurring, like churn spike plus fundraise slip, per scenario-war-room — and state each risk's runway impact in months, not just severity."
+    },
+    "advice": {
+     "skills": [
+      "ceo-advisor",
+      "hard-call",
+      "execute"
+     ],
+     "hint": "Weigh each move against the CEO's only three levers: cash, people, focus (ceo-advisor). For one-way doors, add hard-call's 10/10/10 regret framing. Convert the recommended move into a first 90-day milestone with a named DRI and check-in cadence per execute."
+    },
+    "tasks": {
+     "skills": [
+      "execute",
+      "decision-logger",
+      "team-communications"
+     ],
+     "hint": "Attach each decision to a 90-day execution shape: first weekly milestone, DRI, check-in cadence (execute). Log approved decisions with their original assumptions for later post-mortem scoring (decision-logger). Format the Slack summary as 3P — Progress/Plans/Problems (team-communications)."
+    },
+    "summary": {
+     "skills": [
+      "board-deck-builder",
+      "decision-logger",
+      "internal-narrative"
+     ],
+     "hint": "Write the TL;DR as a board-update line: metric, delta, driver, ask (board-deck-builder). Link decisions to their decision-log entries rather than re-recording them, noting any assumption the meeting changed (decision-logger). Flag lines contradicting the story told to investors or staff (internal-narrative)."
+    }
+   }
+  },
+  {
+   "id": "product-manager",
+   "label": "Product Manager",
+   "symbol": "shippingbox",
+   "buttons": {
+    "agenda": {
+     "skills": [
+      "scrum-master",
+      "product-strategist",
+      "product-discovery"
+     ],
+     "hint": "Tag each block with meeting type (discovery / sprint review / stakeholder sync) and the OKR it serves; sequence decision blocks before status. In discovery calls reserve a block for riskiest-assumption questions; in sprint reviews add a demo-vs-acceptance-criteria check."
+    },
+    "brainstorm": {
+     "skills": [
+      "experiment-designer",
+      "product-manager-toolkit",
+      "roast"
+     ],
+     "hint": "Score converged ideas with RICE before assigning bets; attach a falsifiable hypothesis and rough sample-size sanity check to each experiment. Run a quick 5-angle roast (user, eng, data, GTM, finance) on the top Bold Bet before it earns roadmap language."
+    },
+    "unresolved": {
+     "skills": [
+      "capture",
+      "decision-logger",
+      "senior-pm"
+     ],
+     "hint": "Type each loop as discovery-question, spec-gap, stakeholder-signoff, or dependency; cross-check the decision log so settled calls aren't reopened as 'unresolved'. Route every loop to its home: backlog item, spec section, or next sync agenda."
+    },
+    "whattoask": {
+     "skills": [
+      "grill-me",
+      "product-discovery",
+      "office-hours"
+     ],
+     "hint": "Extract the riskiest desirability/viability/feasibility assumption first. Prefer past-behavior evidence questions ('walk me through the last time you...') over hypotheticals, and pick the one decision-tree branch whose answer would actually change the roadmap."
+    },
+    "factcheck": {
+     "skills": [
+      "statistical-analyst",
+      "product-analytics",
+      "competitive-teardown"
+     ],
+     "hint": "For metric claims, demand denominator, cohort, and timeframe before verifying; test whether the delta clears significance or is noise, using retention/adoption base rates. Check competitor claims against pricing pages and reviews, not sales lore."
+    },
+    "rhetoric": {
+     "skills": [
+      "roast",
+      "grill-me",
+      "statistical-analyst"
+     ],
+     "hint": "Flag PM-meeting patterns: HiPPO appeals, anecdote-as-data, one vocal customer generalized to a segment, survivorship in success stories. Separate user-evidence warrants from stakeholder-opinion warrants and mark which contested claims an experiment could settle."
+    },
+    "answer": {
+     "skills": [
+      "product-manager-toolkit",
+      "roadmap-communicator",
+      "product-analytics"
+     ],
+     "hint": "Answer at the asker's altitude: execs get outcome + date + confidence, engineers get scope + constraint. Anchor to roadmap/spec status and named metrics, and say plainly when the honest answer is 'unvalidated — here's the experiment that would settle it'."
+    },
+    "dispute": {
+     "skills": [
+      "hard-call",
+      "decision-logger",
+      "boardroom"
+     ],
+     "hint": "Translate positions into desired user outcome + metric before comparing options. Check the decision log so settled trade-offs aren't re-fought. For irreversible calls run 10/10/10 with regret minimization; otherwise propose the cheapest reversible test plus a review date."
+    },
+    "risks": {
+     "skills": [
+      "stress-test",
+      "challenge",
+      "senior-pm"
+     ],
+     "hint": "Run a mini pre-mortem — 'we shipped and it failed in 3 months, why?' — then bucket risks as desirability, viability, feasibility, usability. Attach a leading product metric as each risk's early-warning and stress-test the single assumption the roadmap most depends on."
+    },
+    "advice": {
+     "skills": [
+      "cpo-review",
+      "product-strategist",
+      "experiment-designer"
+     ],
+     "hint": "Score each move against the current OKR/North Star and the customer's job-to-be-done, not novelty. Prefer the move that kills the riskiest assumption cheapest, and state the expected metric delta plus the discovery evidence (or its absence) behind each recommendation."
+    },
+    "tasks": {
+     "skills": [
+      "agile-product-owner",
+      "scrum-master",
+      "jira-expert"
+     ],
+     "hint": "Write delivery items as user stories with acceptance criteria; tag discovery tasks (interview, prototype, data pull) separately from delivery tickets. Make each item Jira-ready — project, epic, sprint candidate — and flag anything that changes the current sprint's scope."
+    },
+    "summary": {
+     "skills": [
+      "roadmap-communicator",
+      "team-communications",
+      "decision-logger"
+     ],
+     "hint": "Layer output by audience: exec TL;DR with outcome + confidence, team detail with spec deltas. Frame decisions as roadmap changes (added/cut/moved + why), and log each with owner and the assumption it rests on so the decision ledger survives beyond the call."
+    }
+   }
+  },
+  {
+   "id": "sales-ae",
+   "label": "Sales / Account Executive",
+   "symbol": "dollarsign.circle",
+   "buttons": {
+    "agenda": {
+     "skills": [
+      "execute",
+      "deal-desk"
+     ],
+     "hint": "Tie each block to a deal-stage exit criterion (economic buyer confirmed, paper process mapped). Reserve one block to advance the mutual action plan with a named customer-side owner and date; sequence pricing after value confirmation, never first."
+    },
+    "brainstorm": {
+     "skills": [
+      "pricing-strategist",
+      "churn-prevention",
+      "commercial-policy"
+     ],
+     "hint": "Diverge on deal structures — term length, ramp pricing, pilot scope, save offers — not features. Score each against the margin floor and discount-approval thresholds; the cheapest validating experiment is a one-slide option the champion can float internally this week."
+    },
+    "unresolved": {
+     "skills": [
+      "deal-desk",
+      "rfp-responder",
+      "general-counsel-advisor"
+     ],
+     "hint": "Type each open loop by blocker class: legal/redline, security questionnaire, budget sign-off, technical validation. Rank by close-date impact, and pair every customer-side owner with your internal escalation path (deal desk, legal) plus a trigger date before the next stage gate."
+    },
+    "whattoask": {
+     "skills": [
+      "grill-me",
+      "product-discovery",
+      "stress-test"
+     ],
+     "hint": "Extract the deal's riskiest unvalidated assumption — budget authority, compelling event, decision criteria — and target it. One falsifiable question aimed at the economic buyer or paper process ('Who signs, and by when?') beats three feature questions."
+    },
+    "factcheck": {
+     "skills": [
+      "statistical-analyst",
+      "competitive-intel"
+     ],
+     "hint": "Check competitor claims against battlecard evidence and ROI figures against base rates before they reach the proposal. Flag any stat you cannot source as Needs-source — an unsourced number in front of procurement costs more credibility than a gap."
+    },
+    "rhetoric": {
+     "skills": [
+      "marketing-psychology",
+      "grill-me"
+     ],
+     "hint": "Steelman the buyer's objection before rebutting; tag persuasion moves (anchoring, loss framing, social proof) on both sides of the call. Flag your own unsupported superiority claims — a warrant procurement can falsify damages trust more than any competitor."
+    },
+    "answer": {
+     "skills": [
+      "sales-engineer",
+      "roadmap-communicator",
+      "competitive-intel"
+     ],
+     "hint": "Frame the answer against the buyer's evaluation criterion and tag its commitment level: contracted, roadmap, or workaround. Never invent roadmap dates — give the documented state plus a named follow-up owner; answer competitor questions from the battlecard, not memory."
+    },
+    "dispute": {
+     "skills": [
+      "deal-desk",
+      "hard-call",
+      "general-counsel-advisor"
+     ],
+     "hint": "Separate the stated position (price, clause) from the interest behind it (budget cycle, risk cover). Anchor options to per-deal economics and the policy floor; trade every concession for a get (term, reference, timeline) and run regret-minimization on irreversible contract terms."
+    },
+    "risks": {
+     "skills": [
+      "stress-test",
+      "challenge",
+      "cro-review"
+     ],
+     "hint": "Run a deal pre-mortem: assume the deal slips a quarter and work backwards. Score single-threading, missing economic buyer, unbudgeted spend, and incumbent bias by close-date impact; attach an early-warning signal (ghosted follow-up, new stakeholder) and a mitigation owner to each."
+    },
+    "advice": {
+     "skills": [
+      "cro-review",
+      "churn-prevention",
+      "cfo-review"
+     ],
+     "hint": "Rank moves by pipeline math: biggest lift to win probability or cycle time per hour spent. Classify each as two-way door (option pricing) vs one-way (discount floor, exec escalation). On renewals, choose save offer vs expansion play by net-revenue impact; arm the champion with a CFO-proof metric."
+    },
+    "tasks": {
+     "skills": [
+      "capture",
+      "execute",
+      "team-communications"
+     ],
+     "hint": "Split actions customer-side vs internal; every customer commitment gets a named owner and a date on the mutual action plan. Flag anything gating the next deal stage, and shape the Slack summary for the deal team: stage, blocker, next step, ask."
+    },
+    "summary": {
+     "skills": [
+      "meeting-analyzer",
+      "decision-logger",
+      "customer-success-manager"
+     ],
+     "hint": "Structure around deal movement: stage advanced or not, new stakeholders, qualification fields filled, buying and objection signals quoted verbatim. Log pricing or scope commitments as durable decisions and record renewal or expansion signals to the account."
+    }
+   }
+  },
+  {
+   "id": "marketing-manager",
+   "label": "Marketing Manager",
+   "symbol": "megaphone",
+   "buttons": {
+    "agenda": {
+     "skills": [
+      "launch-strategy",
+      "marketing-strategy-pmm",
+      "team-communications"
+     ],
+     "hint": "Anchor each block to a launch-phase gate (pre/launch/post) and the metric it must move; give agency deliverable reviews a creative-approval exit condition; park positioning debates unless the message-house owner is present; end by naming who sends the recap to the growth channel."
+    },
+    "brainstorm": {
+     "skills": [
+      "marketing-ideas",
+      "ab-test-setup",
+      "roast"
+     ],
+     "hint": "Score ideas against ICP fit, channel CAC, and effort; convert each Quick Win into a testable hypothesis with a minimum detectable effect and the cheapest channel pilot; roast the top Bold Bet from a skeptical-CFO angle before it leaves the room."
+    },
+    "unresolved": {
+     "skills": [
+      "capture",
+      "decision-logger",
+      "vendor-management"
+     ],
+     "hint": "Type open loops as creative/budget/channel/approval; flag agency-dependent items with SOW-SLA dates as the trigger; sweep against previously logged decisions so relitigated calls surface as reopened, not new."
+    },
+    "whattoask": {
+     "skills": [
+      "stress-test",
+      "cmo-review",
+      "competitive-intel"
+     ],
+     "hint": "Extract the campaign's load-bearing assumptions — ICP, channel CAC, message-market fit — and probe the one a competitor move or platform policy change breaks first; phrase the question so a number or a named source can answer it."
+    },
+    "factcheck": {
+     "skills": [
+      "statistical-analyst",
+      "campaign-analytics",
+      "competitive-intel"
+     ],
+     "hint": "Treat lift/CTR/CAC claims as statistics: demand sample size, time window, and attribution model before marking Verified; compare against channel base rates, and flag survivorship bias in the competitor case studies agencies cite."
+    },
+    "rhetoric": {
+     "skills": [
+      "marketing-psychology",
+      "cmo-review"
+     ],
+     "hint": "Name the persuasion device in play (social proof, scarcity, anchoring) and test whether the warrant is evidence or vibe; run positioning claims through the one-sentence test; flag agency pitches where the metric quoted is not the metric that matters."
+    },
+    "answer": {
+     "skills": [
+      "marketing-strategy-pmm",
+      "campaign-analytics"
+     ],
+     "hint": "Ground answers in the message house and campaign data in hand; for how-did-X-perform questions, lead with metric + window + attribution caveat in one breath; tag whether the answer is measured data, industry benchmark, or positioning opinion."
+    },
+    "dispute": {
+     "skills": [
+      "hard-call",
+      "vendor-management",
+      "ab-test-setup"
+     ],
+     "hint": "Split brand-taste disputes from measurable ones — route measurable to a cheap A/B with a decision date; anchor agency conflicts on the SOW/SLA text; for channel-budget fights, apply regret-minimization over the campaign window, not the quarter."
+    },
+    "risks": {
+     "skills": [
+      "challenge",
+      "stress-test",
+      "launch-strategy"
+     ],
+     "hint": "Run a launch pre-mortem: assume the campaign flopped in 90 days and work backwards; bucket risks by phase (pre/launch/post) and dependency (creative, legal, agency, platform policy); set early-warning floors like day-3 CTR or a CPL ceiling."
+    },
+    "advice": {
+     "skills": [
+      "cmo-advisor",
+      "marketing-demand-acquisition",
+      "page-cro"
+     ],
+     "hint": "Bias moves toward reallocating existing budget before net-new spend — check landing-page conversion first; a CRO fix often beats buying more traffic. Attach a funnel metric and payback window to each move; creative pivots are two-way doors, brand repositioning one-way, gated on CMO sign-off."
+    },
+    "tasks": {
+     "skills": [
+      "execute",
+      "team-communications",
+      "capture"
+     ],
+     "hint": "Map actions onto launch-calendar dates and channel owners, including agency-side names; flag anything sitting in a creative or legal approval chain as blocked; shape the Slack summary as 3P (Progress/Plans/Problems) for the growth channel."
+    },
+    "summary": {
+     "skills": [
+      "meeting-analyzer",
+      "decision-logger",
+      "team-communications"
+     ],
+     "hint": "Log each decision with the assumption it rested on so the post-launch retro can score it; put campaign KPIs mentioned vs targets into Continuity; note sentiment shifts from agency or exec stakeholders as a coaching signal for the next sync."
+    }
+   }
+  },
+  {
+   "id": "ops-lead",
+   "label": "BizOps / Chief of Staff",
+   "symbol": "gearshape",
+   "buttons": {
+    "agenda": {
+     "skills": [
+      "company-os",
+      "chief-of-staff",
+      "strategic-alignment"
+     ],
+     "hint": "Tag each block with its meeting-pulse type (scorecard review, issues list, decision) and link it to the OKR or cascade goal it serves; flag blocks with no owner on the accountability chart. Route items that belong in another team's forum out before they eat the timebox."
+    },
+    "brainstorm": {
+     "skills": [
+      "roast",
+      "coo-advisor"
+     ],
+     "hint": "Score ideas against ops leverage: cost-to-serve, cycle time, and headcount impact before novelty. Run each finalist through a quick 5-angle roast (feasibility, adoption, vendor lock-in, process debt, downside) and prefer changes that simplify a mapped process over adding a new tool."
+    },
+    "unresolved": {
+     "skills": [
+      "decision-logger",
+      "strategic-alignment",
+      "senior-pm"
+     ],
+     "hint": "Classify each loop as decision-pending, orphaned goal, or cross-team dependency; check it against the decision log so re-litigated calls surface as reopened, not new. Escalate loops blocking another team's committed milestone to the top regardless of local impact."
+    },
+    "whattoask": {
+     "skills": [
+      "grill-me",
+      "stress-test"
+     ],
+     "hint": "Grill the plan branch-by-branch: target the operating assumption whose failure cascades across the most teams. Prefer questions that force a number (utilization, SLA %, cost per ticket, ramp time) over opinions — one falsified assumption beats three status updates."
+    },
+    "factcheck": {
+     "skills": [
+      "statistical-analyst",
+      "vendor-management"
+     ],
+     "hint": "For vendor claims, verify against scorecard history, SLA logs, and contract terms before external sources; flag misses eligible for credit claims. For metric claims, test whether the sample size and time window can actually support the stated effect before accepting it."
+    },
+    "rhetoric": {
+     "skills": [
+      "stress-test",
+      "grill-me",
+      "boardroom"
+     ],
+     "hint": "Watch for ops-specific moves: anecdote-as-trend from one team, vendor urgency pressure, and sunk-cost defenses of owned processes. Steelman first, then stress-test the load-bearing assumption with a number the speaker should know cold."
+    },
+    "answer": {
+     "skills": [
+      "chief-of-staff",
+      "team-communications"
+     ],
+     "hint": "Answer as the connective layer: cite which team, doc, or decision-log entry owns the truth, and note when the answer crosses another function's lane. If the question is really a routing question, name the right owner and forum in the same sentence."
+    },
+    "dispute": {
+     "skills": [
+      "hard-call",
+      "boardroom"
+     ],
+     "hint": "Separate turf interests from process interests before comparing options; restate each side's position in operating-metric terms. For no-good-option calls run a 10/10/10 pass (10 days/months/years) and log the dissent with the decision so it cannot be silently re-litigated."
+    },
+    "risks": {
+     "skills": [
+      "scenario-war-room",
+      "incident-commander",
+      "challenge"
+     ],
+     "hint": "Pre-mortem the plan 12 months out, then model compound scenarios — vendor slip plus key-person loss plus budget cut together, not one variable at a time. Map each SEV to its cross-team blast radius and name a single accountable owner per mitigation."
+    },
+    "advice": {
+     "skills": [
+      "coo-advisor",
+      "execute"
+     ],
+     "hint": "Bias toward moves that remove a bottleneck or a handoff rather than add headcount or tooling. Frame each move as a 90-day arc — DRI, weekly check-in cadence, and the operating metric that proves it worked — and state which existing process it replaces."
+    },
+    "tasks": {
+     "skills": [
+      "capture",
+      "execute",
+      "decision-logger"
+     ],
+     "hint": "Capture with zero loss, then split outputs into tasks, decisions to log, and SOP updates — decisions recorded verbatim with dissent noted. Every task inherits a DRI and check-in date from the 90-day plan it serves; flag tasks with no plan linkage as scope creep."
+    },
+    "summary": {
+     "skills": [
+      "meeting-analyzer",
+      "team-communications",
+      "decision-logger"
+     ],
+     "hint": "Render the summary as a 3P update (Progress/Plans/Problems) per workstream so it drops straight into the ops channel. Cross-check decisions against the log to mark reversals, and note one recurring meeting anti-pattern (e.g., status crowding out decisions) as a process fix."
+    }
+   }
+  },
+  {
+   "id": "tech-lead",
+   "label": "Engineer / Tech Lead",
+   "symbol": "chevron.left.forwardslash.chevron.right",
+   "buttons": {
+    "agenda": {
+     "skills": [
+      "scrum-master",
+      "spec-driven-workflow",
+      "incident-commander"
+     ],
+     "hint": "Tag each block as design-review, incident-review, or planning, and set an engineering exit artifact per block: an ADR, a SEV action list, or committed sprint scope. Reserve a short error-budget and on-call health check before any new-work block."
+    },
+    "brainstorm": {
+     "skills": [
+      "experiment-designer",
+      "roast",
+      "feature-flags-architect"
+     ],
+     "hint": "Score ideas against blast radius, rollback cost, and ops burden, not just build effort. Route winners into flag-gated canaries or throwaway spikes with a numeric pass metric and a kill criterion agreed before any sprint commitment."
+    },
+    "unresolved": {
+     "skills": [
+      "tech-debt-tracker",
+      "capture",
+      "decision-logger"
+     ],
+     "hint": "Type each open loop as debt, blocker, or undecided ADR; score severity by interest rate — cost of delay per sprint. Sweep for latent coupling: shared schemas, deploy order, on-call ownership. Log undecided items as draft ADRs with a decision deadline."
+    },
+    "whattoask": {
+     "skills": [
+      "grill-me",
+      "stress-test",
+      "challenge"
+     ],
+     "hint": "Grill the design's weakest branch: pull the load, failure-mode, and data-migration assumptions nobody stated, then ask the one question whose answer would force a redesign. Prefer questions with a measurable answer — QPS, p99, error-budget burn."
+    },
+    "factcheck": {
+     "skills": [
+      "statistical-analyst",
+      "slo-architect"
+     ],
+     "hint": "For performance and reliability claims, demand the measurement behind them: sample size, time window, percentile, baseline. Cross-check against SLO dashboards and error-budget data in hand; downgrade single-run benchmarks and 'it got faster' anecdotes to Needs-source."
+    },
+    "rhetoric": {
+     "skills": [
+      "adversarial-reviewer",
+      "roast"
+     ],
+     "hint": "Listen for engineering-specific moves: 'best practice' appeals with no context, resume-driven tech choices, sunk-cost defense of legacy code, 'works on staging' as production proof, and premature-optimization framing used to dodge real scaling questions."
+    },
+    "answer": {
+     "skills": [
+      "senior-architect",
+      "incident-commander"
+     ],
+     "hint": "Answer as the accountable engineer: give the answer, then the load-bearing constraint it rests on — SLA, data model, deploy path. If the question hides an architecture decision, name the tradeoff axis instead of guessing a number."
+    },
+    "dispute": {
+     "skills": [
+      "hard-call",
+      "tech-stack-evaluator",
+      "decision-logger"
+     ],
+     "hint": "Anchor tech disputes in measurable criteria — TCO, ops burden, migration cost — and run a weighted scorecard, not vibes. When positions harden, propose a time-boxed spike whose result settles it, and close by logging the call as an ADR with dissent noted and a revisit date."
+    },
+    "risks": {
+     "skills": [
+      "incident-response",
+      "chaos-engineering",
+      "challenge"
+     ],
+     "hint": "Frame risks as concrete failure modes: trigger, blast radius, detection signal, rollback path. Run a 12-month pre-mortem on the design, separate steady-state violations from one-off events, and attach the dashboard metric and on-call owner who would catch it first."
+    },
+    "advice": {
+     "skills": [
+      "cto-review",
+      "vpe-review",
+      "feature-flags-architect"
+     ],
+     "hint": "Bias moves toward flag-gated rollouts, strangler patterns, and spikes before rewrites. Weigh each against delivery throughput (cycle time, deploy frequency, DORA) and scaling cliffs, and make the first step PR-sized — something an engineer can open today."
+    },
+    "tasks": {
+     "skills": [
+      "agile-product-owner",
+      "execute",
+      "capture"
+     ],
+     "hint": "Convert decisions into ticket-shaped items with testable acceptance criteria, sized to fit one sprint. Flag anything blocking the critical path, a release, or on-call rotation; mark follow-ups needing an ADR, runbook update, or migration plan as engineering-doc tasks."
+    },
+    "summary": {
+     "skills": [
+      "meeting-analyzer",
+      "team-communications",
+      "postmortem"
+     ],
+     "hint": "Structure the recap as Progress/Plans/Problems for the eng channel; for incident reviews, add a timeline and 5-Whys causal chain in blameless wording. Call out decisions that change interfaces, on-call, or deploy order — those get broadcast, not buried."
+    }
+   }
+  },
+  {
+   "id": "engineering-manager",
+   "label": "Engineering Manager",
+   "symbol": "wrench.and.screwdriver",
+   "buttons": {
+    "agenda": {
+     "skills": [
+      "company-os",
+      "scrum-master",
+      "senior-pm"
+     ],
+     "hint": "Tag each block with meeting type (1:1, delivery review, staffing, tech-debt) and pull the DRI from the accountability chart. Route pure status to async pre-reads; reserve room time for decisions and coaching. Separate metrics-review blocks from decision blocks so neither eats the other."
+    },
+    "brainstorm": {
+     "skills": [
+      "roast",
+      "experiment-designer",
+      "tech-stack-evaluator"
+     ],
+     "hint": "Score ideas against team capacity, error budget, and build-vs-buy TCO before converging. For an EM the cheapest validating experiment is a timeboxed spike with a named engineer and one sprint's exit criteria — flag any idea that silently commits headcount."
+    },
+    "unresolved": {
+     "skills": [
+      "decision-logger",
+      "senior-pm",
+      "capacity-planner"
+     ],
+     "hint": "Reconcile each open loop against the decision ledger — is it new, slipped, or a reopened past decision? Tag loops blocked on staffing or cross-team dependencies separately: those need an escalation owner and a date, not just a next step."
+    },
+    "whattoask": {
+     "skills": [
+      "grill-me",
+      "stress-test",
+      "vpe-review"
+     ],
+     "hint": "Walk the plan's decision tree and target the branch with hidden staffing or dependency exposure. Prefer throughput-first probes — cycle time, WIP, deploy frequency — over feature detail; aim the falsifiable question at the estimate's weakest assumption."
+    },
+    "factcheck": {
+     "skills": [
+      "statistical-analyst",
+      "vpe-advisor",
+      "slo-architect"
+     ],
+     "hint": "For velocity, uptime, or cycle-time claims, demand the window, sample size, and variance before accepting a point estimate. Benchmark against DORA baselines and the service's error budget; flag single-sprint anecdotes presented as trends."
+    },
+    "rhetoric": {
+     "skills": [
+      "meeting-analyzer",
+      "grill-me"
+     ],
+     "hint": "Steelman the engineer's technical warrant first, then flag eng-meeting anti-patterns: anecdote-as-data, hero narratives, sunk-cost defenses of legacy systems, and complexity appeals used to dodge estimates. Note who stays silent — missing dissent is itself a signal."
+    },
+    "answer": {
+     "skills": [
+      "vpe-advisor",
+      "cto-advisor"
+     ],
+     "hint": "Answer in the frame the asker holds — date, headcount, or risk — not implementation detail. Tag whether the source is the live transcript or a delivery artifact (roadmap, DORA dashboard). If the question conflates capacity with priority, ask which one they mean."
+    },
+    "dispute": {
+     "skills": [
+      "hard-call",
+      "tech-stack-evaluator",
+      "decision-logger"
+     ],
+     "hint": "Convert both positions to shared units — TCO, error budget, cycle-time impact — before comparing. Apply 10/10/10 regret framing to tech-debt vs feature calls, and record the dissenting view verbatim in the decision log so any later reversal is honest, not political."
+    },
+    "risks": {
+     "skills": [
+      "challenge",
+      "incident-commander",
+      "capacity-planner"
+     ],
+     "hint": "Run a 12-month pre-mortem on the plan, then map each risk to incident-style SEV levels covering both production and delivery. Always sweep staffing risks: bus-factor-of-one systems, attrition on critical paths, and utilization already above sustainable load."
+    },
+    "advice": {
+     "skills": [
+      "cto-advisor",
+      "execute",
+      "chro-advisor"
+     ],
+     "hint": "Frame each move as delegate-vs-do and name the DORA or team-health metric it should shift. Turn the chosen move into a 90-day arc: DRI, weekly check-in, first one-week step. For people issues, prefer a coaching move over a process move when trust is intact."
+    },
+    "tasks": {
+     "skills": [
+      "capture",
+      "agile-product-owner",
+      "jira-expert"
+     ],
+     "hint": "Normalize actions into INVEST-ready ticket drafts with epic and sprint hints for Jira. Separate private coaching commitments (1:1 follow-ups, feedback owed) from team-visible tasks — people matters never go in the Slack summary."
+    },
+    "summary": {
+     "skills": [
+      "team-communications",
+      "decision-logger",
+      "meeting-analyzer"
+     ],
+     "hint": "Render two layers: a 3P (Progress/Plans/Problems) digest for leadership and a detailed eng-team version. Reconcile decisions against the ledger to mark kept/slipped/reopened, and keep coaching or performance observations out of the shared artifact."
+    }
+   }
+  },
+  {
+   "id": "customer-success",
+   "label": "Customer Success Manager",
+   "symbol": "heart.text.square",
+   "buttons": {
+    "agenda": {
+     "skills": [
+      "board-deck-builder",
+      "board-prep",
+      "customer-success-manager"
+     ],
+     "hint": "Order blocks by account risk: open the QBR with health-score deltas and renewal-date proximity, not vendor updates. Timebox one block for the customer's own agenda and one for expansion signals; make each block's exit condition a customer-voiced commitment."
+    },
+    "brainstorm": {
+     "skills": [
+      "roast",
+      "experiment-designer",
+      "onboarding-cro"
+     ],
+     "hint": "Score ideas against retention leverage: time-to-value impact, adoption lift, exec-sponsor visibility. Frame each experiment as an adoption pilot with a named customer champion and a 30-day usage metric; roast the winner from a churned customer's perspective first."
+    },
+    "unresolved": {
+     "skills": [
+      "incident-commander",
+      "vendor-management",
+      "capture"
+     ],
+     "hint": "Type each loop by renewal threat: SLA breach (credit exposure), unshipped roadmap promise, stalled onboarding milestone, aging ticket. Rank by days-to-renewal x sponsor sentiment; anything the customer raised twice becomes an escalation candidate with an internal owner."
+    },
+    "whattoask": {
+     "skills": [
+      "grill-me",
+      "stress-test",
+      "chief-customer-officer-advisor"
+     ],
+     "hint": "Extract assumptions about renewal intent, budget owner, and champion strength first. Probe churn root-cause axes — value gap, sponsor change, competitor eval, adoption stall — and craft the question to make silent risk speakable: 'What must be true for you to renew early?'"
+    },
+    "factcheck": {
+     "skills": [
+      "statistical-analyst",
+      "product-analytics"
+     ],
+     "hint": "Check usage and value claims against telemetry: test 'nobody uses feature X' against adoption cohorts and seat utilization before conceding. Apply the segment's base rates (typical activation curve, NRR band) so anecdotes are judged against peer benchmarks, not zero."
+    },
+    "rhetoric": {
+     "skills": [
+      "marketing-psychology",
+      "grill-me"
+     ],
+     "hint": "Watch escalation-specific patterns: loss framing ('paying for nothing'), anchoring on one outage, cherry-picked competitor claims. Steelman the grievance in the customer's business terms before naming the fallacy — the relationship outlives the argument."
+    },
+    "answer": {
+     "skills": [
+      "customer-success-manager",
+      "roadmap-communicator"
+     ],
+     "hint": "Answer from account-specific evidence — their health score, ticket history, contract terms — never generic product claims. On roadmap asks, state only committed items with quarter-level dates and label the rest 'under consideration'; an overpromise here is next QBR's escalation."
+    },
+    "dispute": {
+     "skills": [
+      "hard-call",
+      "deal-desk",
+      "marketing-psychology"
+     ],
+     "hint": "Separate position (credit, discount) from interest (feeling heard after an SLA miss, defending budget to their CFO). Price each option in renewal-risk terms and choose the one you'd defend at renewal in 10 months; never concede without a reciprocal commitment — it sets precedent."
+    },
+    "risks": {
+     "skills": [
+      "incident-response",
+      "challenge",
+      "cco-review"
+     ],
+     "hint": "Frame risks as churn drivers: sponsor departure, adoption stall, unresolved SEVs, competitor eval, budget cut — weight impact by ARR x renewal proximity. Run a 12-month pre-mortem ('this account churned — what did we ignore today?'); usage deltas are the early-warning wire."
+    },
+    "advice": {
+     "skills": [
+      "chief-customer-officer-advisor",
+      "execute",
+      "churn-prevention"
+     ],
+     "hint": "Bias moves toward retention leverage: tie each to a health-score component (adoption, sponsor engagement, support burden) with a 90-day milestone and a DRI on both sides. Treat concessions — discounts, custom work — as one-way doors; save offers must trade for longer commitment."
+    },
+    "tasks": {
+     "skills": [
+      "capture",
+      "execute",
+      "team-communications"
+     ],
+     "hint": "Split actions into customer-owed vs us-owed — success plans stall when customer-side tasks go unowned, so flag those with the sponsor's name and a nudge date. Tag every promise made to the customer as renewal-critical yes/no; route SLA and escalation items into the internal 3P update."
+    },
+    "summary": {
+     "skills": [
+      "meeting-analyzer",
+      "decision-logger",
+      "team-communications"
+     ],
+     "hint": "Lead with account trajectory: health delta, verbatim renewal stance ('we're evaluating options'), sentiment shift vs last call. Log each commitment to the durable account record so next QBR's kept/slipped audit is automatic; produce internal (risk-candid) and customer-safe versions."
+    }
+   }
+  },
+  {
+   "id": "project-manager",
+   "label": "Project / Delivery Manager",
+   "symbol": "checklist",
+   "buttons": {
+    "agenda": {
+     "skills": [
+      "scrum-master",
+      "company-os",
+      "senior-pm"
+     ],
+     "hint": "Tag each block with its ceremony type (standup/status/dependency/retro) and the delivery artifact it must update (burndown, RAID log, release plan). Pull carry-overs from last sprint's issue list and give recurring blockers a standing slot with a DRI instead of re-litigating them."
+    },
+    "brainstorm": {
+     "skills": [
+      "experiment-designer",
+      "product-manager-toolkit",
+      "roast"
+     ],
+     "hint": "Score converged ideas with RICE using sprint capacity as Effort; reject any Bold Bet lacking a named DRI and timebox. Frame the cheapest experiment as a one-sprint spike with an explicit kill criterion, and pressure-test the top pick for schedule risk before it enters the backlog."
+    },
+    "unresolved": {
+     "skills": [
+      "process-mapper",
+      "jira-expert",
+      "vendor-management"
+     ],
+     "hint": "Walk the handoff chain for each open loop — flag anything crossing team or vendor boundaries as a dependency risk with an SLA-style due date. Map each loop to a ticket state (missing/stale/mislabeled) so the fix is a concrete tracker action, not a vague follow-up."
+    },
+    "whattoask": {
+     "skills": [
+      "grill-me",
+      "stress-test",
+      "product-discovery"
+     ],
+     "hint": "Target delivery-critical assumptions first: estimates, dependency readiness, and definitions of done. Grill the branch with the vaguest owner or date — the falsifiable question should force a testable commitment ('what must be true by Friday?') rather than reassurance."
+    },
+    "factcheck": {
+     "skills": [
+      "statistical-analyst",
+      "research-summarizer"
+     ],
+     "hint": "Treat velocity, ETA, and percent-complete claims as statistical claims: ask for the sample (how many sprints, which tickets) and compare against the team's own base rate before accepting. Tag each verdict with the tracker artifact (burndown, ticket history) that could settle it."
+    },
+    "rhetoric": {
+     "skills": [
+      "grill-me",
+      "executive-mentor",
+      "roast"
+     ],
+     "hint": "Watch for status-theater warrants — 'on track', 'almost done', 'no blockers' — and test whether ticket and burndown data actually support them. Steelman the optimistic case first, then name the schedule-pressure incentive behind any green-shifted claim."
+    },
+    "answer": {
+     "skills": [
+      "team-communications",
+      "research-summarizer"
+     ],
+     "hint": "Shape the BLUF like a 3P status line: current state, delta since last checkpoint, and what it changes for the plan. Source-tag tracker artifacts (ticket IDs, burndown) when available; if the question hides a date commitment, flag that answering requires an estimate, not a guess."
+    },
+    "dispute": {
+     "skills": [
+      "hard-call",
+      "boardroom",
+      "decision-logger"
+     ],
+     "hint": "When both options are painful (cut scope vs slip date), run 10/10/10: impact in 10 days, 10 weeks, 10 months. Have each side state the other's interest before comparing options, and close by logging the decision with owner, revisit trigger, and dissent recorded for the retro."
+    },
+    "risks": {
+     "skills": [
+      "challenge",
+      "incident-commander",
+      "senior-pm"
+     ],
+     "hint": "Run a 60-second pre-mortem — 'the release slipped: why?' — and harvest risks from the answers. Split schedule, dependency, and scope risks; for each, name the earliest observable tracker signal (stalled ticket, missed handoff) and the sprint by which mitigation must start."
+    },
+    "advice": {
+     "skills": [
+      "execute",
+      "coo-advisor",
+      "vpe-advisor"
+     ],
+     "hint": "Anchor moves in delivery mechanics: cadence fixes, WIP limits, dependency escalation paths. Express impact in DORA-style terms (cycle time, deploy frequency) and make the first step schedulable this sprint with a DRI and a check-in date."
+    },
+    "tasks": {
+     "skills": [
+      "capture",
+      "jira-expert",
+      "agile-product-owner"
+     ],
+     "hint": "Normalize each item to ticket-ready form: verb + deliverable + acceptance criterion, sized to one sprint or flagged [SPLIT?]. Note the target board/epic per item, and separate true decisions (full DACI) from routine actions (owner+due suffices) so nothing stays a hallway promise."
+    },
+    "summary": {
+     "skills": [
+      "team-communications",
+      "handoff",
+      "postmortem"
+     ],
+     "hint": "Structure the recap as 3P (Progress/Plans/Problems) so it drops into the status channel unedited. For kept/slipped/reopened, quote the prior commitment verbatim next to today's claim, and reference tracker artifacts by ID rather than restating them — a summary is a handoff, not an archive."
+    }
+   }
+  },
+  {
+   "id": "recruiter-hr",
+   "label": "Recruiter / People Ops",
+   "symbol": "person.badge.plus",
+   "buttons": {
+    "agenda": {
+     "skills": [
+      "office-hours",
+      "interview-system-designer",
+      "capacity-planner"
+     ],
+     "hint": "Structure intake and debrief blocks around a scorecard: name the competencies to assess, assign who probes which, and set 'independent scores submitted' as the exit condition. Timebox req-prioritization items with the requesting manager as owner and capacity math pre-attached."
+    },
+    "brainstorm": {
+     "skills": [
+      "roast",
+      "cold-email",
+      "culture-architect"
+     ],
+     "hint": "Score sourcing and people-program ideas against pass-through lift, candidate experience, and precedent risk. Pressure-test survivors from 5 angles before converging; make the cheapest experiment a 20-candidate outreach batch or one-team pilot with a reply/adoption threshold."
+    },
+    "unresolved": {
+     "skills": [
+      "decision-logger",
+      "capture",
+      "process-mapper"
+     ],
+     "hint": "Type open loops as candidate-blocking, req-blocking, or compliance; weight candidate-blocking highest — offers decay in days. Sweep for handoff gaps between recruiter, manager, and comp. Tie each trigger to a pipeline stage or review date, and log unresolved hire/no-hire splits verbatim."
+    },
+    "whattoask": {
+     "skills": [
+      "grill-me",
+      "interview-system-designer",
+      "office-hours"
+     ],
+     "hint": "Map claims to competency evidence gaps first; pick the axis with the most hiring signal (scope, ownership, conflict). Prefer behavioral past-tense probes — 'walk me through the last time...' — and in manager intakes, ask the one question that forces a real role definition."
+    },
+    "factcheck": {
+     "skills": [
+      "statistical-analyst",
+      "vpe-advisor",
+      "general-counsel-advisor"
+     ],
+     "hint": "For funnel, attrition, or comp claims, demand sample size and base rate before verdicting; compare pass-through and time-to-fill against known benchmarks. Mark employment-law or policy assertions Needs-source unless the actual policy or contract text is in hand."
+    },
+    "rhetoric": {
+     "skills": [
+      "meeting-analyzer",
+      "interview-system-designer",
+      "executive-mentor"
+     ],
+     "hint": "Sweep warrants for interviewer-bias patterns: halo/horn, pedigree anchoring, similarity bias, recency. Steelman the dissenting interviewer before the majority. Separate scorecard-evidence claims from vibes, quoting the exact behavioral evidence cited — or flagging its absence."
+    },
+    "answer": {
+     "skills": [
+      "chro-advisor",
+      "general-counsel-advisor",
+      "knowledge-ops"
+     ],
+     "hint": "Anchor answers in the comp band, leveling guide, or policy doc actually in hand and cite it inline. For legal-adjacent asks (leave, visas, termination), give the BLUF plus an explicit 'confirm with counsel' flag — never improvise employment law in a live call."
+    },
+    "dispute": {
+     "skills": [
+      "hard-call",
+      "boardroom",
+      "executive-mentor"
+     ],
+     "hint": "Re-anchor split debriefs on scorecard evidence, not the loudest or most senior voice; restate each side's interest (team velocity vs quality bar). Treat a hire as a near one-way door: when regret is symmetric, tie-break toward gathering one more targeted signal over forcing the call."
+    },
+    "risks": {
+     "skills": [
+      "challenge",
+      "stress-test",
+      "cfo-review"
+     ],
+     "hint": "Pre-mortem people decisions 12 months out: mis-hire, offer decline, comp compression, backfill attrition. Convert plan assumptions (accept rate, ramp time) into early-warning metrics with named owners, and size severity by loaded cost of a mis-hire plus the precedent it sets."
+    },
+    "advice": {
+     "skills": [
+      "chro-advisor",
+      "founder-coach",
+      "change-management"
+     ],
+     "hint": "Frame moves as talent leverage: which single change most lifts pass-through, retention, or ramp per hour of recruiter effort. Classify comp and leveling calls as one-way doors (they set precedent); pair every policy move with the manager's first coaching step and an ADKAR landing plan."
+    },
+    "tasks": {
+     "skills": [
+      "execute",
+      "capture",
+      "team-communications"
+     ],
+     "hint": "Assign DACI with the recruiter as Driver and hiring manager as Approver on every candidate decision. Flag [OWNER?]/[DUE?] hardest on candidate-facing steps — feedback SLA, references, offer — and render the Slack summary as next pipeline stage per candidate."
+    },
+    "summary": {
+     "skills": [
+      "meeting-analyzer",
+      "decision-logger",
+      "internal-comms"
+     ],
+     "hint": "Log each hire/no-hire and comp decision with the evidence quoted, dissent named, and confidence level so debriefs never re-litigate. Track kept/slipped against candidate SLAs, and close with the comms plan: who tells the candidate, the team, and the manager what — and by when."
+    }
+   }
+  }
+ ]
+}
