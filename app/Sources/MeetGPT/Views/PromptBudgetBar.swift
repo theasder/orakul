@@ -179,7 +179,7 @@ struct PromptBudgetBar: View {
                 HStack(spacing: Space.s) {
                     Image(systemName: "person.crop.circle.badge.questionmark")
                         .foregroundStyle(Theme.accent)
-                    Text("Sign in for managed AI credits and sync.")
+                    Text("Войдите, чтобы получить кредиты и синхронизацию.")
                         .font(Typo.caption)
                         .foregroundStyle(Theme.inkSecondary)
                     Spacer(minLength: 0)
@@ -1028,7 +1028,7 @@ struct PromptBudgetDetails: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Signed out. Sign in to Cruxwing to see compute credits.")
+        .accessibilityLabel("Вы не вошли. Войдите в orakul, чтобы видеть кредиты.")
     }
 
     private var unavailableCreditRow: some View {

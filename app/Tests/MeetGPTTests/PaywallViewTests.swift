@@ -35,7 +35,7 @@ struct PaywallViewTests {
         let sut = try view.inspect()
         #expect(throws: Never.self) { try sut.find(text: "Тарифы orakul") }
         #expect(throws: Never.self) { try sut.find(text: "Остаться на бесплатном") }
-        #expect(throws: Never.self) { try sut.find(text: "See plans") }
+        #expect(throws: Never.self) { try sut.find(text: "Посмотреть тарифы") }
         // A benefit line is present; the pricing-stage title is not (still intro).
         #expect(throws: Never.self) {
             try sut.find(text: "Councils are explicit, on-demand actions")

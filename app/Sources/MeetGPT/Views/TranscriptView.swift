@@ -127,7 +127,7 @@ private struct TranscriptSelectionBar: View {
 
     var body: some View {
         HStack(spacing: Space.m) {
-            Text("Selection")
+            Text("Выделенное")
                 .font(Typo.callout)
                 .foregroundStyle(Theme.inkSecondary)
             Button("Спросить об этом", action: onAsk)

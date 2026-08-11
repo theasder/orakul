@@ -128,7 +128,7 @@ struct ContentView: View {
                 presentPaywallIfNeeded()
             }
         }
-        // Settings ▸ General ▸ "Show the setup guide again". Settings is its own
+        // Settings ▸ General ▸ "Показать настройку заново". Settings is its own
         // window, so the request arrives through the shared AppState rather than
         // a notification. The gate is re-run rather than forcing the first step:
         // a user who already granted both permissions should land on the sample

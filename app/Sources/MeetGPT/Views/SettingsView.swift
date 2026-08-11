@@ -102,7 +102,7 @@ private struct GeneralSettingsTab: View {
             SettingsSection(title: "Setup guide",
                             caption: "Re-runs the permission pre-flight, the capture check, and the sample call. Nothing is reset except the guide itself.") {
                 SettingsRow {
-                    Label("Show the setup guide again", systemImage: "arrow.counterclockwise")
+                    Label("Показать настройку заново", systemImage: "arrow.counterclockwise")
                         .labelStyle(SettingLabelStyle())
                     Spacer()
                     Button("Показать") { state.replayOnboarding() }
@@ -1252,7 +1252,7 @@ struct SignInSheet: View {
                 Button {
                     Task { await state.signInWithApple() }
                 } label: {
-                    Label("Sign in with Apple", systemImage: "apple.logo")
+                    Label("Войти через Apple", systemImage: "apple.logo")
                         .font(Typo.callout.weight(.semibold))
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 8)

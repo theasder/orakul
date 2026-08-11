@@ -178,7 +178,7 @@ struct ContextSection: View {
                 }
             }
         } label: {
-            Label("Sets", systemImage: "square.stack.3d.up")
+            Label("Наборы", systemImage: "square.stack.3d.up")
         }
         .menuStyle(.button)
         .buttonStyle(QuietButtonStyle())

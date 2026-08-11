@@ -544,7 +544,7 @@ private struct ThemeChip: View {
             // another row in the style picker — see SocraticMode. It changes
             // whether you get an answer, which no style does.
             Toggle(isOn: $state.socraticModeEnabled) {
-                Label("Socratic mode", systemImage: "questionmark.bubble")
+                Label("Сократический режим", systemImage: "questionmark.bubble")
             }
             .accessibilityIdentifier("composer.socraticMode")
             if state.socraticModeEnabled {

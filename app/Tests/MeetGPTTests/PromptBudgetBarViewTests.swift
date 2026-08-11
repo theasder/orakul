@@ -205,7 +205,7 @@ struct PromptBudgetBarViewTests {
 
         // The disclosure control is mode-independent.
         #expect(throws: Never.self) {
-            try inspected.find(viewWithAccessibilityLabel: "Prompt input budget")
+            try inspected.find(viewWithAccessibilityLabel: "Бюджет промпта")
         }
     }
 

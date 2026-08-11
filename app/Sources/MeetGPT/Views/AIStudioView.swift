@@ -108,7 +108,7 @@ struct AIStudioView: View {
                     Image(systemName: "arrow.up.forward.app")
                 }
                 .buttonStyle(IconButtonStyle())
-                .accessibilityLabel("Send tasks to a tracker")
+                .accessibilityLabel("Отправить задачи в трекер")
                 .help("Create these tasks in Linear, Jira, or Asana")
             }
             // Refine the visible answer (item 20). User-invoked only; hidden
@@ -229,7 +229,7 @@ struct AIStudioView: View {
                 .menuIndicator(.hidden)
                 .fixedSize()
                 .disabled(exportingDOCX || exportingElsewhere)
-                .accessibilityLabel("Share answer")
+                .accessibilityLabel("Поделиться ответом")
                 .help("Copy this answer, or export it — with its prompt and blind spots — to Word, Google Docs, or Notion")
             }
         }
@@ -547,7 +547,7 @@ private struct AskComposer: View {
                         Text("\(prompt.icon)  \(prompt.title)")
                     }
                 }
-            } label: { Label("Start from a prompt", systemImage: "text.badge.star") }
+            } label: { Label("Начать с промпта", systemImage: "text.badge.star") }
             if !trimmed.isEmpty {
                 Button { onSaveAsPrompt(text) } label: { Label("Сохранить как промпт…", systemImage: "bookmark") }
             }

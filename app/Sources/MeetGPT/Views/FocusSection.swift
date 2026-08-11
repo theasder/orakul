@@ -141,7 +141,7 @@ private struct HiddenMeetingsDisclosure: View {
                     .padding(.leading, Space.m)
                 }
                 if meetings.count > 1 {
-                    Button("Show all", action: onRestoreAll)
+                    Button("Показать все", action: onRestoreAll)
                         .buttonStyle(.plain)
                         .font(Typo.caption)
                         .foregroundStyle(Theme.inkTertiary)

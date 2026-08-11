@@ -162,7 +162,7 @@ struct MenuBarView: View {
     private var recordLabel: String {
         switch state.status {
         case .idle, .error: return "Start recording"
-        case .starting:     return "Starting…"
+        case .starting:     return "Запускаю…"
         case .recording:    return "Stop recording"
         case .paused:       return "Stop recording"
         case .stopping:     return "Stopping…"
@@ -172,7 +172,7 @@ struct MenuBarView: View {
     private var statusTitle: String {
         switch state.status {
         case .idle:          return "Idle"
-        case .starting:      return "Starting…"
+        case .starting:      return "Запускаю…"
         case .recording:     return "Recording"
         case .paused:        return "Paused"
         case .stopping:      return "Stopping…"

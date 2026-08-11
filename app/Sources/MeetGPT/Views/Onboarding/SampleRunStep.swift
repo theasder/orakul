@@ -114,7 +114,7 @@ struct SampleRunStep: View {
                             .id(line.atSeconds)
                         }
                         if visibleLines.isEmpty {
-                            Text("Starting…").font(Typo.caption).foregroundStyle(Theme.inkTertiary)
+                            Text("Запускаю…").font(Typo.caption).foregroundStyle(Theme.inkTertiary)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -212,7 +212,7 @@ struct SampleRunStep: View {
             } else {
                 Button("Пропустить", action: finish)
                     .buttonStyle(QuietButtonStyle())
-                    .accessibilityLabel("Skip the sample")
+                    .accessibilityLabel("Пропустить пример")
             }
         }
     }

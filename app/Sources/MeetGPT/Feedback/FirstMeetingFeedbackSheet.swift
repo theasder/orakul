@@ -20,7 +20,7 @@ struct FirstMeetingFeedbackSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             VStack(alignment: .leading, spacing: 6) {
-                Text("How did that go?")
+                Text("Как всё прошло?")
                     .font(.title3.weight(.semibold))
                 Text("Your first call with Cruxwing just ended. One tap tells us more than any download number.")
                     .font(.callout)
@@ -48,7 +48,7 @@ struct FirstMeetingFeedbackSheet: View {
                     TextField("Email, if you're open to a follow-up (optional)", text: $email)
                         .textFieldStyle(.roundedBorder)
 
-                    Text("Nothing else is attached — no transcript, no audio, no meeting name.")
+                    Text("Больше ничего не прикладывается — ни транскрипта, ни звука, ни названия встречи.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

@@ -132,7 +132,7 @@ struct CaptureCheckStep: View {
     /// user who cannot find it is stuck on the first screen of the product.
     private var footer: some View {
         HStack(spacing: Space.m) {
-            Text("Signed out — on-device transcription is unlimited either way.")
+            Text("Вы не вошли — расшифровка на устройстве всё равно без ограничений.")
                 .font(Typo.caption).foregroundStyle(Theme.inkTertiary)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: Space.s)

@@ -72,7 +72,7 @@ struct PaywallView: View {
                 }
                 .buttonStyle(QuietButtonStyle())
                 Spacer()
-                Button("See plans") { stage = .pricing }
+                Button("Посмотреть тарифы") { stage = .pricing }
                     .buttonStyle(PrimaryButtonStyle())
                     .accessibilityIdentifier("paywall.see-plans")
             }
@@ -257,7 +257,7 @@ struct PaywallView: View {
                 .accessibilityIdentifier("paywall.success")
             Text("Тариф активен — модели и лимиты доступны сразу.")
                 .font(Typo.callout).foregroundStyle(Theme.inkSecondary)
-            Button("Start using Cruxwing") {
+            Button("Начать работу с orakul") {
                 Config.paywallChoiceMade = true
                 dismiss()
             }
@@ -269,7 +269,7 @@ struct PaywallView: View {
 
     private func errorView(_ message: String) -> some View {
         VStack(alignment: .leading, spacing: Space.l) {
-            Label("Something went wrong", systemImage: "exclamationmark.triangle")
+            Label("Что-то пошло не так", systemImage: "exclamationmark.triangle")
                 .font(Typo.title).foregroundStyle(Theme.recordRed)
             Text(message).font(Typo.callout).foregroundStyle(Theme.inkSecondary)
             HStack {
@@ -426,7 +426,7 @@ private struct PlanCard: View {
             HStack {
                 Spacer()
                 if plan.purchasable {
-                    Button("Subscribe") { onSubscribe() }
+                    Button("Подписаться") { onSubscribe() }
                         .buttonStyle(PrimaryButtonStyle())
                         .accessibilityLabel("Subscribe to \(plan.name), \(plan.priceLabel)")
                 } else {

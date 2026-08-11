@@ -468,7 +468,7 @@ struct SidebarFooter: View {
     private var statusLabel: String {
         switch state.status {
         case .idle: return "Готово"
-        case .starting: return "Starting…"
+        case .starting: return "Запускаю…"
         case .recording: return "Recording"
         case .paused: return "Paused"
         case .stopping: return "Stopping…"
