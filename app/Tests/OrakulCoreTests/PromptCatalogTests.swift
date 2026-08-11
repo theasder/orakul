@@ -15,10 +15,10 @@ struct PromptCatalogTests {
         """.utf8)
     }
 
-    private func button(id: String, tier: String = "free", offline: Bool = true) -> String {
+    private func button(id: String, offline: Bool = true) -> String {
         """
         {"id": "\(id)", "label": "Кнопка", "prompt": "Достаточно длинный текст запроса",
-         "tier": "\(tier)", "offline": \(offline), "adapted": "почему так"}
+         "offline": \(offline), "adapted": "почему так"}
         """
     }
 
@@ -30,19 +30,22 @@ struct PromptCatalogTests {
         #expect(catalog.recall != nil, "главная кнопка продукта пропала из каталога")
     }
 
-    @Test("поиск по своим созвонам бесплатный — и это проверяется в сборке")
-    func recallIsFree() throws {
+    @Test("всё в каталоге работает на устройстве — платить не за что")
+    func everythingIsFreeAndLocal() throws {
         let catalog = try PromptCatalog.bundled()
+        let networkBound = catalog.buttons.filter { !$0.offline }.map(\.id)
+        #expect(networkBound.isEmpty,
+                "кнопки, которым нужна сеть: \(networkBound) — это ломает единственное обещание продукта")
         let recall = try #require(catalog.recall)
-        #expect(recall.tier == .free)
         #expect(recall.offline)
     }
 
-    @Test("бесплатная кнопка, которой нужна сеть, не собирается")
-    func freeButtonMustBeOffline() {
-        // Не «мы стараемся»: каталог с таким сочетанием не грузится вообще.
-        let broken = json(button(id: "bad", tier: "free", offline: false))
-        #expect(throws: PromptCatalog.LoadError.freeButtonRequiresNetwork("bad")) {
+    @Test("кнопка, которой нужна сеть, не собирается")
+    func buttonMustBeOffline() {
+        // Не «мы стараемся»: каталог с такой кнопкой не грузится вообще.
+        // Платных уровней нет, значит нет и оправдания «это в подписке».
+        let broken = json(button(id: "bad", offline: false))
+        #expect(throws: PromptCatalog.LoadError.buttonRequiresNetwork("bad")) {
             try PromptCatalog.decode(broken)
         }
     }
@@ -55,47 +58,10 @@ struct PromptCatalogTests {
         }
     }
 
-    @Test("уровни упорядочены: команда видит бесплатное, бесплатный — нет")
-    func tierOrdering() throws {
-        let catalog = try PromptCatalog.decode(json(
-            button(id: "free-one") + "," +
-            button(id: "team-one", tier: "team", offline: false) + "," +
-            button(id: "company-one", tier: "company", offline: false)))
-
-        #expect(catalog.available(for: .free).map(\.id) == ["free-one"])
-        #expect(catalog.available(for: .team).map(\.id) == ["free-one", "team-one"])
-        #expect(catalog.available(for: .company).count == 3)
-    }
-
-    @Test("без сети остаются только кнопки, считающиеся на устройстве")
-    func offlineFiltering() throws {
-        let catalog = try PromptCatalog.decode(json(
-            button(id: "local") + "," +
-            button(id: "remote", tier: "team", offline: false)))
-
-        #expect(catalog.actionable(for: .company, online: true).count == 2)
-        #expect(catalog.actionable(for: .company, online: false).map(\.id) == ["local"])
-        // Бесплатный уровень без сети не теряет ничего — в этом весь уровень.
-        #expect(catalog.actionable(for: .free, online: false).count
-                == catalog.available(for: .free).count)
-    }
-
-    @Test("недоступная кнопка объясняет причину, а не молчит")
-    func unavailabilityIsExplained() throws {
-        let catalog = try PromptCatalog.decode(json(
-            button(id: "local") + "," +
-            button(id: "remote", tier: "team", offline: false)))
-        let local = catalog.buttons[0]
-        let remote = catalog.buttons[1]
-
-        #expect(catalog.unavailabilityReason(for: local, tier: .free, online: false) == nil)
-        // Не хватает уровня — говорим, какого именно.
-        let byTier = catalog.unavailabilityReason(for: remote, tier: .free, online: true)
-        #expect(byTier?.contains("Команда") == true)
-        // Уровень есть, сети нет — причина другая, и она не про деньги.
-        let byNetwork = catalog.unavailabilityReason(for: remote, tier: .team, online: false)
-        #expect(byNetwork?.contains("сеть") == true)
-        #expect(byNetwork?.contains("уровне") != true)
+    @Test("каталог отдаёт все кнопки: разграничивать нечего")
+    func everythingIsActionable() throws {
+        let catalog = try PromptCatalog.bundled()
+        #expect(catalog.actionable.count == catalog.buttons.count)
     }
 
     @Test("порядок кнопок в файле ничего не решает")

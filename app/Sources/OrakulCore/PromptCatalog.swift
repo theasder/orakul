@@ -8,28 +8,10 @@ import Foundation
 /// работает без сети и что показывать, когда сети нет.
 public struct PromptCatalog: Codable, Sendable {
 
-    /// Уровень подписки. Порядок важен: `free < team < company`.
-    public enum Tier: String, Codable, Comparable, Sendable, CaseIterable {
-        case free
-        case team
-        case company
-
-        private var rank: Int {
-            switch self {
-            case .free: return 0
-            case .team: return 1
-            case .company: return 2
-            }
-        }
-
-        public static func < (lhs: Tier, rhs: Tier) -> Bool { lhs.rank < rhs.rank }
-    }
-
     public struct Button: Codable, Equatable, Sendable {
         public let id: String
         public let label: String
         public let prompt: String
-        public let tier: Tier
         /// Работает ли кнопка целиком на устройстве.
         public let offline: Bool
         /// Почему формулировка именно такая. Пользователю не показывается —
@@ -46,9 +28,10 @@ public struct PromptCatalog: Codable, Sendable {
     public enum LoadError: Error, Equatable {
         case resourceMissing
         case duplicateIdentifier(String)
-        /// Бесплатная кнопка, которой нужна сеть, ломает сразу два обещания:
-        /// «работает без сети» и «звук не покидает компьютер».
-        case freeButtonRequiresNetwork(String)
+        /// Кнопка, которой нужна сеть, ломает обещание продукта: всё работает
+        /// на устройстве. Платных уровней нет, оправдания «это в подписке» —
+        /// тоже, поэтому такая кнопка просто не грузится.
+        case buttonRequiresNetwork(String)
     }
 
     /// Каталог из строки JSON. Отдельно от загрузки из бандла, чтобы правила
@@ -82,57 +65,26 @@ public struct PromptCatalog: Codable, Sendable {
             guard seen.insert(button.id).inserted else {
                 throw LoadError.duplicateIdentifier(button.id)
             }
-            if button.tier == .free && !button.offline {
-                throw LoadError.freeButtonRequiresNetwork(button.id)
+            if !button.offline {
+                throw LoadError.buttonRequiresNetwork(button.id)
             }
         }
     }
 
     // MARK: - Что показывать
 
-    /// Кнопки, доступные на этом уровне подписки.
-    public func available(for tier: Tier) -> [Button] {
-        buttons.filter { $0.tier <= tier }
-    }
-
     /// Кнопки, которые можно нажать прямо сейчас.
     ///
-    /// Без сети остаются только те, что считаются на устройстве, — и это не
-    /// деградация, а бесплатный уровень в чистом виде.
-    public func actionable(for tier: Tier, online: Bool) -> [Button] {
-        available(for: tier).filter { online || $0.offline }
-    }
-
-    /// Почему кнопка недоступна — текстом, который можно показать человеку.
-    ///
-    /// Кнопка не исчезает: пропавшая кнопка читается как поломка, а не как
-    /// ограничение, и пользователь идёт искать её вместо того, чтобы понять,
-    /// что происходит.
-    public func unavailabilityReason(for button: Button,
-                                     tier: Tier,
-                                     online: Bool) -> String? {
-        if button.tier > tier {
-            return "Доступно на уровне «\(button.tier.displayName)»"
-        }
-        if !online && !button.offline {
-            return "Нужна сеть: эта кнопка обращается к внешнему сервису"
-        }
-        return nil
-    }
+    /// Раньше здесь были уровни подписки. Их больше нет: продукт бесплатный
+    /// целиком, поэтому единственная причина, по которой кнопка может быть
+    /// недоступна, — техническая, а не коммерческая. Сейчас таких причин тоже
+    /// нет, и метод возвращает всё: честный список из одной строки лучше, чем
+    /// механизм разграничения, которому нечего разграничивать.
+    public var actionable: [Button] { buttons }
 
     /// Главная кнопка продукта. Обращение по имени, а не по индексу: порядок в
     /// каталоге меняют текстовики, и он не должен ничего ломать.
     public var recall: Button? {
         buttons.first { $0.id == "what-decided" }
-    }
-}
-
-public extension PromptCatalog.Tier {
-    var displayName: String {
-        switch self {
-        case .free: return "Открытый"
-        case .team: return "Команда"
-        case .company: return "Компания"
-        }
     }
 }

@@ -162,20 +162,35 @@ material is yours.
 
 ---
 
-## 5. Business model
+## 5. Business model — бесплатно, целиком
 
-- **Core open source on GitHub, permissive licence.** Apache-2.0 over MIT: it
-  grants patent rights explicitly, which is what a corporate adopter's lawyer
-  looks for, and it matches the licence of the preferred model weights.
-- **Free tier** genuinely useful offline and on-device — simultaneously the trust
-  argument and the cost argument.
-- **Paid tiers**: advanced contextual search across team history, enterprise
-  security (on-prem, own endpoint), high-volume API.
-- **Metric: repository stars and adoption.** Stated plainly because it changes
-  engineering priorities — a star is earned by a README a developer can run in
-  five minutes, not by a feature matrix. **ASSUMPTION**: no research yet on what
-  drives stars in the RU developer ecosystem specifically. Next research task;
-  not to be guessed.
+Решение владельца: платных уровней нет. Не «пока не назначены цены», а нет
+вообще — тарифы, платные кнопки и разграничение по подписке удалены из продукта,
+из каталога, со страницы и из кода.
+
+Это не только про деньги. Граница проходила по инфраструктуре: бесплатно то, что
+считается на компьютере пользователя, платно то, за что платим мы. Убрав вторую
+половину, продукт получает свойство, которое раньше приходилось обещать словами:
+**всё работает без сети, потому что ничего другого просто нет**. Кнопка,
+требующая сети, теперь не грузится — не по вкусу, а потому что каталог с ней
+не проходит проверку при сборке.
+
+Что удалено:
+
+- `config/plans.ru.json` и его тесты — каталог уровней;
+- кнопки `to-tracker` и `week-digest` — единственные, которым нужен наш сервер;
+- поле `tier` у кнопок — место, где платный уровень отрастает обратно;
+- `PromptCatalog.Tier`, `available(for:)`, `unavailabilityReason(...)` —
+  механизм разграничения, которому больше нечего разграничивать;
+- раздел «Тарифы» на странице.
+
+Метрика прежняя: звёзды и установки. Она стала честнее — у репозитория, где
+нечего продавать, README и есть весь маркетинг.
+
+**Что это стоит.** Коннекторы к трекерам и сводка недели были обоснованием
+платного уровня; вместе с ним ушли и они. Это сознательный размен: продукт,
+который целиком работает на устройстве, проще обещать и невозможно испортить
+тихим переносом функции за платную стену.
 
 ---
 

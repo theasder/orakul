@@ -150,6 +150,7 @@ struct SpeechEvalTests {
         let stems = ["ru1-ai-security-w900", "ru1-ai-security-w2700", "ru1-ai-security-w4300"]
 
         var rates: [Double] = []
+        var ratesAfter: [Double] = []
         for stem in stems {
             let texts = engines.compactMap {
                 try? String(contentsOfFile: "\(dir)/\(stem).\($0).txt", encoding: .utf8)
@@ -173,11 +174,34 @@ struct SpeechEvalTests {
             let drift = SpeechEval.wordErrorRate(reference: texts[0], hypothesis: texts[1])
             print(String(format: "    whisper vs parakeet: расходятся на %.0f%% слов (замен %d, пропусков %d, вставок %d)",
                          drift.rate * 100, drift.substitutions, drift.deletions, drift.insertions))
+
+            // Тот же замер после словаря. Смысл всей затеи: если согласие не
+            // выросло, словарь не решает измеренную задачу, и об этом надо
+            // узнать здесь, а не после релиза.
+            let repaired = texts.map { RussianLexicon.restore($0) }
+            let afterReports = SpeechEval.termDisagreements(terms: terms, across: repaired)
+            let afterSpoken = afterReports.filter { $0.found > 0 }
+            let afterDisputed = afterSpoken.filter(\.isDisputed)
+            if !afterSpoken.isEmpty {
+                let after = Double(afterSpoken.count - afterDisputed.count) / Double(afterSpoken.count)
+                ratesAfter.append(after)
+                print(String(format: "    после словаря: спорных %d, согласие %.0f%% (было %.0f%%)",
+                             afterDisputed.count, after * 100, agreement * 100))
+                for report in afterDisputed.sorted(by: { $0.term < $1.term }) {
+                    print("        всё ещё спорный «\(report.term)»: \(report.found) из \(report.total)")
+                }
+            }
         }
 
         guard !rates.isEmpty else { return }
         let mean = rates.reduce(0, +) / Double(rates.count)
-        print(String(format: "среднее согласие по терминам: %.0f%%", mean * 100))
+        // Обе цифры, и обязательно рядом: одна «до» в отчёте выглядела бы как
+        // результат работы словаря, хотя это результат его отсутствия.
+        print(String(format: "среднее согласие по терминам: %.0f%% (сырые расшифровки)", mean * 100))
+        if !ratesAfter.isEmpty {
+            let meanAfter = ratesAfter.reduce(0, +) / Double(ratesAfter.count)
+            print(String(format: "среднее согласие после словаря: %.0f%%", meanAfter * 100))
+        }
         // Порога здесь нет намеренно: это замер, а не ворота. Порог появится
         // тогда, когда появится эталон и можно будет считать WER честно.
     }

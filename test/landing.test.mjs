@@ -93,13 +93,18 @@ describe('orakul landing (ru)', () => {
     assert.match(text, /Apache 2\.0/);
   });
 
-  test('quotes no price it has not decided', () => {
-    // A free tier that is real, and paid tiers that say "not decided" rather
-    // than inventing a number somebody might plan a budget around.
-    assert.match(text, /0 ₽/);
-    const paid = (text.match(/цена уточняется/g) || []).length;
-    assert.equal(paid, 2, 'both paid tiers must decline to quote a price');
-    assert.doesNotMatch(text, /\d+\s*₽\s*\/\s*мес|\d{3,}\s*₽/, 'no invented prices');
+  test('sells nothing: no tiers, no prices, no locked features', () => {
+    // The product is free in full. That is checkable, and worth checking,
+    // because a paid tier tends to reappear one feature at a time.
+    assert.match(text, /Тарифов нет/i);
+    // Not a blunt search for "цена": the hero asks «что мы решили по ценам?»,
+    // which is a meeting topic, not a product price. Match what a paywall
+    // actually looks like.
+    assert.doesNotMatch(text, /₽|руб\.|подписк|платная версия|тариф(?!ов нет)/i,
+      'a price crept back onto the page');
+    assert.doesNotMatch(text, /Команда<\/h3>|Компания<\/h3>/, 'a paid tier card is back');
+    // And no feature may be described as belonging to a plan.
+    assert.doesNotMatch(text, /доступно на уровне|в платной версии|в подписке/i);
   });
 
   test('every navigation link points at a section that exists', () => {

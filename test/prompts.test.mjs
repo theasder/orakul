@@ -38,37 +38,21 @@ describe('orakul quick-action buttons (ru)', () => {
     assert.equal(new Set(ids).size, ids.length, 'duplicate id');
     for (const button of buttons) {
       assert.match(button.id, /^[a-z][a-z0-9-]*$/, `id not kebab-case: ${button.id}`);
-      for (const field of ['label', 'prompt', 'tier', 'adapted']) {
+      for (const field of ['label', 'prompt', 'adapted']) {
         assert.ok(button[field], `${button.id} is missing ${field}`);
       }
       assert.equal(typeof button.offline, 'boolean', `${button.id}.offline must be boolean`);
     }
   });
 
-  test('the free tier is the majority of the product, not a teaser', () => {
-    // "Focus on the freemium version": if most buttons are locked, the free
-    // tier is a trial with extra steps and the open-source promise reads as
-    // bait. Asserting the product decision means changing it takes an argument
-    // rather than a quiet edit.
-    const free = buttons.filter((b) => b.tier === 'free');
-    assert.ok(free.length >= Math.ceil(buttons.length * 0.6),
-      `only ${free.length} of ${buttons.length} buttons are free`);
-    // The headline capability must never move behind a paywall.
-    const recall = buttons.find((b) => b.id === 'what-decided');
-    assert.equal(recall.tier, 'free', 'cross-meeting recall is the product; it stays free');
-  });
-
-  test('every free button works without a network, and paid ones admit they do not', () => {
-    // The free tier's argument is "your audio never leaves the Mac". A free
-    // button needing the network breaks the privacy claim and the offline
-    // claim at the same time.
+  test('every button is free and local — there is nothing to sell', () => {
+    // Tiers were removed from the product, so they must not survive in the
+    // data either: a `tier` field is where a paywall grows back.
     for (const button of buttons) {
-      if (button.tier === 'free') {
-        assert.equal(button.offline, true, `free button ${button.id} must work offline`);
-      } else {
-        assert.equal(button.offline, false, `${button.id} is paid; it must not claim offline`);
-      }
+      assert.ok(!('tier' in button), `${button.id} still carries a tier`);
+      assert.equal(button.offline, true, `${button.id} needs the network`);
     }
+    assert.ok(buttons.some((b) => b.id === 'what-decided'), 'recall is the product');
   });
 
   test('labels are Russian and short enough to be a button', () => {
@@ -120,8 +104,9 @@ describe('orakul quick-action buttons (ru)', () => {
       assert.doesNotMatch(prompt, /отправ(ь|ляй|им)|разошли|напиши письмо/i,
         `${id} implies auto-sending; the product never sends`);
     }
-    const tracker = buttons.find((b) => b.id === 'to-tracker');
-    assert.match(tracker.adapted, /отправляет человек/i);
+    // The tracker button went with the paid tier; the promise it carried —
+    // that a human does the sending — is now a property of every button,
+    // asserted by the loop above rather than by one example.
   });
 
   test('every button records why it is worded that way', () => {
