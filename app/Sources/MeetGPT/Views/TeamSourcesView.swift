@@ -76,7 +76,7 @@ struct TeamSourcesView: View {
 
             // Keyword rules — the trigger set the watcher scans for.
             VStack(alignment: .leading, spacing: Space.s) {
-                Text("KEYWORD RULES")
+                Text("ПРАВИЛА ПО СЛОВАМ")
                     .font(Typo.label)
                     .foregroundStyle(Theme.inkTertiary)
                     .kerning(0.4)

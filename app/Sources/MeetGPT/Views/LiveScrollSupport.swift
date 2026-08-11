@@ -3,7 +3,7 @@ import SwiftUI
 
 /// Shared policy for live transcript/answer panes. Content follows only while
 /// the reader is already at the bottom; scrolling upward transfers control to
-/// the reader until they return or press "Latest".
+/// the reader until they return or press "Последняя".
 enum LiveScrollPolicy {
     static let nearBottomThreshold: CGFloat = 24
     /// How far the bottom may drift before follow mode DISENGAGES. Wider than
@@ -222,7 +222,7 @@ struct JumpToLatestButton: View {
 
     var body: some View {
         Button(action: action) {
-            Label("Latest", systemImage: "arrow.down")
+            Label("Последняя", systemImage: "arrow.down")
                 .font(Typo.caption.weight(.semibold))
                 .foregroundStyle(Theme.ink)
                 .padding(.horizontal, Space.m)

@@ -207,7 +207,7 @@ private struct MCPAddServerSheet: View {
                 .accessibilityLabel("Адрес своего сервера")
                 .accessibilityIdentifier("settings.connected.custom.url")
             if invalid {
-                Text("Enter a name and a valid https:// URL.")
+                Text("Введите имя и корректный адрес https://")
                     .font(Typo.caption).foregroundStyle(Theme.recordRed)
                     .accessibilityIdentifier("settings.connected.custom.error")
             }
@@ -256,7 +256,7 @@ struct MCPImportSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.l) {
-            Label("Import from a connected app", systemImage: "app.connected.to.app.below.fill")
+            Label("Импорт из подключённого приложения", systemImage: "app.connected.to.app.below.fill")
                 .font(Typo.title).foregroundStyle(Theme.ink)
 
             Picker("App", selection: $serverID) {
@@ -294,7 +294,7 @@ struct MCPImportSheet: View {
                         .textFieldStyle(.plain).padding(Space.m)
                         .background(Theme.surface, in: RoundedRectangle(cornerRadius: Radius.s, style: .continuous))
                         .overlay(RoundedRectangle(cornerRadius: Radius.s, style: .continuous).strokeBorder(Theme.hairline, lineWidth: 1))
-                        .accessibilityLabel("Connected app import query")
+                        .accessibilityLabel("Запрос на импорт")
                         .accessibilityIdentifier("connected-import.query")
                 } else if case .connecting = mcp.state(of: server.id) {
                     HStack(spacing: Space.s) {

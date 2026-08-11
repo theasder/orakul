@@ -328,7 +328,7 @@ private struct LedgerSection: View {
                     }
                 }
                 if state.ledgerDecisions.isEmpty {
-                    Text("Decisions you log with 📌 appear here.")
+                    Text("Решения, отмеченные 📌, появятся здесь.")
                         .font(Typo.caption)
                         .foregroundStyle(Theme.inkTertiary)
                 } else {

@@ -95,7 +95,7 @@ struct MenuBarView: View {
                 overlay.toggle(state: state, mcp: mcp)
             } label: {
                 menuRow(icon: "rectangle.inset.topright.filled",
-                        title: overlay.isShown ? "Hide overlay" : "Show overlay")
+                        title: overlay.isShown ? "Скрыть плашку" : "Show overlay")
             }
             .buttonStyle(QuietButtonStyle())
             .help("Floating co-pilot card that stays on top of your meeting")

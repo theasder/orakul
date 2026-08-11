@@ -76,8 +76,8 @@ struct OverlayView: View {
                 Image(systemName: "xmark")
             }
             .buttonStyle(IconButtonStyle(size: 20))
-            .accessibilityLabel("Hide overlay")
-            .help("Hide overlay")
+            .accessibilityLabel("Скрыть плашку")
+            .help("Скрыть плашку")
         }
     }
 }
@@ -131,14 +131,14 @@ private struct OverlaySuggestionRow: View {
             }
             .buttonStyle(IconButtonStyle(size: 18))
             .opacity(hovering ? 1 : 0.35)
-            .accessibilityLabel("Ask the assistant about this suggestion")
+            .accessibilityLabel("Спросить ассистента об этой подсказке")
             .help("Send to the assistant")
             Button(action: onDismiss) {
                 Image(systemName: "xmark")
             }
             .buttonStyle(IconButtonStyle(size: 18))
             .opacity(hovering ? 1 : 0.35)
-            .accessibilityLabel("Dismiss suggestion")
+            .accessibilityLabel("Скрыть подсказку")
             .help("Скрыть")
         }
         .padding(.horizontal, Space.s)

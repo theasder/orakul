@@ -125,7 +125,7 @@ private struct TaskRow: View {
         case .done:
             Image(systemName: "checkmark.circle.fill").foregroundStyle(Theme.speakerYou)
         default:
-            Button("File", action: onFile)
+            Button("Создать", action: onFile)
                 .buttonStyle(QuietButtonStyle())
                 .disabled(!canFile)
                 .accessibilityLabel("File task: \(item.task)")

@@ -194,7 +194,7 @@ private struct MandatoryInformationOverlay: View {
         ZStack {
             Color.black.opacity(0.32).ignoresSafeArea()
             VStack(alignment: .leading, spacing: Space.m) {
-                Label("Information required", systemImage: "exclamationmark.shield.fill")
+                Label("Нужны данные", systemImage: "exclamationmark.shield.fill")
                     .font(Typo.headline)
                     .foregroundStyle(Theme.ink)
                 Text(notice.message)
@@ -353,7 +353,7 @@ private struct MeetingColumn: View {
         if state.enhancingTranscript {
             HStack(spacing: Space.xs) {
                 BreathingDots(tint: Theme.accent)
-                Text("Enhancing with Fireflies…")
+                Text("Дополняю из Fireflies…")
                     .font(Typo.caption)
                     .foregroundStyle(Theme.inkSecondary)
             }
@@ -368,7 +368,7 @@ private struct MeetingColumn: View {
             HStack(spacing: Space.s) {
                 if state.canEnhanceWithFireflies {
                     Button { state.enhanceTranscriptWithFirefliesNow() } label: {
-                        Label("Enhance with Fireflies", systemImage: "flame")
+                        Label("Дополнить из Fireflies", systemImage: "flame")
                     }
                     .buttonStyle(QuietButtonStyle(prominent: true))
                     .help("Merge on-device Whisper captions with the Fireflies transcript and clean with the LLM")
@@ -398,7 +398,7 @@ private struct MeetingColumn: View {
                         // measured against human references this replaces the
                         // remote-side transcript with one 57% more accurate on
                         // work calls, and more on accented speech.
-                        Label("Improve transcript", systemImage: "wand.and.stars")
+                        Label("Улучшить транскрипт", systemImage: "wand.and.stars")
                     }
                     // Not prominent while a free Fireflies merge is pending:
                     // Fireflies recorded the same meeting and its merge is
@@ -477,7 +477,7 @@ private struct TranscriptionPerformanceBanner: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(Theme.inkSecondary)
-            .accessibilityLabel("Dismiss performance recommendation")
+            .accessibilityLabel("Скрыть совет о производительности")
         }
         .padding(Space.m)
         .background(Theme.accentSoft, in: RoundedRectangle(cornerRadius: Radius.m, style: .continuous))
@@ -526,8 +526,8 @@ private struct ErrorToast: View {
                     Image(systemName: "xmark")
                 }
                 .buttonStyle(IconButtonStyle(size: 22))
-                .accessibilityLabel("Dismiss error")
-                .help("Dismiss error")
+                .accessibilityLabel("Скрыть ошибку")
+                .help("Скрыть ошибку")
             }
             .padding(.horizontal, Space.l)
             .padding(.vertical, Space.m)

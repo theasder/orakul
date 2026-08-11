@@ -36,7 +36,7 @@ struct SampleRunStep: View {
             banner
 
             VStack(alignment: .leading, spacing: Space.xxs) {
-                Text("Goal for this call").font(Typo.label)
+                Text("Цель звонка").font(Typo.label)
                     .foregroundStyle(Theme.inkTertiary)
                 Text(sample.goal).font(Typo.callout).foregroundStyle(Theme.ink)
                     .fixedSize(horizontal: false, vertical: true)
@@ -178,9 +178,9 @@ struct SampleRunStep: View {
                     if state.samplePinnedDecision == nil {
                         Button("📌 Log decision") { state.pinSampleDecision() }
                             .buttonStyle(PrimaryButtonStyle())
-                            .accessibilityLabel("Log the sample decision")
+                            .accessibilityLabel("Записать пример решения")
                     } else {
-                        Label("Logged — sample only. Nothing was written to your ledger.",
+                        Label("Записано — только пример. В ваш журнал ничего не попало.",
                               systemImage: "checkmark.circle.fill")
                             .font(Typo.caption).foregroundStyle(Theme.speakerYou)
                             .fixedSize(horizontal: false, vertical: true)

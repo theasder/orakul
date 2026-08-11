@@ -548,7 +548,7 @@ private struct ThemeChip: View {
             }
             .accessibilityIdentifier("composer.socraticMode")
             if state.socraticModeEnabled {
-                Button("Answer plainly next  ⌘⇧A") { state.answerPlainlyNext() }
+                Button("Ответить прямо  ⌘⇧A") { state.answerPlainlyNext() }
                     .disabled(state.socraticBrokenOut)
                     .accessibilityIdentifier("composer.socraticBreakout")
             }
@@ -735,7 +735,7 @@ private struct FacilitationNoteCard: View {
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(Theme.speakerThem)
             VStack(alignment: .leading, spacing: 2) {
-                Text("Facilitation")
+                Text("Ведение звонка")
                     .font(Typo.caption.weight(.semibold))
                     .foregroundStyle(Theme.speakerThem)
                 Text(note)

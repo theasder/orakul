@@ -60,7 +60,7 @@ struct FocusSection: View {
 }
 
 /// Shown right after a Focus row is tapped. Dismissal is not the same as undo:
-/// keeping the context is the common case, so "Keep" simply retires the banner
+/// keeping the context is the common case, so "Оставить" simply retires the banner
 /// while "Undo" reverses every field the tap rewrote and hides the meeting —
 /// an accidental tap almost always means "not this one".
 private struct AppliedMeetingBanner: View {
@@ -80,7 +80,7 @@ private struct AppliedMeetingBanner: View {
                     .lineLimit(1)
                 Spacer(minLength: 0)
             }
-            Text("Loaded into this call's context.")
+            Text("Загружено в контекст этого звонка.")
                 .font(Typo.caption)
                 .foregroundStyle(Theme.inkSecondary)
             HStack(spacing: Space.s) {
@@ -88,7 +88,7 @@ private struct AppliedMeetingBanner: View {
                     .buttonStyle(.plain)
                     .font(Typo.caption.weight(.semibold))
                     .foregroundStyle(Theme.accentText)
-                Button("Keep", action: onKeep)
+                Button("Оставить", action: onKeep)
                     .buttonStyle(.plain)
                     .font(Typo.caption)
                     .foregroundStyle(Theme.inkTertiary)

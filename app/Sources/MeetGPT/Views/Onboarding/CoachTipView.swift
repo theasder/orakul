@@ -5,7 +5,7 @@ import SwiftUI
 /// The queue is what keeps this from becoming a tour: `CoachTipQueue.next`
 /// returns an optional, so there is no way to render two, and nothing appears at
 /// all while a call is being recorded. A tip retires when its feature is used —
-/// "Got it" is the fallback for someone who wants it gone now.
+/// "Понятно" is the fallback for someone who wants it gone now.
 struct CoachTipView: View {
     @EnvironmentObject var state: AppState
     /// Which control is asking. Only the tip pointing here renders, so the
@@ -54,7 +54,7 @@ struct CoachTipView: View {
                     .fixedSize(horizontal: false, vertical: true)
                 HStack {
                     Spacer(minLength: 0)
-                    Button("Got it") { retire(tip) }
+                    Button("Понятно") { retire(tip) }
                         .buttonStyle(QuietButtonStyle(prominent: true))
                         .accessibilityLabel("Dismiss tip: \(tip.title)")
                 }

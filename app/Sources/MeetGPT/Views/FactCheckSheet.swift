@@ -16,7 +16,7 @@ struct FactCheckSheet: View {
     @ViewBuilder private var trackedBody: some View {
         VStack(alignment: .leading, spacing: Space.l) {
             HStack(spacing: Space.s) {
-                Label("Fact check", systemImage: "checkmark.seal")
+                Label("Проверка фактов", systemImage: "checkmark.seal")
                     .font(Typo.title).foregroundStyle(Theme.ink)
                 if state.factChecking { BreathingDots(tint: Theme.accent) }
                 Spacer()
@@ -61,7 +61,7 @@ struct FactCheckSheet: View {
                 centered {
                     Image(systemName: "exclamationmark.triangle")
                         .font(.system(size: 26)).foregroundStyle(Theme.danger)
-                    Text("Fact check failed")
+                    Text("Проверка фактов не удалась")
                         .font(Typo.callout.weight(.medium)).foregroundStyle(Theme.ink)
                     Text(error)
                         .font(Typo.caption).foregroundStyle(Theme.inkSecondary)

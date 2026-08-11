@@ -70,7 +70,7 @@ struct CaptureCheckStep: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: Space.xs) {
-            Label("Let's make sure Cruxwing can hear the room.",
+            Label("Проверим, что orakul слышит комнату.",
                   systemImage: "waveform")
                 .font(Typo.title).foregroundStyle(Theme.ink)
             // Deliberately does NOT restate the duration. The capture-check row
@@ -157,13 +157,13 @@ private struct PermissionRow: View {
         OnboardingRow(icon: icon, title: title, detail: detail) {
             switch PermissionPrompt.action(granted: granted, alreadyAsked: alreadyAsked) {
             case nil:
-                Label("Granted", systemImage: "checkmark.circle.fill")
+                Label("Выдано", systemImage: "checkmark.circle.fill")
                     .font(Typo.caption.weight(.medium))
                     .foregroundStyle(Theme.speakerYou)
                     .labelStyle(.titleAndIcon)
                     .accessibilityLabel("\(title) granted")
             case .request:
-                Button("Enable", action: action)
+                Button("Включить", action: action)
                     .buttonStyle(QuietButtonStyle())
                     .accessibilityLabel("Enable \(title)")
             case .openSettings:

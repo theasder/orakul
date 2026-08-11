@@ -25,7 +25,7 @@ struct SettingsView: View {
     @ViewBuilder private var trackedBody: some View {
         TabView(selection: $state.selectedSettingsTab) {
             GeneralSettingsTab()
-                .tabItem { Label("General", systemImage: "gearshape") }
+                .tabItem { Label("Общее", systemImage: "gearshape") }
                 .tag(SettingsTab.general)
             TranscriptionSettingsTab()
                 .tabItem { Label("Transcription", systemImage: "waveform") }
@@ -162,14 +162,14 @@ private struct GeneralSettingsTab: View {
                         .accessibilityIdentifier("settings.general.call-detection")
                 }
                 SettingsRow {
-                    Label("Ignore music / video", systemImage: "music.note.tv")
+                    Label("Игнорировать музыку и видео", systemImage: "music.note.tv")
                         .labelStyle(SettingLabelStyle())
                     Spacer()
                     Toggle("", isOn: $ignoreMedia)
                         .labelsHidden().toggleStyle(.switch)
                         .disabled(!callDetection)
                         .onChange(of: ignoreMedia) { Config.ignoreMediaApps = $0 }
-                        .accessibilityLabel("Ignore music and video")
+                        .accessibilityLabel("Игнорировать музыку и видео")
                         .accessibilityIdentifier("settings.general.ignore-media")
                 }
             }
@@ -203,7 +203,7 @@ private struct GeneralSettingsTab: View {
                         .accessibilityIdentifier("settings.general.reminders")
                 }
                 SettingsRow {
-                    Label("Lead time", systemImage: "clock")
+                    Label("Время до встречи", systemImage: "clock")
                         .labelStyle(SettingLabelStyle())
                     Spacer()
                     Picker("", selection: $reminderMinutes) {
@@ -264,10 +264,10 @@ private struct TranscriptionSettingsTab: View {
                     }
                 }
 
-                SettingsSection(title: "Language",
+                SettingsSection(title: "Язык",
                                 caption: "Auto re-detects supported languages as the conversation changes. For Russian-only meetings, choose Russian: Auto can misdetect short or noisy local Whisper chunks. Use Auto for genuinely mixed-language calls. Applied on your next recording.") {
                     SettingsRow {
-                        Label("Language", systemImage: "globe")
+                        Label("Язык", systemImage: "globe")
                             .labelStyle(SettingLabelStyle())
                         Spacer()
                         Picker("", selection: $transcriptionLanguage) {
@@ -378,7 +378,7 @@ private struct TranscriptionSettingsTab: View {
                             .strokeBorder(Theme.hairline, lineWidth: 1))
                         .overlay(alignment: .topLeading) {
                             if glossary.isEmpty {
-                                Text("Cruxwing, RICE, ARR, Kubernetes…")
+                                Text("orakul, RICE, ARR, Kubernetes…")
                                     .font(.system(size: 12, design: .monospaced))
                                     .foregroundStyle(Theme.inkTertiary)
                                     .padding(.horizontal, Space.s + 4).padding(.vertical, Space.s + 8)
@@ -410,7 +410,7 @@ private struct TranscriptionSettingsTab: View {
 
                     SettingsRow {
                         VStack(alignment: .leading, spacing: 3) {
-                            Text("Find names and technical terms")
+                            Text("Найти имена и термины")
                                 .font(Typo.callout).foregroundStyle(Theme.ink)
                             Text(connectedGlossaryCostCaption)
                                 .font(Typo.caption).foregroundStyle(Theme.inkTertiary)
@@ -420,7 +420,7 @@ private struct TranscriptionSettingsTab: View {
                         if state.connectedGlossarySuggestionStatus == .loading {
                             ProgressView().controlSize(.small)
                         }
-                        Button("Find terms") {
+                        Button("Найти термины") {
                             Task { await state.generateConnectedGlossarySuggestions() }
                         }
                         .buttonStyle(.bordered)
@@ -430,7 +430,7 @@ private struct TranscriptionSettingsTab: View {
 
                     if state.connectedGlossarySourceCount == 0 {
                         HStack {
-                            Text("Connect a readable app first.")
+                            Text("Сначала подключите приложение, которое можно читать.")
                                 .font(Typo.caption).foregroundStyle(Theme.inkTertiary)
                             Spacer()
                             Button("Рабочие приложения") { state.selectedSettingsTab = .connectedApps }
@@ -550,7 +550,7 @@ private struct AISettingsTab: View {
                         .lineLimit(1).truncationMode(.tail)
                     Spacer()
                     PlanBadge(tier: state.currentTier)
-                    Button("Manage…") { showPaywall = true }
+                    Button("Управление…") { showPaywall = true }
                         .buttonStyle(QuietButtonStyle())
                         .accessibilityIdentifier("settings.ai.manage-plan")
                 }
@@ -793,7 +793,7 @@ private struct AccountPrivacyTab: View {
                 }
                 SettingsRow {
                     VStack(alignment: .leading, spacing: 4) {
-                        Label("Also remove these terms", systemImage: "text.badge.minus")
+                        Label("Убрать и эти термины", systemImage: "text.badge.minus")
                             .labelStyle(SettingLabelStyle())
                         Text("Project code names, client names — one per line. Removed wherever they appear.")
                             .font(Typo.caption)
@@ -1042,7 +1042,7 @@ private struct GoogleSignInRow: View {
             GoogleServiceToggles()
 
             if !state.hasGoogleClientID {
-                Text("Add GOOGLE_CLIENT_ID in mac/.env and rebuild Cruxwing.")
+                Text("Добавьте GOOGLE_CLIENT_ID в mac/.env и пересоберите orakul.")
                     .font(Typo.caption).foregroundStyle(Theme.inkTertiary)
             } else if !state.hasGoogleClientSecret {
                 Text("Add GOOGLE_CLIENT_SECRET for the same Google Desktop OAuth client, then rebuild Cruxwing.")
@@ -1056,7 +1056,7 @@ private struct GoogleSignInRow: View {
                       Config.googleScopeVersion < GoogleAuth.scopeVersion
                         || Config.googleGrantedServices != Config.googleEnabledServices {
                 HStack(spacing: Space.s) {
-                    Text("Access or workflow search changed — reconnect to apply it.")
+                    Text("Доступ или поиск изменились — переподключите, чтобы применить.")
                         .font(Typo.caption).foregroundStyle(Theme.accentText)
                     Button("Reconnect now") { Task { await state.connectGoogle() } }
                         .buttonStyle(QuietButtonStyle())
@@ -1307,7 +1307,7 @@ struct SignInSheet: View {
                 .textFieldStyle(.plain).padding(Space.m)
                 .background(Theme.surface, in: RoundedRectangle(cornerRadius: Radius.s, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: Radius.s, style: .continuous).strokeBorder(Theme.hairline, lineWidth: 1))
-            Toggle("Create a new account", isOn: $registering)
+            Toggle("Создать аккаунт", isOn: $registering)
                 .toggleStyle(.checkbox).font(Typo.caption)
             if let providerError {
                 Text(providerError).font(Typo.caption).foregroundStyle(Theme.recordRed)

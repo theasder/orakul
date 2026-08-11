@@ -40,7 +40,7 @@ struct ModelSelectionRows: View {
     var body: some View {
         row(label: "Provider", icon: "building.2") {
             Picker("", selection: $provider) {
-                Text("Auto · all providers (recommended)").tag(LLMCatalog.autoID)
+                Text("Автоматически · все поставщики (рекомендуем)").tag(LLMCatalog.autoID)
 
                 // Price-tiered orchestration councils — multi-model panels the
                 // backend runs, gated by the caller's tariff (strongest first).
@@ -56,10 +56,10 @@ struct ModelSelectionRows: View {
                 }
                 // Single-jurisdiction councils (direct-key builds only).
                 if LLMCatalog.councilAvailable(.us, for: tier) {
-                    Text("Council · US 🇺🇸 (GPT + Claude + Gemini)").tag(LLMCatalog.councilUS)
+                    Text("Совет · США 🇺🇸 (GPT + Claude + Gemini)").tag(LLMCatalog.councilUS)
                 }
                 if LLMCatalog.councilAvailable(.china, for: tier) {
-                    Text("Council · China 🇨🇳 (DeepSeek + Qwen + more)").tag(LLMCatalog.councilCN)
+                    Text("Совет · Китай 🇨🇳 (DeepSeek + Qwen и другие)").tag(LLMCatalog.councilCN)
                 }
 
                 if !providers.isEmpty { Divider() }
@@ -85,7 +85,7 @@ struct ModelSelectionRows: View {
         if let pinned {
             row(label: "Version", icon: "number") {
                 Picker("", selection: $version) {
-                    Text("Auto · best stable").tag(LLMCatalog.autoID)
+                    Text("Автоматически · самая стабильная").tag(LLMCatalog.autoID)
                     Divider()
                     ForEach(LLMCatalog.versions(of: pinned, for: tier)) { model in
                         Text(model.label).tag(model.id)

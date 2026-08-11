@@ -169,7 +169,7 @@ struct PromptBudgetBar: View {
                         Image(systemName: "xmark")
                     }
                     .buttonStyle(IconButtonStyle(size: 20))
-                    .accessibilityLabel("Dismiss sign-out notice")
+                    .accessibilityLabel("Скрыть уведомление о выходе")
                 }
                 .padding(Space.s)
                 .background(Theme.danger.opacity(0.08),
@@ -968,12 +968,12 @@ struct PromptBudgetDetails: View {
                 HStack(spacing: Space.s) {
                     ProgressView()
                         .controlSize(.small)
-                    Text("Loading compute credit balance…")
+                    Text("Загружаю баланс кредитов…")
                         .font(Typo.caption)
                         .foregroundStyle(Theme.inkSecondary)
                 }
                 .accessibilityElement(children: .combine)
-                .accessibilityLabel("Loading compute credit balance")
+                .accessibilityLabel("Загружаю баланс кредитов")
             case .fresh, .stale:
                 if let usage = creditUsage {
                     let allowance = max(usage.allowances.computeCredits, 1)

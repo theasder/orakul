@@ -42,8 +42,8 @@ struct SetupCard: View {
                         Image(systemName: "xmark").font(.system(size: 8, weight: .bold))
                     }
                     .buttonStyle(IconButtonStyle(size: 16))
-                    .help("Hide setup")
-                    .accessibilityLabel("Hide setup")
+                    .help("Скрыть настройку")
+                    .accessibilityLabel("Скрыть настройку")
                 }
 
                 VStack(alignment: .leading, spacing: Space.xs) {
@@ -146,7 +146,7 @@ struct NoCallTodayCard: View {
                     }
                     .buttonStyle(IconButtonStyle(size: 16))
                     .help("Hide")
-                    .accessibilityLabel("Hide suggestion")
+                    .accessibilityLabel("Скрыть подсказку")
                 }
 
                 VStack(alignment: .leading, spacing: Space.s) {

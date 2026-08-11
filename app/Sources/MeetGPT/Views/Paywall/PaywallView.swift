@@ -99,7 +99,7 @@ struct PaywallView: View {
             if loadingPlans {
                 HStack {
                     Spacer()
-                    ProgressView().controlSize(.small).accessibilityLabel("Loading plans")
+                    ProgressView().controlSize(.small).accessibilityLabel("Загружаю тарифы")
                     Spacer()
                 }
             } else if plans.isEmpty {
@@ -146,11 +146,11 @@ struct PaywallView: View {
         }
     }
 
-    /// "Have a code?" — redeem a promo/access code instead of paying.
+    /// "Есть код?" — redeem a promo/access code instead of paying.
     private var promoField: some View {
         VStack(alignment: .leading, spacing: Space.xs) {
             Divider().padding(.vertical, Space.xxs)
-            Text("Have a code?")
+            Text("Есть код?")
                 .font(Typo.caption.weight(.medium)).foregroundStyle(Theme.inkSecondary)
             HStack(spacing: Space.s) {
                 TextField("Promo or access code", text: $promoCode)
@@ -239,7 +239,7 @@ struct PaywallView: View {
     private var processing: some View {
         VStack(alignment: .center, spacing: Space.l) {
             ProgressView().controlSize(.large)
-            Text("Finish the payment in your browser…")
+            Text("Завершите оплату в браузере…")
                 .font(Typo.headline).foregroundStyle(Theme.ink)
             Text("This screen updates automatically once Stripe confirms.")
                 .font(Typo.caption).foregroundStyle(Theme.inkTertiary)
@@ -430,7 +430,7 @@ private struct PlanCard: View {
                         .buttonStyle(PrimaryButtonStyle())
                         .accessibilityLabel("Subscribe to \(plan.name), \(plan.priceLabel)")
                 } else {
-                    Text("Included")
+                    Text("Входит")
                         .font(Typo.caption.weight(.semibold))
                         .foregroundStyle(Theme.speakerYou)
                 }
@@ -459,7 +459,7 @@ private struct OfferBanner: View {
                 }
             }
             Spacer()
-            Button("Get it") { onSubscribe() }
+            Button("Получить") { onSubscribe() }
                 .buttonStyle(.borderedProminent).tint(.white.opacity(0.25))
                 .accessibilityLabel("Get \(plan.name), \(plan.priceLabel)")
         }

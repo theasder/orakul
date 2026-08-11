@@ -438,7 +438,7 @@ private struct FollowUpPromptsBlock: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s) {
-            SectionLabel("Follow up")
+            SectionLabel("Уточнить")
             FlowLayout(spacing: Space.s, lineSpacing: Space.s) {
                 ForEach(prompts) { prompt in
                     PromptChip(

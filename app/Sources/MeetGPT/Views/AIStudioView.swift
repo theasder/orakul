@@ -182,7 +182,7 @@ struct AIStudioView: View {
                             Button {
                                 exportTo { await state.exportAssistantAnswerToGoogleDocs() }
                             } label: {
-                                Label("Google Docs", systemImage: "doc.text")
+                                Label("Google Документы", systemImage: "doc.text")
                             }
                         }
                         // Google Sheets — only when the answer actually contains
@@ -535,7 +535,7 @@ private struct AskComposer: View {
 
     private var attachMenu: some View {
         Menu {
-            Button { open(.image) } label: { Label("Image", systemImage: "photo") }
+            Button { open(.image) } label: { Label("Изображение", systemImage: "photo") }
             Button { open(.file) }  label: { Label("Создать", systemImage: "doc") }
             Button { open(.folder) } label: { Label("Папка…", systemImage: "folder.badge.plus") }
             Button { open(.audio) } label: { Label("Звук", systemImage: "waveform") }

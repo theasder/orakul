@@ -128,12 +128,12 @@ struct ContextSection: View {
 
     private var addSourceMenu: some View {
         Menu {
-            Button { showImporter = true } label: { Label("Files…", systemImage: "paperclip") }
+            Button { showImporter = true } label: { Label("Файлы…", systemImage: "paperclip") }
             Button { showFolderImporter = true } label: { Label("Папка…", systemImage: "folder.badge.plus") }
-            Button { promptKind = .doc } label: { Label("Google Doc…", systemImage: "doc.richtext") }
-            Button { promptKind = .sheet } label: { Label("Google Sheet…", systemImage: "tablecells") }
+            Button { promptKind = .doc } label: { Label("Google Документ…", systemImage: "doc.richtext") }
+            Button { promptKind = .sheet } label: { Label("Google Таблица…", systemImage: "tablecells") }
             Button { promptKind = .notion } label: { Label("Notion page…", systemImage: "note.text") }
-            Button { showMCPImport = true } label: { Label("Connected app…", systemImage: "app.connected.to.app.below.fill") }
+            Button { showMCPImport = true } label: { Label("Подключённое приложение…", systemImage: "app.connected.to.app.below.fill") }
             if mcp.prefersMCP("fireflies") || state.googleConnected {
                 Divider()
             }
@@ -213,7 +213,7 @@ private struct SourcePromptSheet: View {
                     .foregroundStyle(Theme.accentText)
             }
             if kind != .notion, !state.googleHasDocsScope {
-                Text("Connect Google (Settings) with Docs & Sheets access first.")
+                Text("Сначала подключите Google в настройках с доступом к Документам и Таблицам.")
                     .font(Typo.caption)
                     .foregroundStyle(Theme.accentText)
             }
@@ -417,7 +417,7 @@ private struct NotesField: View {
                 .focused($focused)
 
             if text.isEmpty {
-                Text("Agenda, prior decisions, bios, links…")
+                Text("Повестка, прошлые решения, справки, ссылки…")
                     .font(Typo.callout)
                     .foregroundStyle(Theme.inkTertiary)
                     .padding(.top, Space.m)

@@ -45,7 +45,7 @@ struct FirefliesImportPicker: View {
     private var loading: some View {
         HStack(spacing: Space.s) {
             ProgressView().controlSize(.small)
-            Text("Loading your Fireflies meetings…")
+            Text("Загружаю встречи из Fireflies…")
                 .font(.system(size: 12))
                 .foregroundStyle(Theme.inkSecondary)
             Spacer()

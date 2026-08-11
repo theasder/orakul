@@ -36,7 +36,7 @@ struct RecordingConsentSheet: View {
                 Spacer()
                 Button("Не сейчас") { dismiss() }
                     .buttonStyle(QuietButtonStyle())
-                Button("I understand — start recording") {
+                Button("Понятно — начать запись") {
                     state.acceptRecordingConsent()
                 }
                 .buttonStyle(QuietButtonStyle(prominent: true))

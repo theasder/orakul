@@ -80,7 +80,7 @@ struct SelectableTranscriptText: NSViewRepresentable {
         /// bug that makes a selectable live transcript unusable.
         private var renderedFingerprint: String = ""
         /// The SwiftUI binding is the public source of truth, while this local
-        /// copy lets us distinguish a "Latest" request from an ordinary update
+        /// copy lets us distinguish a "Последняя" request from an ordinary update
         /// whose rendered transcript has not changed.
         private var lastRequestedFollow = true
         /// Replacing an attributed string changes both the document height and
@@ -113,7 +113,7 @@ struct SelectableTranscriptText: NSViewRepresentable {
             let followWasRequested = shouldScrollToBottom && !lastRequestedFollow
             lastRequestedFollow = shouldScrollToBottom
 
-            // "Latest" has to work even when no new words landed between the
+            // "Последняя" has to work even when no new words landed between the
             // reader scrolling away and pressing the button.
             guard contentChanged || followWasRequested else { return }
             if !contentChanged {
