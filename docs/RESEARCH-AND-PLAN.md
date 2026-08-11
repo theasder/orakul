@@ -37,7 +37,27 @@ team already produces — its calls, its repos, its trackers — where the answe
 specific to *this* codebase and *this* team's decisions, and cannot be closed as
 a duplicate.
 
-### 1.2 The pain is inside the calls, not around them
+### 1.2 For a developer, the call itself IS the pain
+
+Corrected after a founder note, and it changes the pitch more than it changes
+the code. The framing above — decisions get lost, so make meetings searchable —
+is a **manager's** pain. A developer's pain is one level earlier: the meeting
+exists at all. Russian practitioner writing states it outright, up to
+"Продуктивность в тишине: отказ от совещаний как идеал", and complains directly
+about the volume of calls in a working day.[^calls-quiet]
+
+This matters for the metric. The stated goal is GitHub stars in a Russian
+*developer* ecosystem, so the adopter is a developer even when the payer is a
+lead. A page that opens on decision hygiene is written for the person who
+approves the invoice, not the person who stars the repo.
+
+**Positioning, therefore:** not "better meetings" but *you did not have to be
+there*. The tool reads the call so attendance becomes optional for the ones
+where you were needed for five minutes out of sixty. What it must never claim is
+that it can excuse you — that is a decision made by people, and a landing page
+promising otherwise sells something it cannot deliver.
+
+### 1.3 The pain is inside the calls, not around them
 
 Searching in Russian for what actually goes wrong during developer calls returns
 the Cruxwing thesis almost verbatim. Teams report that as the number of calls and
@@ -325,6 +345,7 @@ orakul в обратном: **не искать ответ у посторонн
 [^so-decline]: [Stack Overflow умирает? Как ИИ вытесняет живые сообщества разработчиков — Хабр](https://habr.com/ru/companies/ru_mts/articles/912160/)
 [^so-mod]: [Убивают ли LLM сайт StackOverflow? — Хабр](https://habr.com/ru/articles/875760/); [Почему умирает Stack Overflow — Skillbox Media](https://skillbox.ru/media/code/pochemu-umiraet-stack-overflow-i-kuda-teper-idti-za-otvetami/)
 [^qna]: [Как правильно оформить вопрос на QNA.Habr — Хабр Q&A](https://qna.habr.com/q/1391680); [Правила — Хабр Q&A](https://qna.habr.com/help/rules)
+[^calls-quiet]: [Продуктивность в тишине: Отказ от совещаний как идеал — Хабр](https://habr.com/ru/articles/800645/); [Сколько раз в неделю – норма? О производственных совещаниях — Хабр](https://habr.com/ru/articles/834136/)
 [^calls-manage]: [Как не бесить разработчиков и чётко управлять проектом](https://www.novostiitkanala.ru/news/detail.php?ID=196819)
 [^calls-agreements]: [Про звонки и совещания — vc.ru](https://vc.ru/dev/1997848-effektivnye-zvonki-i-soveshchaniya-v-komande); [Созвоны, аватарки и немного тревожности — Хабр/YADRO](https://habr.com/ru/companies/yadro/articles/1062334/)
 [^vks]: [Видеоконференции SberJazz](https://sberjazz.ko.ru/); [ТОП-13 платформ ВКС 2026 (on-premise)](https://iaassaaspaas.ru/rating/vks/on-premise-2026)

@@ -27,13 +27,27 @@ describe('orakul landing (ru)', () => {
     assert.ok(/[а-яё]/i.test(description), 'description must be Russian');
   });
 
-  test('leads with the pain the research actually found', () => {
+  test('leads with the developer\u2019s pain, not the manager\u2019s', () => {
+    // The buyer may be a lead, but the adopter is a developer, and the metric
+    // is stars in a developer ecosystem. Developers do not want better
+    // meetings — they want fewer, which Russian practitioner writing says out
+    // loud ("Продуктивность в тишине: отказ от совещаний как идеал").
+    // The page must open on attendance, not on decision hygiene.
+    const hero = html.slice(html.indexOf('class="hero"'), html.indexOf('id="problem"'));
+    assert.match(hero, /не ходить/i);
+    assert.match(hero, /Присутствовать нужно не на каждом/i);
+    // And it must not promise the tool can excuse you from a meeting — that is
+    // a decision made by people, not by software.
+    assert.doesNotMatch(hero, /отмени|можно пропускать все|больше никаких созвонов/i);
+  });
+
+  test('keeps the pain the research actually found', () => {
     // "договорённости живут в головах и чатах" and re-deciding are the two
     // failures Russian practitioners describe in their own words
     // (RESEARCH-AND-PLAN.md §1.2). The hero must say that, not a generic
     // productivity claim.
     assert.match(text, /договорённости живут в головах и чатах/i);
-    assert.match(text, /решает то же самое заново|решать одно и то же/i);
+    assert.match(text, /реша(ет|ют) (то же самое )?заново|решать одно и то же/i);
   });
 
   test('promises a quote, and admits what happens without one', () => {
