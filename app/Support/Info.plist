@@ -33,7 +33,7 @@
 	<key>NSHumanReadableCopyright</key>
 	<string>© 2026 orakul</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>orakul записывает созвон, чтобы вы могли потом спросить «что мы решили». Запись и расшифровка остаются на вашем компьютере.</string>
+	<string>orakul записывает звонок, чтобы вы могли потом спросить «что мы решили». Запись и расшифровка остаются на вашем компьютере.</string>
 	<key>NSScreenCaptureUsageDescription</key>
 	<string>orakul пишет системный звук, чтобы расшифровать и собеседников тоже. Бот в звонок не заходит, видео не записывается.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>

@@ -36,6 +36,8 @@ describe('orakul landing (ru)', () => {
     const hero = html.slice(html.indexOf('class="hero"'), html.indexOf('id="problem"'));
     assert.match(hero, /не ходить/i);
     assert.match(hero, /Присутствовать нужно не на каждом/i);
+    // Словарь продукта: «звонок», как в демо-фильме.
+    assert.doesNotMatch(text, /созвон/i, 'the product says «звонок»');
     // And it must not promise the tool can excuse you from a meeting — that is
     // a decision made by people, not by software.
     assert.doesNotMatch(hero, /отмени|можно пропускать все|больше никаких созвонов/i);

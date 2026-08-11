@@ -58,16 +58,35 @@ describe('orakul quick-action buttons (ru)', () => {
     }
   });
 
+  test('speaks the product\u2019s Russian, not a second dialect of it', () => {
+    // The demo film is the shipped Russian voice, so it is the authority —
+    // and the test reads the real file rather than a copy, so the two cannot
+    // drift. Two words for one thing ("созвон" here, "звонок" in the film)
+    // read as two different products.
+    const film = readFileSync(
+      resolve(here, '..', '..', 'cruxwing-marketing', 'public', 'demo-film', 'scene.ru.js'),
+      'utf8',
+    );
+    for (const term of ['звонк', 'Слепые зоны', 'владельца']) {
+      assert.ok(film.includes(term), `the film no longer says "${term}" — re-check the voice`);
+    }
+
+    const copy = buttons.map((b) => `${b.label} ${b.prompt}`).join(' ');
+    assert.match(copy, /звонк/i, 'the product says "звонок", not "созвон"');
+    assert.doesNotMatch(copy, /созвон/i, 'a second word for the same thing');
+    assert.ok(buttons.some((b) => /слепые зоны/i.test(b.label)),
+      'the film calls them "слепые зоны"');
+    assert.ok(buttons.some((b) => /без владельца/i.test(b.prompt)),
+      'the film says "без владельца", not "ответственный не назван"');
+  });
+
   test('no corporate anglicisms where a Russian word exists', () => {
-    // The tell of a translated product. Each of these has a natural Russian
-    // equivalent already used in the catalogue.
+    // The tell of a translated product. Each has a natural Russian equivalent
+    // already used in the catalogue — and in the film.
     const calques = /экшн|фоллоу-?ап|блайндспот|стейкхолдер|митинг|дедлайн/i;
     for (const { id, label, prompt } of buttons) {
       assert.doesNotMatch(`${label} ${prompt}`, calques, `anglicism in ${id}`);
     }
-    // And the positive form: the word Russian developers actually use.
-    assert.ok(buttons.some((b) => /созвон/i.test(b.label + b.prompt)),
-      'nothing says "созвон" — this was written for the wrong audience');
   });
 
   test('prompts demand a quote and forbid invention', () => {
@@ -83,7 +102,7 @@ describe('orakul quick-action buttons (ru)', () => {
     // "Ответственный не назван" is a result, not a gap to fill with a guess —
     // the single most useful line in a Russian stand-up summary.
     const promises = buttons.find((b) => b.id === 'who-promised');
-    assert.match(promises.prompt, /ответственный не назван/i);
+    assert.match(promises.prompt, /без владельца/i);
   });
 
   test('no button promises to send anything on the user’s behalf', () => {

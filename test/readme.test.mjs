@@ -43,8 +43,13 @@ describe('README', () => {
     assert.match(readme, /swift build -c release/);
     assert.match(readme, /swift test/);
     assert.ok(readdirSync(resolve(repo, 'test')).some((f) => f.endsWith('.test.mjs')),
-      'node --test has nothing to run');
-    assert.match(readme, /node --test/);
+      'the documented test command has nothing to run');
+    // Проверяем, что команда из README реально существует, а не что она
+    // записана определённой строкой: раньше здесь стоял литерал, и README,
+    // перешедший на npm test, уронил тест, хотя команда была верной.
+    assert.match(readme, /npm test/);
+    const pkg = JSON.parse(readFileSync(resolve(repo, 'package.json'), 'utf8'));
+    assert.ok(pkg.scripts?.test, 'README promises npm test, package.json has no test script');
   });
 
   test('the licence it names is the licence in the repo', () => {
