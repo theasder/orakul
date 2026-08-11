@@ -16,6 +16,11 @@ public struct CommandLineApp {
         public let output: String
         /// Ненулевой код — «команда не сделала того, что просили».
         public let exitCode: Int32
+
+        public init(output: String, exitCode: Int32) {
+            self.output = output
+            self.exitCode = exitCode
+        }
     }
 
     let store: SessionStore
