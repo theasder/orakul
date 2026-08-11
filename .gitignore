@@ -1,3 +1,4 @@
 node_modules/
 public/download/
 .DS_Store
+.build/
