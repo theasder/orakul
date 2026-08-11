@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>orakul.ai — созвон, который можно спросить</title>
+  <meta name="description" content="Открытый ИИ-помощник для созвонов на русском. Спросите «что мы решили по ценам?» — и получите ответ из своих же встреч, с цитатой. Расшифровка на вашем компьютере, без бота в звонке." />
+  <meta name="theme-color" content="#0B0A08" />
+  <meta property="og:title" content="orakul.ai — созвон, который можно спросить" />
+  <meta property="og:description" content="Открытый исходный код. Русский интерфейс. Ответы из ваших встреч — с цитатой из расшифровки." />
+  <meta property="og:locale" content="ru_RU" />
+  <style>
+    /* Тёмная «типографская» тема: тушь и янтарь. Намеренно не фиолетовая —
+       orakul отдельный бренд, а не перекрашенный Cruxwing. Системные шрифты:
+       ни одного внешнего запроса со страницы. */
+    :root {
+      --ink: #0B0A08;
+      --ink-raised: #14120E;
+      --ink-sunk: #090807;
+      --text: #F2EDE3;
+      --muted: #A79E8C;
+      --faint: #6E6658;
+      --rule: rgba(242, 237, 227, 0.12);
+      --amber: #E0A93B;
+      --amber-dim: #B4842A;
+
+      --serif: Georgia, "Times New Roman", serif;
+      --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PT Sans", "Helvetica Neue", Arial, sans-serif;
+      --mono: ui-monospace, SFMono-Regular, Menlo, "PT Mono", Consolas, monospace;
+
+      --wrap: 1120px;
+      --measure: 62ch;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      * { animation: none !important; transition: none !important; }
+    }
+    body {
+      margin: 0;
+      background: var(--ink);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 17px;
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: clip;
+    }
+    .wrap { max-width: var(--wrap); margin: 0 auto; padding: 0 24px; }
+    .col { max-width: var(--measure); }
+    p { color: var(--muted); margin: 0 0 1em; }
+    a { color: var(--amber); text-underline-offset: 3px; }
+    .eyebrow {
+      font-family: var(--mono); font-size: 11px; letter-spacing: 0.16em;
+      text-transform: uppercase; color: var(--faint); margin: 0 0 14px;
+    }
+
+    header.site {
+      border-bottom: 1px solid var(--rule);
+      position: sticky; top: 0; z-index: 10;
+      background: rgba(11, 10, 8, 0.86); backdrop-filter: blur(8px);
+    }
+    header.site .wrap { display: flex; align-items: center; justify-content: space-between; gap: 20px; height: 62px; }
+    .brand { font-family: var(--mono); font-weight: 600; color: var(--text); text-decoration: none; }
+    .brand b { color: var(--amber); font-weight: 600; }
+    header.site nav { display: flex; gap: 22px; font-size: 14px; }
+    header.site nav a { color: var(--muted); text-decoration: none; }
+    header.site nav a:hover, header.site nav a:focus-visible { color: var(--text); }
+    @media (max-width: 760px) { header.site nav { display: none; } }
+
+    .hero { padding: 88px 0 72px; border-bottom: 1px solid var(--rule); }
+    .hero h1 {
+      font-family: var(--serif);
+      font-size: clamp(2.3rem, 1.2rem + 4.4vw, 4.2rem);
+      line-height: 1.04; letter-spacing: -0.02em; font-weight: 400;
+      margin: 0 0 22px; text-wrap: balance; color: var(--text);
+    }
+    .hero h1 em { font-style: italic; color: var(--amber); }
+    .hero .lead { font-size: 1.13rem; max-width: 56ch; }
+    .cta-row { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin: 32px 0 18px; }
+    .btn {
+      display: inline-block; padding: 13px 24px; border-radius: 4px;
+      font-weight: 600; text-decoration: none; font-size: 0.98rem;
+      background: var(--amber); color: #17130A;
+      transition: transform 140ms ease, background 140ms ease;
+    }
+    .btn:hover, .btn:focus-visible { background: #F0BD53; transform: translateY(-1px); }
+    .btn.ghost { background: none; color: var(--text); box-shadow: inset 0 0 0 1px var(--rule); }
+    .btn.ghost:hover, .btn.ghost:focus-visible { background: rgba(224, 169, 59, 0.1); box-shadow: inset 0 0 0 1px var(--amber-dim); }
+    a:focus-visible, button:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
+    .hero-note { font-family: var(--mono); font-size: 12.5px; color: var(--faint); }
+
+    /* Диалог — главный экран продукта, показан разговором, а не скриншотом. */
+    .ask {
+      margin-top: 52px; border: 1px solid var(--rule); border-radius: 8px;
+      background: linear-gradient(180deg, var(--ink-raised), var(--ink-sunk));
+      overflow: hidden;
+    }
+    .ask-head {
+      font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+      color: var(--faint); padding: 12px 20px; border-bottom: 1px solid var(--rule); margin: 0;
+    }
+    .ask-body { padding: 22px 20px 24px; }
+    .q { font-size: 1.06rem; color: var(--text); font-weight: 600; margin: 0 0 14px; }
+    .q::before { content: "— "; color: var(--amber); }
+    .quote {
+      border-left: 2px solid var(--amber-dim); padding: 8px 0 8px 16px; margin: 0;
+      color: var(--text); font-family: var(--serif); font-size: 1.02rem;
+    }
+    .src { font-family: var(--mono); font-size: 12px; color: var(--faint); margin: 8px 0 0; }
+
+    section { padding: 76px 0; border-bottom: 1px solid var(--rule); }
+    h2 {
+      font-family: var(--serif); font-weight: 400; letter-spacing: -0.015em;
+      font-size: clamp(1.7rem, 1.2rem + 1.8vw, 2.5rem); line-height: 1.12;
+      margin: 0 0 16px; text-wrap: balance;
+    }
+    .grid { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); margin-top: 36px; }
+    .card { border: 1px solid var(--rule); border-radius: 6px; padding: 22px; background: var(--ink-raised); }
+    .card h3 { font-size: 1.06rem; margin: 0 0 8px; color: var(--text); font-weight: 600; }
+    .card p { margin: 0; font-size: 0.96rem; }
+    .kicker { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--amber-dim); display: block; margin-bottom: 10px; }
+
+    ul.plain { list-style: none; padding: 0; margin: 24px 0 0; display: grid; gap: 12px; }
+    ul.plain li { position: relative; padding-left: 20px; color: var(--muted); }
+    ul.plain li::before { content: "\2192"; position: absolute; left: 0; color: var(--amber-dim); font-family: var(--mono); font-size: 13px; }
+    ul.plain b { color: var(--text); }
+
+    .tools { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 28px; }
+    .tool { font-family: var(--mono); font-size: 12.5px; padding: 7px 12px; border: 1px solid var(--rule); border-radius: 3px; color: var(--muted); }
+    .tool.soon { color: var(--faint); border-style: dashed; }
+
+    .plans { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); margin-top: 36px; }
+    .plan { border: 1px solid var(--rule); border-radius: 6px; padding: 24px; background: var(--ink-raised); }
+    .plan.lead { border-color: var(--amber-dim); }
+    .plan h3 { font-family: var(--mono); font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--amber); margin: 0 0 12px; }
+    .price { font-family: var(--serif); font-size: 2rem; color: var(--text); line-height: 1; margin: 0 0 14px; }
+    .price small { font-family: var(--sans); font-size: 0.8rem; color: var(--faint); }
+    .plan ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 9px; font-size: 0.93rem; color: var(--muted); }
+    .plan li::before { content: "\00B7 "; color: var(--amber-dim); }
+
+    .honest { background: var(--ink-sunk); }
+    .honest .card { background: none; border-color: rgba(242, 237, 227, 0.08); }
+
+    footer.site { padding: 40px 0 64px; }
+    footer.site .wrap { display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; align-items: center; }
+    footer.site p { margin: 0; font-size: 0.88rem; }
+    .mono { font-family: var(--mono); }
+  </style>
+</head>
+<body>
+  <header class="site">
+    <div class="wrap">
+      <a class="brand" href="/">orakul<b>.ai</b></a>
+      <nav aria-label="Основная навигация">
+        <a href="#problem">Зачем</a>
+        <a href="#how">Как работает</a>
+        <a href="#tools">Интеграции</a>
+        <a href="#open">Открытый код</a>
+        <a href="#plans">Тарифы</a>
+      </nav>
+      <a class="btn ghost" href="#open">GitHub</a>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero" aria-labelledby="hero-heading">
+      <div class="wrap">
+        <p class="eyebrow">ИИ-помощник для созвонов · русский интерфейс</p>
+        <h1 id="hero-heading">Созвон, который можно <em>спросить</em>.</h1>
+        <p class="lead">Договорённости живут в головах и чатах — и через две недели команда решает то же самое заново. orakul слушает ваши созвоны и отвечает на вопрос «что мы решили?» цитатой из встречи, где это прозвучало.</p>
+
+        <div class="cta-row">
+          <a class="btn" href="#open">Поставить из GitHub</a>
+          <a class="btn ghost" href="#how">Как это работает</a>
+        </div>
+        <p class="hero-note">Открытый исходный код · Расшифровка на вашем компьютере · Бот в звонок не заходит</p>
+
+        <div class="ask">
+          <p class="ask-head">Пример ответа</p>
+          <div class="ask-body">
+            <p class="q">Что мы решили по ценам?</p>
+            <p>На созвоне «Цены, планёрка» 24 июля решили перейти на оплату за использование — две копейки за кредит. Ответственный не назван.</p>
+            <blockquote class="quote">
+              «давайте перейдём на usage-based, две копейки за кредит, и посчитаем к следующей неделе»
+              <p class="src">Цитата из вашей расшифровки. Если этих слов в ней нет — ответа не будет.</p>
+            </blockquote>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="problem" aria-labelledby="problem-heading">
+      <div class="wrap">
+        <div class="col">
+          <p class="eyebrow">Проблема</p>
+          <h2 id="problem-heading">Второй раз решать одно и то же — самое дорогое, что делает команда.</h2>
+          <p>Чем больше созвонов и чатов, тем меньше управляемости: договорённости остаются в памяти участников, расшифровка падает в чат и там же теряется. Через две недели никто не может сказать, о чём договорились, — и вопрос выносят на созвон снова.</p>
+        </div>
+        <div class="grid">
+          <article class="card">
+            <span class="kicker">Что ломается</span>
+            <h3>Форумы больше не отвечают</h3>
+            <p>Вопрос на Q&amp;A устаревает за сутки, теги дублируются, а на Stack Overflow новичку закрывают вопрос как «дубликат». Публикации там упали на 90% от пика 2020 года.</p>
+          </article>
+          <article class="card">
+            <span class="kicker">Что ломается</span>
+            <h3>Чаты не ищутся</h3>
+            <p>Решение принято голосом на созвоне, а живёт текстом в трёх разных чатах. Поиск находит обсуждение, но не итог.</p>
+          </article>
+          <article class="card">
+            <span class="kicker">Что ломается</span>
+            <h3>Расшифровка ≠ память</h3>
+            <p>Автоматический текст встречи — это ещё одна стена текста. На вопрос «кто и что обещал» она не отвечает.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="how" aria-labelledby="how-heading">
+      <div class="wrap">
+        <div class="col">
+          <p class="eyebrow">Как работает</p>
+          <h2 id="how-heading">Поиск идёт по вашим встречам, а не по интернету.</h2>
+        </div>
+        <ul class="plain col">
+          <li><b>Захват без бота.</b> Приложение пишет системный звук напрямую — в списке участников никого лишнего не появляется.</li>
+          <li><b>Расшифровка на устройстве.</b> По умолчанию звук не покидает компьютер. Облачный движок — отдельный выбор, а не настройка по умолчанию.</li>
+          <li><b>Ответ с цитатой.</b> Каждый ответ показывает встречу и точные слова из расшифровки. Нет слов — нет ответа.</li>
+          <li><b>Русский интерфейс и русская речь.</b> Модель выбирается по языку встречи; английские термины внутри русской фразы — обычный случай, а не исключение.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="tools" aria-labelledby="tools-heading">
+      <div class="wrap">
+        <div class="col">
+          <p class="eyebrow">Интеграции</p>
+          <h2 id="tools-heading">С тем, чем команда уже пользуется.</h2>
+          <p>Российский рынок не сошёлся на одном стеке, поэтому коннекторы — отдельный слой, а не встроенный частный случай. Пунктиром отмечено то, что ещё в работе.</p>
+        </div>
+        <div class="tools">
+          <span class="tool">Яндекс Трекер</span>
+          <span class="tool">Kaiten</span>
+          <span class="tool soon">WEEEK</span>
+          <span class="tool soon">YouGile</span>
+          <span class="tool soon">Pyrus</span>
+          <span class="tool">Яндекс Телемост</span>
+          <span class="tool">VK Teams</span>
+          <span class="tool soon">SberJazz</span>
+          <span class="tool soon">TrueConf</span>
+          <span class="tool">GitHub</span>
+          <span class="tool">GitLab</span>
+        </div>
+      </div>
+    </section>
+
+    <section id="open" aria-labelledby="open-heading">
+      <div class="wrap">
+        <div class="col">
+          <p class="eyebrow">Открытый код</p>
+          <h2 id="open-heading">Ядро открыто. Лицензия Apache 2.0.</h2>
+          <p>Инструмент, который слушает ваши созвоны, нельзя проверить по маркетинговой странице — только по коду. Поэтому ядро открыто, а не «открыто по запросу»: Apache 2.0 явно выдаёт права на патенты, и это то, на что смотрит юрист компании-заказчика.</p>
+        </div>
+        <div class="grid">
+          <article class="card">
+            <span class="kicker">Что открыто</span>
+            <h3>Всё, что обрабатывает вашу речь</h3>
+            <p>Захват, расшифровка на устройстве, поиск по встречам и формат ответа с цитатой.</p>
+          </article>
+          <article class="card">
+            <span class="kicker">Модели</span>
+            <h3>Открытые веса по умолчанию</h3>
+            <p>Приоритет — модели с разрешительной лицензией. Российские модели подключаются отдельно, когда важна локальность данных.</p>
+          </article>
+          <article class="card">
+            <span class="kicker">Метрика</span>
+            <h3>Запустить за пять минут</h3>
+            <p>Успех проекта меряется звёздами и установками, а звезду получает README, который срабатывает с первого раза.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="plans" aria-labelledby="plans-heading">
+      <div class="wrap">
+        <div class="col">
+          <p class="eyebrow">Тарифы</p>
+          <h2 id="plans-heading">Бесплатно — не демо, а рабочий инструмент.</h2>
+        </div>
+        <div class="plans">
+          <article class="plan lead">
+            <h3>Открытый</h3>
+            <p class="price">0 ₽</p>
+            <ul>
+              <li>Запись и расшифровка на устройстве — без ограничений</li>
+              <li>Поиск по своим встречам</li>
+              <li>Русский интерфейс</li>
+              <li>Работает без сети</li>
+            </ul>
+          </article>
+          <article class="plan">
+            <h3>Команда</h3>
+            <p class="price">— <small>цена уточняется</small></p>
+            <ul>
+              <li>Контекстный поиск по истории команды</li>
+              <li>Коннекторы к трекерам и вики</li>
+              <li>Сводка недели по аудиториям</li>
+            </ul>
+          </article>
+          <article class="plan">
+            <h3>Компания</h3>
+            <p class="price">— <small>цена уточняется</small></p>
+            <ul>
+              <li>Развёртывание на своих серверах</li>
+              <li>Свой эндпоинт модели</li>
+              <li>API с высоким лимитом</li>
+            </ul>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="honest" aria-labelledby="honest-heading">
+      <div class="wrap">
+        <div class="col">
+          <p class="eyebrow">Честно</p>
+          <h2 id="honest-heading">Что пока не готово.</h2>
+          <p>Страница описывает продукт на стадии разработки. Список ниже — не скромность, а условие доверия к инструменту, который слушает ваши разговоры.</p>
+        </div>
+        <div class="grid">
+          <article class="card">
+            <h3>Качество русской расшифровки</h3>
+            <p>Главный технический риск: всё остальное читает расшифровку. Измеряем на настоящей речи разработчиков, а не на бенчмарке.</p>
+          </article>
+          <article class="card">
+            <h3>Определение говорящих</h3>
+            <p>Код есть, по умолчанию выключен: на записях, где мы знаем, кто говорил, правильное имя получают примерно семь строк из восьми. Порог для включения — девять из десяти.</p>
+          </article>
+          <article class="card">
+            <h3>Часть коннекторов</h3>
+            <p>Отмеченные пунктиром выше ещё не готовы. Пунктир исчезнет вместе с выходом коннектора, а не раньше.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site">
+    <div class="wrap">
+      <p class="mono">orakul.ai · © 2026</p>
+      <p>Ветка проекта Cruxwing для русскоязычных команд.</p>
+    </div>
+  </footer>
+</body>
+</html>
