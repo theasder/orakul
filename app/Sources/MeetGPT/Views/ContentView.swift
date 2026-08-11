@@ -222,7 +222,7 @@ private struct MandatoryInformationOverlay: View {
             )
             .softShadow()
             .accessibilityElement(children: .contain)
-            .accessibilityLabel("Mandatory information")
+            .accessibilityLabel("Обязательные сведения")
         }
         .transition(.opacity)
         .zIndex(100)

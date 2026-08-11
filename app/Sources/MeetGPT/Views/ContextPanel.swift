@@ -10,7 +10,7 @@ enum SourceKind: Int, Identifiable {
         switch self {
         case .doc:    return "Google Doc"
         case .sheet:  return "Google Sheet"
-        case .notion: return "Notion page"
+        case .notion: return "Страница Notion"
         }
     }
     var placeholder: String {
@@ -132,7 +132,7 @@ struct ContextSection: View {
             Button { showFolderImporter = true } label: { Label("Папка…", systemImage: "folder.badge.plus") }
             Button { promptKind = .doc } label: { Label("Google Документ…", systemImage: "doc.richtext") }
             Button { promptKind = .sheet } label: { Label("Google Таблица…", systemImage: "tablecells") }
-            Button { promptKind = .notion } label: { Label("Notion page…", systemImage: "note.text") }
+            Button { promptKind = .notion } label: { Label("Страница Notion…", systemImage: "note.text") }
             Button { showMCPImport = true } label: { Label("Подключённое приложение…", systemImage: "app.connected.to.app.below.fill") }
             if mcp.prefersMCP("fireflies") || state.googleConnected {
                 Divider()
@@ -166,7 +166,7 @@ struct ContextSection: View {
     @ViewBuilder
     private var setsMenu: some View {
         Menu {
-            Button("Save current as set…") { showSaveSet = true }
+            Button("Сохранить текущее как набор…") { showSaveSet = true }
                 .disabled(state.totalContextChars == 0)
             if !state.contextSets.isEmpty {
                 Divider()
@@ -204,11 +204,11 @@ private struct SourcePromptSheet: View {
             Label("Attach a \(kind.title)", systemImage: kind.systemImage)
                 .font(Typo.title)
                 .foregroundStyle(Theme.ink)
-            Text("Paste the link. Its text is added as a context source.")
+            Text("Вставьте ссылку — её текст станет источником контекста.")
                 .font(Typo.callout)
                 .foregroundStyle(Theme.inkSecondary)
             if kind == .notion, !notionViaMCP {
-                Text("Connect Notion first: Settings → Connected apps (one click, no keys).")
+                Text("Сначала подключите Notion: «Настройки → Рабочие приложения» (один клик, без ключей).")
                     .font(Typo.caption)
                     .foregroundStyle(Theme.accentText)
             }
@@ -271,7 +271,7 @@ private struct SaveSetSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.l) {
-            Label("Save context set", systemImage: "square.stack.3d.up")
+            Label("Сохранить набор контекста", systemImage: "square.stack.3d.up")
                 .font(Typo.title)
                 .foregroundStyle(Theme.ink)
             Text("Save the current files + notes as a reusable set you can apply to a future call.")

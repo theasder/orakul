@@ -370,7 +370,7 @@ struct SidebarFooter: View {
 
     var body: some View {
         HStack(spacing: Space.s) {
-            // Idle needs no chip ("Ready" was redundant with the pill), and
+            // Idle needs no chip ("Готово" was redundant with the pill), and
             // .recording needs none either — the red record pill above already
             // says it (operator request: drop the bottom-left Recording label).
             if state.status != .idle, state.status != .recording { statusChip }
@@ -467,7 +467,7 @@ struct SidebarFooter: View {
 
     private var statusLabel: String {
         switch state.status {
-        case .idle: return "Ready"
+        case .idle: return "Готово"
         case .starting: return "Starting…"
         case .recording: return "Recording"
         case .paused: return "Paused"

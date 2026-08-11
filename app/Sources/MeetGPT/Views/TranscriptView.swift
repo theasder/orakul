@@ -73,7 +73,7 @@ struct TranscriptView: View {
             set: { if !$0 { renamingSpeaker = nil } }
         )) {
             TextField("Name", text: $renameText)
-            Button("Rename") { applyRename() }
+            Button("Переименовать") { applyRename() }
             Button("Отмена", role: .cancel) { renamingSpeaker = nil }
         } message: {
             Text("Every \"\(renamingSpeaker ?? "")\" line becomes this name — in the transcript and in what the AI sees.")

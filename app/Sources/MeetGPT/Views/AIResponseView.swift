@@ -262,7 +262,7 @@ private struct AnswerActionsRow: View {
             // else's system, so it gets its own group rather than sitting next
             // to an irreversible CRM write.
             VStack(alignment: .leading, spacing: Space.s) {
-                SectionLabel("Save as")
+                SectionLabel("Сохранить как")
                 FlowLayout(spacing: Space.s, lineSpacing: Space.s) {
                     ForEach(state.availableDocumentExports) { export in
                         exportChip(export)

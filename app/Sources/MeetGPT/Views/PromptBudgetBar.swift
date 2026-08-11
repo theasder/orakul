@@ -253,7 +253,7 @@ struct PromptBudgetBar: View {
     private func appBadges(_ visible: [ConnectedAppIdentity],
                            hidden: [ConnectedAppIdentity]) -> some View {
         if visible.isEmpty {
-            Label("No apps connected", systemImage: "app.dashed")
+            Label("Приложения не подключены", systemImage: "app.dashed")
                 .font(Typo.caption.weight(.medium))
                 .foregroundStyle(Theme.inkTertiary)
                 .fixedSize()
@@ -611,7 +611,7 @@ struct PromptBudgetControl: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
             .help("Open the current partial input and credit breakdown")
-            .accessibilityLabel("Prompt input budget")
+            .accessibilityLabel("Бюджет промпта")
             .accessibilityValue(accessibilityValue)
             .popover(isPresented: $showDetails, arrowEdge: .bottom) {
                 PromptBudgetDetails(

@@ -63,7 +63,7 @@ struct SetupCard: View {
                     if !appsConnected {
                         SetupRow(done: false, title: "Connect Notion, Linear, Asana…")
                     }
-                    Text("Recording works without either.")
+                    Text("Запись работает и без того, и без другого.")
                         .font(Typo.caption).foregroundStyle(Theme.inkTertiary)
                         .padding(.top, Space.xxs)
                         .fixedSize(horizontal: false, vertical: true)
@@ -139,7 +139,7 @@ struct NoCallTodayCard: View {
         if eligible {
             VStack(alignment: .leading, spacing: Space.s) {
                 HStack(spacing: Space.xs) {
-                    SectionLabel("No call until Monday?")
+                    SectionLabel("До понедельника звонков нет?")
                     Spacer(minLength: 0)
                     Button { dismissed = true } label: {
                         Image(systemName: "xmark").font(.system(size: 8, weight: .bold))
@@ -150,7 +150,7 @@ struct NoCallTodayCard: View {
                 }
 
                 VStack(alignment: .leading, spacing: Space.s) {
-                    Text("Point Cruxwing at something you were going to listen to anyway.")
+                    Text("Направьте orakul на то, что вы и так собирались послушать.")
                         .font(Typo.caption).foregroundStyle(Theme.inkSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                     SuggestedSource(
@@ -161,7 +161,7 @@ struct NoCallTodayCard: View {
                         icon: "mic",
                         title: "A podcast",
                         detail: "Hosts and guests separated, arguments summarised, no invented action items.")
-                    Text("Pick the type on the recording chip, or leave it on Auto-detect.")
+                    Text("Выберите тип на плашке записи или оставьте автоопределение.")
                         .font(Typo.caption).foregroundStyle(Theme.inkTertiary)
                         .fixedSize(horizontal: false, vertical: true)
                 }

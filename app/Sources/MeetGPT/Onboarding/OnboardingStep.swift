@@ -106,7 +106,7 @@ enum CoachTipQueue {
         /// app can actually observe — there is no "decision candidate" state to
         /// key off, and pretending otherwise put the tip on the wrong trigger.
         let hasSomethingToLog: Bool
-        /// Whether the "No call until Monday?" card is on screen right now.
+        /// Whether the "До понедельника звонков нет?" card is on screen right now.
         ///
         /// It already teaches what the recordingType tip teaches — a lecture
         /// gets a learning plan, and the type is yours to override — and it

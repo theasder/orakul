@@ -82,7 +82,7 @@ struct TeamSourcesView: View {
                     .kerning(0.4)
 
                 if keywords.isEmpty {
-                    Text("No rules yet — add a keyword to start flagging.")
+                    Text("Правил пока нет — добавьте слово, чтобы отмечать.")
                         .font(Typo.caption)
                         .foregroundStyle(Theme.inkTertiary)
                 } else {
@@ -235,7 +235,7 @@ private struct ConnectorRow: View {
 private struct StatusPill: View {
     let configured: Bool
     var body: some View {
-        Text(configured ? "Ready" : "Off")
+        Text(configured ? "Готово" : "Off")
             .font(Typo.label)
             .foregroundStyle(configured ? Theme.speakerYou : Theme.inkTertiary)
             .padding(.horizontal, Space.s)

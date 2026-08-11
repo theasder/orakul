@@ -169,7 +169,7 @@ private struct PermissionRow: View {
             case .openSettings:
                 // macOS will not prompt a second time, so pressing Enable again
                 // would do nothing at all. Send them where the toggle lives.
-                Button("Open System Settings") {
+                Button("Открыть системные настройки") {
                     if let url = PermissionPrompt.settingsURL(for: kind) {
                         NSWorkspace.shared.open(url)
                     }
@@ -212,7 +212,7 @@ private struct CaptureCheckRow: View {
                 } else {
                     Button(probe.verdict == nil ? "Run test" : "Run again", action: start)
                         .buttonStyle(QuietButtonStyle())
-                        .accessibilityLabel("Run capture check")
+                        .accessibilityLabel("Проверить захват звука")
                 }
             },
             footer: {
@@ -278,9 +278,9 @@ private struct RelaunchRow: View {
             title: "macOS hasn't applied Screen Recording yet",
             detail: "A macOS quirk, not a Cruxwing bug — the permission takes effect on the next launch. Nothing is lost."
         ) {
-            Button("Quit & reopen") { relaunch() }
+            Button("Выйти и открыть заново") { relaunch() }
                 .buttonStyle(QuietButtonStyle(prominent: true))
-                .accessibilityLabel("Quit and reopen Cruxwing")
+                .accessibilityLabel("Выйти и открыть orakul заново")
         }
     }
 
@@ -316,11 +316,11 @@ private struct ModelWarmupRow: View {
             case .preparing:
                 HStack(spacing: Space.xs) {
                     ProgressView().controlSize(.small)
-                    Text("Preparing…").font(Typo.caption)
+                    Text("Готовлю…").font(Typo.caption)
                         .foregroundStyle(Theme.inkSecondary)
                 }
             case .ready:
-                Label("Ready", systemImage: "checkmark.circle.fill")
+                Label("Готово", systemImage: "checkmark.circle.fill")
                     .font(Typo.caption.weight(.medium))
                     .foregroundStyle(Theme.speakerYou)
                     .labelStyle(.titleAndIcon)

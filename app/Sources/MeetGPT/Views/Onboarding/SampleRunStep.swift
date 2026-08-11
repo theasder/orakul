@@ -64,11 +64,11 @@ struct SampleRunStep: View {
 
     private var banner: some View {
         HStack(spacing: Space.s) {
-            Text("SAMPLE")
+            Text("ПРИМЕР")
                 .font(Typo.label).foregroundStyle(Theme.speakerThem)
                 .padding(.horizontal, Space.s).padding(.vertical, 2)
                 .background(Theme.accentTint, in: Capsule())
-            Text("Fictional call — none of this is your data, and none of it is saved.")
+            Text("Вымышленный звонок — это не ваши данные, и они не сохраняются.")
                 .font(Typo.caption).foregroundStyle(Theme.inkSecondary)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: Space.s)
@@ -80,7 +80,7 @@ struct SampleRunStep: View {
         .background(Theme.accentTint,
                     in: RoundedRectangle(cornerRadius: Radius.s, style: .continuous))
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Sample call. Fictional, and not saved.")
+        .accessibilityLabel("Пример звонка. Вымышленный и не сохраняется.")
     }
 
     private var clock: String {

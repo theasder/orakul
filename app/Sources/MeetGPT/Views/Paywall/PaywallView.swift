@@ -89,7 +89,7 @@ struct PaywallView: View {
             }
 
             Picker("", selection: $interval) {
-                Text("Monthly").tag("month")
+                Text("Ежемесячно").tag("month")
                 Text("Год · два месяца в подарок").tag("year")
             }
             .pickerStyle(.segmented)
@@ -140,7 +140,7 @@ struct PaywallView: View {
                 }
                 .buttonStyle(QuietButtonStyle())
                 Spacer()
-                Text("Payments via Stripe · cancel anytime")
+                Text("Оплата через Stripe · отменить можно в любой момент")
                     .font(Typo.caption).foregroundStyle(Theme.inkTertiary)
             }
         }
@@ -153,10 +153,10 @@ struct PaywallView: View {
             Text("Есть код?")
                 .font(Typo.caption.weight(.medium)).foregroundStyle(Theme.inkSecondary)
             HStack(spacing: Space.s) {
-                TextField("Promo or access code", text: $promoCode)
+                TextField("Промокод или код доступа", text: $promoCode)
                     .textFieldStyle(.roundedBorder)
                     .disableAutocorrection(true)
-                    .accessibilityLabel("Promo or access code")
+                    .accessibilityLabel("Промокод или код доступа")
                     .accessibilityIdentifier("paywall.promo-code")
                     .onSubmit { Task { await redeem() } }
                 Button(redeeming ? "Redeeming…" : "Redeem") { Task { await redeem() } }

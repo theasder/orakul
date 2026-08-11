@@ -117,7 +117,7 @@ private struct GeneralSettingsTab: View {
                         .labelStyle(SettingLabelStyle())
                     Spacer()
                     Picker("", selection: $state.userRoleID) {
-                        Text("Not set").tag(String?.none)
+                        Text("Не задано").tag(String?.none)
                         Divider()
                         ForEach(RoleSkillMatrix.positions) { position in
                             Text(position.label).tag(String?.some(position.id))
@@ -216,7 +216,7 @@ private struct GeneralSettingsTab: View {
                     .labelsHidden().pickerStyle(.menu).fixedSize()
                     .disabled(!reminders)
                     .onChange(of: reminderMinutes) { Config.meetingReminderMinutes = $0; state.applyReminderSettings() }
-                    .accessibilityLabel("Meeting reminder lead time")
+                    .accessibilityLabel("За сколько напоминать")
                     .accessibilityIdentifier("settings.general.reminder-lead-time")
                 }
             }
@@ -326,7 +326,7 @@ private struct TranscriptionSettingsTab: View {
                         Config.localModelChosenByUser = true
                         Config.localWhisperModel = $0
                     }
-                    .accessibilityLabel("On-device transcription model")
+                    .accessibilityLabel("Модель распознавания на устройстве")
                     .accessibilityIdentifier("settings.transcription.local-model")
                     if let picked = LocalWhisperModel.options.first(where: { $0.id == localModel }) {
                         Text(picked.caption)
@@ -540,10 +540,10 @@ private struct AISettingsTab: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.xl) {
-            SettingsSection(title: "Plan",
+            SettingsSection(title: "Тариф",
                             caption: "Your plan sets which models are available.") {
                 SettingsRow {
-                    Label("Plan", systemImage: "creditcard")
+                    Label("Тариф", systemImage: "creditcard")
                         .labelStyle(SettingLabelStyle())
                     Text(state.tierStatus)
                         .font(Typo.caption).foregroundStyle(Theme.inkTertiary)
@@ -772,7 +772,7 @@ private struct AccountPrivacyTab: View {
                         .labelStyle(SettingLabelStyle())
                     Spacer()
                     if Config.recordingConsentAccepted {
-                        Button("Revoke") { Config.recordingConsentAccepted = false }
+                        Button("Отозвать") { Config.recordingConsentAccepted = false }
                             .buttonStyle(QuietButtonStyle())
                             .accessibilityIdentifier("settings.privacy.revoke-recording-consent")
                     }
@@ -844,7 +844,7 @@ private struct AccountPrivacyTab: View {
                             .labelStyle(SettingLabelStyle())
                         Spacer()
                         Picker("", selection: $devTierPreview) {
-                            Text("Real entitlement").tag("off")
+                            Text("Реальный доступ").tag("off")
                             ForEach(Tier.allCases) { tier in
                                 Text(tier.label).tag(tier.rawValue)
                             }
@@ -960,7 +960,7 @@ private struct EngineChoiceRow: View {
                 }
                 Spacer()
                 if !available {
-                    Text("Not in this build")
+                    Text("Нет в этой сборке")
                         .font(Typo.caption)
                         .foregroundStyle(Theme.inkTertiary)
                 }
@@ -1058,7 +1058,7 @@ private struct GoogleSignInRow: View {
                 HStack(spacing: Space.s) {
                     Text("Доступ или поиск изменились — переподключите, чтобы применить.")
                         .font(Typo.caption).foregroundStyle(Theme.accentText)
-                    Button("Reconnect now") { Task { await state.connectGoogle() } }
+                    Button("Переподключить") { Task { await state.connectGoogle() } }
                         .buttonStyle(QuietButtonStyle())
                         .disabled(state.googleConnecting)
                         .accessibilityIdentifier("settings.connected.google.reconnect")
@@ -1203,8 +1203,8 @@ struct SignInSheet: View {
 
             Picker("", selection: $method) {
                 Text("Код из письма").tag("code")
-                Text("Password").tag("password")
-                Text("Phone").tag("phone")
+                Text("Пароль").tag("password")
+                Text("Телефон").tag("phone")
             }
             .pickerStyle(.segmented).labelsHidden()
 

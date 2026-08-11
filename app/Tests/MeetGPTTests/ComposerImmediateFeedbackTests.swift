@@ -228,7 +228,7 @@ struct ComposerImmediateFeedbackTests {
         #expect(!feedback.hasImportingItems)
         let readyChip = ComposerAttachmentStatusChip(
             item: feedback.items[0], onRemove: {})
-        #expect(throws: Never.self) { try readyChip.inspect().find(text: "Ready") }
+        #expect(throws: Never.self) { try readyChip.inspect().find(text: "Готово") }
 
         feedback.reconcile(contextFileIDs: [])
         #expect(feedback.items.isEmpty)

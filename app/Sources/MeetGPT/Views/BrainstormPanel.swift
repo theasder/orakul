@@ -103,7 +103,7 @@ struct BrainstormSection: View {
                     Image(systemName: "sparkles")
                         .font(.system(size: 10))
                         .foregroundStyle(Theme.accent)
-                    Text("Proposed from this call — edit it, or")
+                    Text("Предложено по этому звонку — измените или")
                         .font(Typo.caption)
                         .foregroundStyle(Theme.inkTertiary)
                         .lineLimit(1)
@@ -215,7 +215,7 @@ struct BrainstormSection: View {
                             .foregroundStyle(Theme.inkTertiary)
                         Spacer(minLength: 0)
                         if blindSpotPanel.canResume {
-                            Button("Resume") { state.resumeSuggestionsThisCall() }
+                            Button("Продолжить") { state.resumeSuggestionsThisCall() }
                                 .buttonStyle(QuietButtonStyle(prominent: true))
                         } else if hoveringSuggestions, blindSpotPanel.canPause {
                             Button { state.snoozeSuggestionsForCall() } label: {
@@ -353,7 +353,7 @@ private struct RecordingContextChip: View {
                     ? (selection.customLabel ?? "") : ""
                 showingCustomType = true
             } label: {
-                Label("Other…", systemImage: selection.mode == .custom ? "checkmark" : "tag")
+                Label("Другое…", systemImage: selection.mode == .custom ? "checkmark" : "tag")
             }
         } label: {
             HStack(spacing: Space.xs) {
@@ -386,10 +386,10 @@ private struct RecordingContextChip: View {
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
         .accessibilityIdentifier("recording.context.menu")
-        .accessibilityLabel("Recording type")
+        .accessibilityLabel("Тип записи")
         .accessibilityValue(state.effectiveRecordingContextLabel)
         .help("What this recording represents — override auto-detect without stopping capture")
-        .alert("Recording type", isPresented: $showingCustomType) {
+        .alert("Тип записи", isPresented: $showingCustomType) {
             TextField("For example: architecture review video", text: $customDraft)
                 .accessibilityIdentifier("recording.context.custom-field")
             Button("Use type") {
@@ -608,7 +608,7 @@ private struct RoleChip: View {
             let isCustom = state.userRoleID == RoleSkillMatrix.customRoleID
             Menu {
                 Picker("Ваша роль", selection: $state.userRoleID) {
-                    Label("No role", systemImage: "person.crop.circle.dashed")
+                    Label("Без роли", systemImage: "person.crop.circle.dashed")
                         .tag(String?.none)
                     Divider()
                     ForEach(RoleSkillMatrix.positions) { position in

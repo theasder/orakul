@@ -125,7 +125,7 @@ struct AIStudioView: View {
                         Image(systemName: "arrow.uturn.backward")
                     }
                     .buttonStyle(IconButtonStyle())
-                    .accessibilityLabel("Revert refine")
+                    .accessibilityLabel("Вернуть исходный")
                     .help("Restore the answer as it was before refining")
                 }
                 if state.canRefineCurrentAnswer {
@@ -143,7 +143,7 @@ struct AIStudioView: View {
                     .menuStyle(.borderlessButton)
                     .menuIndicator(.hidden)
                     .fixedSize()
-                    .accessibilityLabel("Refine answer")
+                    .accessibilityLabel("Уточнить ответ")
                     .help("Condense or elaborate this answer — a new AI pass you can undo")
                 }
             }
@@ -211,7 +211,7 @@ struct AIStudioView: View {
                             Button {
                                 exportTo { await state.exportAssistantAnswerToNotion() }
                             } label: {
-                                Label("Notion page", systemImage: "n.square")
+                                Label("Страница Notion", systemImage: "n.square")
                             }
                         }
                     }
@@ -549,7 +549,7 @@ private struct AskComposer: View {
                 }
             } label: { Label("Start from a prompt", systemImage: "text.badge.star") }
             if !trimmed.isEmpty {
-                Button { onSaveAsPrompt(text) } label: { Label("Save as a prompt…", systemImage: "bookmark") }
+                Button { onSaveAsPrompt(text) } label: { Label("Сохранить как промпт…", systemImage: "bookmark") }
             }
         } label: {
             Image(systemName: "plus")
@@ -738,7 +738,7 @@ struct ComposerAttachmentStatusChip: View {
             if item.kind == .audio || item.kind == .video { return "Расшифровываю…" }
             return item.kind == .folder ? "Indexing…" : "Importing…"
         case .ready:
-            return "Ready"
+            return "Готово"
         case .failed:
             return "Import failed"
         }
@@ -844,7 +844,7 @@ private struct ImageChip: View {
             .buttonStyle(.plain)
             .offset(x: 6, y: -6)
             .opacity(hovering ? 1 : 0)
-            .accessibilityLabel("Remove image")
+            .accessibilityLabel("Убрать изображение")
         }
         .padding(.top, 6)
         .padding(.trailing, 6)

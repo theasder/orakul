@@ -23,10 +23,10 @@ struct MCPAppsSection: View {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 11))
                     .foregroundStyle(Theme.inkTertiary)
-                TextField("", text: $search, prompt: Text("Search apps — try “jira”, “crm”, “tickets”"))
+                TextField("", text: $search, prompt: Text("Поиск приложений — например «jira», «crm», «тикеты»"))
                     .textFieldStyle(.plain)
                     .font(Typo.callout)
-                    .accessibilityLabel("Search connected apps")
+                    .accessibilityLabel("Поиск по приложениям")
                     .accessibilityIdentifier("settings.connected.search")
                 if !search.isEmpty {
                     Button { search = "" } label: {
@@ -139,9 +139,9 @@ private struct MCPServerRow: View {
                         Image(systemName: "trash")
                     }
                     .buttonStyle(IconButtonStyle(size: 20))
-                    .accessibilityLabel("Remove custom server")
+                    .accessibilityLabel("Убрать свой сервер")
                     .accessibilityIdentifier("settings.connected.provider.\(server.id).remove")
-                    .help("Remove custom server")
+                    .help("Убрать свой сервер")
                 }
             }
             if let statusText {
@@ -194,7 +194,7 @@ private struct MCPAddServerSheet: View {
                 .font(Typo.title).foregroundStyle(Theme.ink)
             Text("Paste the Streamable HTTP endpoint of any MCP server (https). Cruxwing connects with standard OAuth — no keys needed if the server supports dynamic client registration.")
                 .font(Typo.callout).foregroundStyle(Theme.inkSecondary)
-            TextField("", text: $name, prompt: Text("Name — e.g. HubSpot"))
+            TextField("", text: $name, prompt: Text("Название — например HubSpot"))
                 .textFieldStyle(.plain).padding(Space.m)
                 .background(Theme.surface, in: RoundedRectangle(cornerRadius: Radius.s, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: Radius.s, style: .continuous).strokeBorder(Theme.hairline, lineWidth: 1))

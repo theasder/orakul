@@ -237,7 +237,7 @@ struct PromptEditorView: View {
             }
 
             VStack(alignment: .leading, spacing: Space.xs) {
-                SectionLabel("Prompt")
+                SectionLabel("Промпт")
                 TextEditor(text: $draft.prompt)
                     .font(Typo.body)
                     .foregroundStyle(Theme.ink)
@@ -260,7 +260,7 @@ struct PromptEditorView: View {
                 Spacer()
                 Button("Отмена") { dismiss() }
                     .buttonStyle(QuietButtonStyle())
-                Button("Save prompt") {
+                Button("Сохранить промпт") {
                     state.saveCustomPrompt(.custom(id: draft.id, icon: draft.icon, title: draft.title, prompt: draft.prompt))
                     dismiss()
                 }

@@ -74,7 +74,7 @@ struct FactCheckSheet: View {
                 centered {
                     Image(systemName: "text.magnifyingglass")
                         .font(.system(size: 26)).foregroundStyle(Theme.inkTertiary)
-                    Text("No checkable claims found yet.")
+                    Text("Проверяемых утверждений пока нет.")
                         .font(Typo.callout).foregroundStyle(Theme.inkSecondary)
                 }
             } else {
