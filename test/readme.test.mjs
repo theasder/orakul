@@ -19,7 +19,7 @@ describe('README', () => {
   test('says up front that there is no app yet', () => {
     // The most expensive lie a README can tell is implying it runs. A visitor
     // who clones this and finds no binary does not come back.
-    assert.match(readme, /ядро без приложения/i);
+    assert.match(readme, /кроме микрофона|ядро без приложения/i);
     assert.match(readme, /Чего ещё нет/i);
     for (const missing of [/захват/i, /расшифровщик/i, /интерфейс/i]) {
       assert.match(readme, missing, 'the missing pieces must be named, not implied');
@@ -27,7 +27,10 @@ describe('README', () => {
   });
 
   test('never claims a capability the code does not have', () => {
-    assert.doesNotMatch(readme, /записывает созвон|скачать приложение|установить orakul/i);
+    // The CLI exists now, so "runnable" is true — but recording a call is
+    // still not, and that is the claim that must never appear.
+    assert.doesNotMatch(readme, /записывает созвон|скачать приложение/i);
+    assert.match(readme, /записать созвон orakul ещё не может/i);
     // Semantic search is exactly what this does NOT do.
     assert.doesNotMatch(readme, /понимает смысл|семантический поиск/i);
     assert.match(readme, /синонимы\s*—\s*нет/i, 'the search limitation belongs on the front page');
@@ -37,7 +40,8 @@ describe('README', () => {
     // `swift test` needs a package; `node --test` needs test files. A README
     // whose first command fails is worse than no README.
     assert.ok(existsSync(resolve(repo, 'app', 'Package.swift')), 'swift test has no package');
-    assert.match(readme, /cd app && swift test/);
+    assert.match(readme, /swift build -c release/);
+    assert.match(readme, /swift test/);
     assert.ok(readdirSync(resolve(repo, 'test')).some((f) => f.endsWith('.test.mjs')),
       'node --test has nothing to run');
     assert.match(readme, /node --test/);

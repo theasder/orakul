@@ -14,7 +14,10 @@ let package = Package(
     name: "Orakul",
     platforms: [.macOS(.v14)],
     products: [
-        .library(name: "OrakulCore", targets: ["OrakulCore"])
+        .library(name: "OrakulCore", targets: ["OrakulCore"]),
+        // Программа, которую можно запустить сегодня: захвата звука ещё нет, но
+        // всё, что происходит с созвоном после расшифровки, уже работает.
+        .executable(name: "orakul", targets: ["orakul"])
     ],
     targets: [
         .target(
@@ -25,6 +28,9 @@ let package = Package(
                 .copy("Resources/prompts.ru.json")
             ]
         ),
+        // Оболочка без логики: разбор аргументов и тексты — в ядре, где их
+        // покрывают тесты.
+        .executableTarget(name: "orakul", dependencies: ["OrakulCore"]),
         .testTarget(name: "OrakulCoreTests", dependencies: ["OrakulCore"])
     ]
 )

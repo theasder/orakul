@@ -162,7 +162,16 @@ public struct RecallIndex: Sendable {
         var bestOverlap = 0
         for sentence in sentences {
             let overlap = Set(tokens(sentence)).intersection(queryTokens).count
-            if overlap > bestOverlap {
+            guard overlap > 0 else { continue }
+            // При равном совпадении берётся более содержательное предложение.
+            // Найдено на живом прогоне: на вопрос «что решили по тарифам»
+            // обе фразы — «Обсудили тарифы» и «Решили перейти на оплату за
+            // использование, две копейки за кредит» — совпадают одним словом,
+            // и по порядку побеждала первая. Пользователь получал цитату,
+            // которая подтверждает, что тема была, но не отвечает, что решили.
+            let better = overlap > bestOverlap
+                || (overlap == bestOverlap && sentence.count > best.count)
+            if better {
                 bestOverlap = overlap
                 best = sentence
             }
