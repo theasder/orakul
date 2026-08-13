@@ -261,6 +261,26 @@ describe('RESEARCH-AND-PLAN', () => {
       'the section does not say local capture still works on all four');
   });
 
+  test('the blueprint lists the error cases the connector actually has', () => {
+    // Чертёж перечисляет виды ошибок и объясняет, чем каждый чинится. Список
+    // отстал на один случай, пока не заметили: `vendor` появился в коде, а в
+    // чертеже осталось четыре имени. Читатель чертежа тогда не знает, что
+    // делать с пятым — и, что хуже, не знает, что тот есть.
+    const src = readFileSync(
+      resolve(repo, 'mvp', 'Sources', 'OrakulCore', 'RussianTrackers.swift'), 'utf8');
+    const block = src.slice(src.indexOf('public enum TrackerError'));
+    const cases = [...block.slice(0, block.indexOf('\n        }')).matchAll(/case ([a-zA-Z]+)/g)]
+      .map(([, name]) => name);
+    assert.ok(cases.length >= 4, `found ${cases.length} error cases — the check would be hollow`);
+
+    const blueprint = doc.slice(doc.indexOf('### 2.2'));
+    const section = blueprint.slice(0, blueprint.indexOf('\n## '));
+    for (const name of new Set(cases)) {
+      assert.ok(section.includes(name),
+        `the connector can fail with ${name}, and the blueprint never mentions it`);
+    }
+  });
+
   test('the tracker census matches the trackers that actually ship', () => {
     // Перепись — таблица «подключён / нет» с причинами. Такие таблицы устаревают
     // первыми: сервис доезжает до кода, а строка остаётся прежней. Здесь она
