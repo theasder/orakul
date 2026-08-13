@@ -4185,9 +4185,13 @@ final class AppState: ObservableObject {
             defer { firefliesImportBusy = false }
             do {
                 let session = try await manager.firefliesImportMeeting(meeting, goal: callGoal)
-                try sessionStore.save(session)
+                // Второй раз тот же звонок не заводим: нажать «импортировать»
+                // повторно, не поняв, сработало ли, — обычное дело, а копии
+                // вытесняют из ответа разные звонки, мест в нём три. Решение —
+                // в хранилище, где его можно проверить тестом.
+                let stored = try sessionStore.saveImported(session)
                 savedSessions = sessionStore.list()
-                restoreSession(session)
+                restoreSession(stored)
                 // A past call from the same team is the cheapest rich glossary
                 // source there is: no upload, no credits, and its vocabulary is
                 // the vocabulary of the calls still to come.

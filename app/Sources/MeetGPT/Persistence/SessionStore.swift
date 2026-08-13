@@ -161,6 +161,40 @@ struct SessionStore {
         return (sessions.sorted { $0.startedAt > $1.startedAt }, unreadable.sorted())
     }
 
+    /// Уже импортированный звонок с тем же началом и названием, если он есть.
+    ///
+    /// Импорт из Fireflies строит `SavedSession(id: UUID(), …)` — каждый раз
+    /// новый идентификатор, и внешнего идентификатора встречи в записи не
+    /// хранится. Нажать «импортировать» второй раз, не поняв, сработало ли в
+    /// первый, — обычное дело, и в архиве появлялась вторая копия.
+    ///
+    /// Копии не просто занимают место: ответ показывает не больше трёх звонков
+    /// (`RecallAnswer.maximumMeetings`), поэтому дубли вытесняют из ответа
+    /// РАЗНЫЕ звонки. Та же беда, что была у `orakul добавить`.
+    ///
+    /// Ключ — начало встречи и название. `startedAt` берётся из самой встречи,
+    /// а не из момента импорта (см. `FirefliesPastCalls.session(for:)`), то
+    /// есть при повторном импорте он тот же. Двух разных звонков с совпадающей
+    /// секундой начала И названием не бывает.
+    func alreadyImported(_ candidate: SavedSession) -> SavedSession? {
+        list().first { $0.startedAt == candidate.startedAt && $0.title == candidate.title }
+    }
+
+    /// Сохранить импортированный звонок — или вернуть уже заведённый.
+    ///
+    /// Решение живёт здесь, а не в вызывающем: пока оно стояло в `AppState`,
+    /// мутация, отключавшая проверку, не роняла ни один тест. Путь импорта
+    /// требует сети и менеджера, тестом его не пройти, а проверка «в исходнике
+    /// есть слово alreadyImported» не отличает «зовёт» от «зовёт и
+    /// игнорирует». Здесь же это обычная функция, и повторный вызов проверяется
+    /// напрямую — по тому, сколько файлов легло на диск.
+    @discardableResult
+    func saveImported(_ session: SavedSession) throws -> SavedSession {
+        if let existing = alreadyImported(session) { return existing }
+        try save(session)
+        return session
+    }
+
     func load(id: UUID) -> SavedSession? {
         guard let data = try? Data(contentsOf: url(for: id)) else { return nil }
         return try? decoder.decode(SavedSession.self, from: data)

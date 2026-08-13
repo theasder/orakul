@@ -980,6 +980,22 @@ describe('orakul landing (ru)', () => {
       `page says ${stated[1]} s, the suite enforces ${budget[1]} s`);
   });
 
+  test('the re-import promise names both halves of its key', () => {
+    assert.match(text, /Импорт того же звонка второй раз тоже узнаётся/,
+      'the page no longer promises re-imports are recognised');
+    assert.match(text, /по началу звонка и названию/,
+      'the page no longer says what the check compares');
+
+    const store = stripComments(readFileSync(
+      resolve(here, '..', 'app', 'Sources', 'MeetGPT', 'Persistence', 'SessionStore.swift'), 'utf8'));
+    assert.match(store, /startedAt == candidate\.startedAt && \$0\.title == candidate\.title/,
+      'the re-import key is no longer start-time AND title');
+    // Решение обязано жить в хранилище: пока оно стояло в AppState, мутация,
+    // отключавшая его, не роняла ни одного теста.
+    assert.match(store, /func saveImported/,
+      'the save-or-return decision left the store, where it can be tested');
+  });
+
   test('the duplicate check compares text, and the answer cap makes it matter', () => {
     assert.match(text, /не заводится дважды/,
       'the page no longer promises duplicates are refused');
