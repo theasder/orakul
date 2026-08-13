@@ -60,6 +60,11 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Вся история, а не последний коммит: здесь ищут секреты по всем
+          # коммитам. С обычным shallow-клоном проверка увидела бы один
+          # коммит и прошла бы, ничего не проверив.
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '22'

@@ -49,6 +49,30 @@ function skipUnbuilt() {
 }
 
 describe('учётные данные', () => {
+  test('в истории коммитов нет ни одного настоящего секрета', () => {
+    // Репозиторий уйдёт в открытый доступ вместе с историей. Секрет, удалённый
+    // следующим коммитом, остаётся в ней навсегда и находится за минуту.
+    //
+    // Ищутся ЗНАЧЕНИЯ, а не формы: сами шаблоны (`GOCSPX-`, `sk-`) лежат в
+    // проверках и в тексте страницы, и поиск по форме нашёл бы их же.
+    const shallow = execFileSync('git', ['rev-parse', '--is-shallow-repository'],
+                                 { cwd: repo, encoding: 'utf8' }).trim();
+    assert.equal(shallow, 'false',
+      'клон неполный — проверка истории прошла бы, не увидев её; '
+      + 'в CI нужен fetch-depth: 0');
+
+    const commits = execFileSync('git', ['rev-list', '--count', '--all'],
+                                 { cwd: repo, encoding: 'utf8' }).trim();
+    assert.ok(Number(commits) > 5, `в истории ${commits} коммит(ов) — проверять нечего`);
+
+    const history = execFileSync('git', ['log', '--all', '-p'],
+                                 { cwd: repo, encoding: 'utf8', maxBuffer: 512 * 1024 * 1024 });
+    const values = history.match(
+      /GOCSPX-[A-Za-z0-9_-]{15,}|sk-[A-Za-z0-9]{32,}|ghp_[A-Za-z0-9]{36}|AIza[0-9A-Za-z_-]{35}/g);
+    assert.equal(values, null,
+      `в истории найдены настоящие ключи: ${[...new Set(values ?? [])].join(', ')}`);
+  });
+
   test('никакой секрет не пишется в файл настроек', () => {
     // SECURITY.md: «Ключи лежат в Связке ключей macOS, а не в файле
     // настроек». UserDefaults — это как раз файл настроек: обычный plist в
