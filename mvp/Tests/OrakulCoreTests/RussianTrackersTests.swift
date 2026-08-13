@@ -246,17 +246,6 @@ struct RussianTrackersTests {
 
 /// Запоминает запросы: замыкание помечено `Sendable`, поэтому изменяемое
 /// состояние живёт под замком.
-private final class Recorder: @unchecked Sendable {
-    private let lock = NSLock()
-    private var requests: [URLRequest] = []
-
-    func record(_ request: URLRequest) {
-        lock.lock(); defer { lock.unlock() }
-        requests.append(request)
-    }
-    var last: URLRequest? { lock.lock(); defer { lock.unlock() }; return requests.last }
-    var count: Int { lock.lock(); defer { lock.unlock() }; return requests.count }
-}
 
 @Suite("Заголовок организации Яндекс Трекера")
 struct YandexOrgHeaderTests {

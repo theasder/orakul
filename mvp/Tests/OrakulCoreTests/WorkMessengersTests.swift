@@ -251,17 +251,6 @@ struct WorkMessengersTests {
 }
 
 /// Запоминает запросы: замыкание `Sendable`, поэтому состояние под замком.
-private final class Recorder: @unchecked Sendable {
-    private let lock = NSLock()
-    private var requests: [URLRequest] = []
-
-    func record(_ request: URLRequest) {
-        lock.lock(); defer { lock.unlock() }
-        requests.append(request)
-    }
-    var last: URLRequest? { lock.lock(); defer { lock.unlock() }; return requests.last }
-    var count: Int { lock.lock(); defer { lock.unlock() }; return requests.count }
-}
 
 @Suite("Пара значений в одном поле")
 struct PairedTokenTests {
