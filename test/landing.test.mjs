@@ -1954,6 +1954,8 @@ describe('orakul landing (ru)', () => {
     for (const s of summaries) {
       assert.ok(s.length > 10, `a summary is too short to be a claim: «${s}»`);
       assert.ok(!/[:—-]$/.test(s), `a summary dangles on punctuation: «${s}»`);
+      // Заголовок виден вместо абзаца, значит он и есть предложение целиком.
+      assert.ok(/[.?!»)]$/.test(s), `a summary is not a finished sentence: «${s}»`);
     }
   });
 
