@@ -61,7 +61,7 @@ public struct RussianTrackers {
                 // Вебхук показывают одной строкой вида
                 // https://фирма.bitrix24.ru/rest/1/abc.../ — сюда идёт
                 // середина, «1/abc...», а адрес портала в поле ниже.
-                return "Входящий вебхук: «Разработчикам» → «Другое» → «Входящий вебхук», право «Задачи». Нужна середина ссылки — номер пользователя и код через косую черту"
+                return "Входящий вебхук: «Разработчикам» → «Другое» → «Входящий вебхук», право «Задачи». Вставьте ссылку целиком — адрес портала возьмётся из неё"
             }
         }
 
@@ -77,7 +77,10 @@ public struct RussianTrackers {
             // У Kaiten нет общего адреса API: он свой у каждой команды.
             case .kaiten:        return "адрес команды, например team.kaiten.ru"
             // Портал у каждой фирмы свой, общего адреса API нет.
-            case .bitrix24:      return "адрес портала, например фирма.bitrix24.ru"
+            // Заполнять не нужно, если вебхук вставлен целиком: адрес
+            // возьмётся из ссылки. Поле остаётся для тех, кто вписывает
+            // середину руками, и для порталов на своём домене.
+            case .bitrix24:      return "адрес портала, если вставили не ссылку целиком"
             case .yougile:       return nil
             }
         }
@@ -177,10 +180,41 @@ public struct RussianTrackers {
     public init(service: Service, token: String, secondary: String? = nil,
                 destination: String? = nil, http: @escaping HTTP) {
         self.service = service
-        self.token = token
-        self.secondary = secondary
+        // Битрикс показывает вебхук одной строкой целиком. Человек копирует её
+        // целиком — это нормальное поведение, а не ошибка ввода. Требовать
+        // вырезать середину и отдельно вписать портал значит закладывать самый
+        // вероятный способ ошибиться в саму форму.
+        let parsed = Self.splitBitrixWebhook(service: service, token: token)
+        self.token = parsed.token
+        self.secondary = parsed.host ?? secondary
         self.destination = destination
         self.http = http
+    }
+
+    /// Разбирает вставленную целиком ссылку вебхука на портал и учётную часть.
+    ///
+    /// Возвращает исходный токен, если это не Битрикс или если вставлена не
+    /// ссылка: у остальных трёх сервисов токен — обычная строка, и трогать её
+    /// нельзя.
+    static func splitBitrixWebhook(service: Service,
+                                   token: String) -> (token: String, host: String?) {
+        let trimmed = token.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard service == .bitrix24, trimmed.contains("/rest/") else { return (token, nil) }
+
+        let withoutScheme = trimmed
+            .replacingOccurrences(of: "https://", with: "")
+            .replacingOccurrences(of: "http://", with: "")
+        let parts = withoutScheme.split(separator: "/", omittingEmptySubsequences: true)
+        guard let host = parts.first, let restIndex = parts.firstIndex(of: "rest") else {
+            return (token, nil)
+        }
+        // После `rest` идут номер пользователя и код. Дальше может стоять имя
+        // метода — его отбрасываем: адрес метода orakul подставляет сам.
+        let credentials = parts[parts.index(after: restIndex)...]
+            .prefix(2)
+            .joined(separator: "/")
+        guard credentials.contains("/") else { return (token, nil) }
+        return (credentials, String(host))
     }
 
     // MARK: - Запросы

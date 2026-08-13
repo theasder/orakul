@@ -392,3 +392,68 @@ struct Bitrix24Tests {
         #expect(recorder() == nil, "запрос ушёл с подменённым ответственным")
     }
 }
+
+@Suite("Вебхук Битрикса вставляют целиком")
+struct BitrixWebhookPasteTests {
+    private func stub() -> (RussianTrackers.HTTP, () -> URLRequest?) {
+        var last: URLRequest?
+        let http: RussianTrackers.HTTP = { request in
+            last = request
+            return (Data("{\"result\": {\"tasks\": []}}".utf8),
+                    HTTPURLResponse(url: request.url!, statusCode: 200,
+                                    httpVersion: nil, headerFields: nil)!)
+        }
+        return (http, { last })
+    }
+
+    /// Битрикс показывает вебхук одной строкой. Требовать вырезать середину и
+    /// отдельно вписать портал — значит закладывать самый вероятный способ
+    /// ошибиться прямо в форму.
+    @Test("вставленная целиком ссылка даёт и портал, и учётную часть",
+          arguments: [
+            "https://company.bitrix24.ru/rest/1/abc123/",
+            "https://company.bitrix24.ru/rest/1/abc123",
+            "company.bitrix24.ru/rest/1/abc123/",
+            // Со скопированным именем метода на конце — так тоже копируют.
+            "https://company.bitrix24.ru/rest/1/abc123/tasks.task.list",
+          ])
+    func pastedWebhookIsSplit(pasted: String) async throws {
+        let (http, recorder) = stub()
+        _ = try await RussianTrackers(service: .bitrix24, token: pasted,
+                                      http: http).search("тарифы")
+        let url = try #require(recorder()?.url?.absoluteString)
+        #expect(url == "https://company.bitrix24.ru/rest/1/abc123/tasks.task.list",
+                "разбор дал: \(url)")
+    }
+
+    @Test("вписанная руками середина по-прежнему работает")
+    func manualHalvesStillWork() async throws {
+        let (http, recorder) = stub()
+        _ = try await RussianTrackers(service: .bitrix24, token: "1/abc123",
+                                      secondary: "company.bitrix24.ru",
+                                      http: http).search("тарифы")
+        let url = try #require(recorder()?.url?.absoluteString)
+        #expect(url == "https://company.bitrix24.ru/rest/1/abc123/tasks.task.list")
+    }
+
+    /// У остальных трёх токен — обычная строка, и разбор её не касается.
+    @Test("токены других сервисов не трогаются",
+          arguments: [RussianTrackers.Service.yandexTracker, .kaiten, .yougile])
+    func otherServicesUntouched(service: RussianTrackers.Service) {
+        // Строка нарочно похожа на вебхук Битрикса. Без проверки на сервис
+        // разбор откусил бы у чужого токена половину, и первая версия этой
+        // проверки такого не ловила: в ней не было отрезка `rest`, поэтому
+        // разбор и так возвращал исходное значение.
+        let odd = "https://host.example/rest/1/abc123/"
+        let parsed = RussianTrackers.splitBitrixWebhook(service: service, token: odd)
+        #expect(parsed.token == odd, "чужой токен разобрали как вебхук")
+        #expect(parsed.host == nil, "у чужого сервиса появился портал из токена")
+    }
+
+    @Test("не ссылка — значит середина, разбирать нечего")
+    func plainCredentialsAreNotParsed() {
+        let parsed = RussianTrackers.splitBitrixWebhook(service: .bitrix24, token: "1/abc123")
+        #expect(parsed.token == "1/abc123")
+        #expect(parsed.host == nil, "портал взялся из ниоткуда")
+    }
+}
