@@ -15,7 +15,7 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -49,6 +49,42 @@ function skipUnbuilt() {
 }
 
 describe('учётные данные', () => {
+  test('никакой секрет не пишется в файл настроек', () => {
+    // SECURITY.md: «Ключи лежат в Связке ключей macOS, а не в файле
+    // настроек». UserDefaults — это как раз файл настроек: обычный plist в
+    // ~/Library/Preferences, читаемый любым процессом пользователя.
+    //
+    // Проверяется только ЗАПИСЬ. Чтение и удаление разрешены: `google.tokens`
+    // когда-то лежал там, и код нарочно забирает его оттуда и стирает —
+    // запретить это значило бы законсервировать старый ключ на диске.
+    const swift = [];
+    const walk = (dir) => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const full = resolve(dir, entry.name);
+        if (entry.isDirectory()) {
+          if (!/(^|\/)(\.build|build|node_modules)$/.test(full)) walk(full);
+        } else if (entry.name.endsWith('.swift')) swift.push(full);
+      }
+    };
+    walk(resolve(repo, 'app', 'Sources'));
+    walk(resolve(repo, 'mvp', 'Sources'));
+    assert.ok(swift.length > 50, `обход нашёл ${swift.length} файлов — проверка была бы фиктивной`);
+
+    // «keywords» содержит «key», но секретом не является — отсюда границы слова.
+    const secretish = /(token|secret|password|apikey|api_key|credential|session)/i;
+    const offenders = [];
+    for (const file of swift) {
+      const text = readFileSync(file, 'utf8');
+      for (const [, key] of text.matchAll(/UserDefaults\.standard\.set\([^)]*forKey:\s*"([^"]+)"/g)) {
+        if (secretish.test(key.replace(/keywords?/gi, ''))) {
+          offenders.push(`${file.slice(repo.length + 1)}: ${key}`);
+        }
+      }
+    }
+    assert.deepEqual(offenders, [],
+      `секрет уходит в файл настроек вместо Связки ключей:\n${offenders.join('\n')}`);
+  });
+
   test('Secrets.swift под контролем версий — иначе клон не собирается', () => {
     const tracked = execFileSync('git', ['ls-files', 'app/Sources/MeetGPT/Secrets.swift'],
                                  { cwd: repo, encoding: 'utf8' }).trim();
