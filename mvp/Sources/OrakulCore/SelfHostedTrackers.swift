@@ -214,7 +214,10 @@ public struct SelfHostedTrackers {
             let number = (row["iid"] as? Int) ?? (row["number"] as? Int)
                 ?? (service == .redmine ? row["id"] as? Int : nil)
             let key = number.map { "#\($0)" } ?? "—"
-            let state = (row["state"] as? String) ?? "unknown"
+            // Пусто, а не «unknown»: поиск Redmine состояния не отдаёт вовсе, и
+            // строка `[#314, unknown]` сообщает человеку, что что-то неизвестно
+            // ЕМУ. Неизвестно оно не ему — его просто не спрашивали.
+            let state = (row["state"] as? String) ?? ""
             return Item(key: key, title: title, state: state, service: service)
         }
     }

@@ -108,4 +108,40 @@ struct ConnectorHTTPStatusTests {
             _ = try await client.search("лимиты")
         }
     }
+
+    @Test("состояние не выдумывается, когда сервис его не сообщил")
+    func absentStateIsOmittedNotInvented() async {
+        // Поиск Redmine состояния не возвращает вовсе. Раньше строка выходила
+        // как «[#314, unknown]» — будто это человеку что-то неизвестно.
+        let redmine: @Sendable (URLRequest) async throws -> (Data, HTTPURLResponse) = { request in
+            let json = #"{"results": [{"id": 314, "title": "Обновить постгрес"}], "total_count": 1}"#
+            return (Data(json.utf8),
+                    HTTPURLResponse(url: request.url!, statusCode: 200,
+                                    httpVersion: nil, headerFields: nil)!)
+        }
+        let settings = ConnectorQuery.Settings(service: "redmine", token: "tok",
+                                               host: "http://redmine.internal", scope: nil)
+        let answer = await ConnectorQuery.ask(settings, query: "постгрес", trackerHTTP: redmine)
+
+        #expect(answer.text.contains("[#314]"), "ключ потерян: «\(answer.text)»")
+        #expect(!answer.text.contains("unknown"),
+                "состояние выдумано: «\(answer.text)»")
+        #expect(answer.text.contains("Обновить постгрес"))
+    }
+
+    @Test("сообщённое состояние по-прежнему показывается")
+    func reportedStateStillShows() async {
+        // Граница: у GitLab и Gitea состояние есть, и «закрыто» меняет смысл
+        // находки на противоположный — терять его нельзя.
+        let gitlab: @Sendable (URLRequest) async throws -> (Data, HTTPURLResponse) = { request in
+            let json = #"[{"iid": 42, "title": "Поднять лимиты", "state": "closed"}]"#
+            return (Data(json.utf8),
+                    HTTPURLResponse(url: request.url!, statusCode: 200,
+                                    httpVersion: nil, headerFields: nil)!)
+        }
+        let settings = ConnectorQuery.Settings(service: "gitlab", token: "tok",
+                                               host: "http://gitlab.internal", scope: nil)
+        let answer = await ConnectorQuery.ask(settings, query: "лимиты", trackerHTTP: gitlab)
+        #expect(answer.text.contains("[#42, closed]"), "состояние потеряно: «\(answer.text)»")
+    }
 }
