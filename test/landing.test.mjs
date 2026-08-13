@@ -392,6 +392,23 @@ describe('orakul landing (ru)', () => {
     assert.ok(stated, `app declares ${app} packages — this check has no word for that`);
     assert.match(readme, new RegExp(`У приложения в \`app/\` их ${stated}`),
       `app declares ${app} external packages; README says otherwise`);
+
+    // Прямых четыре, но сборка тянет двадцать семь — столько строк `Fetching`
+    // человек и видит. Число живёт в Package.resolved, поэтому проверяется по
+    // нему, а не по памяти: сборка из чистого клона 2026-08-13 дала ровно его.
+    const resolved = JSON.parse(readFileSync(
+      resolve(here, '..', 'app', 'Package.resolved'), 'utf8'));
+    const pins = resolved.pins ?? resolved.object?.pins ?? [];
+    assert.ok(pins.length > app,
+      `Package.resolved lists ${pins.length} pins — fewer than the ${app} direct ones`);
+    // Число обязано стоять рядом со словом «пакет». Голое вхождение не
+    // годится: в README есть идентификатор из примера, начинающийся на 27,
+    // и первая версия проверки прошла на нём, ничего не проверив.
+    const saysTotal = new RegExp(`${pins.length}\\s+пакет`);
+    for (const [name, text] of [['README.md', readme], ['CONTRIBUTING.md', contributing]]) {
+      assert.match(text, saysTotal,
+        `the build fetches ${pins.length} packages, and ${name} never says so`);
+    }
   });
 
   test('the systems the page names are the ones CI actually runs on', () => {
