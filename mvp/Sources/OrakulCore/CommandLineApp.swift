@@ -113,7 +113,21 @@ public struct CommandLineApp {
         let text = RussianLexicon.restore(TranscriptCleanup.strip(raw))
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else {
-            return Result(output: "Файл пустой — сохранять нечего.", exitCode: 1)
+            // Две разные причины пустоты, и человек по ним делает разное.
+            //
+            // Пустой файл — пустой файл. А вот экспорт субтитров без реплик
+            // (шестьдесят девять байт разметки и ни одного слова) после чистки
+            // тоже становится пустым — и фраза «Файл пустой» отправляла
+            // человека спорить с собственным файлом: он его открывает, видит
+            // содержимое и не понимает, кому верить. Пустым файл стал у нас.
+            let fileWasEmpty = raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            return Result(output: fileWasEmpty
+                ? "Файл пустой — сохранять нечего."
+                : """
+                  В файле нет реплик — только разметка и отметки времени.
+                  Сохранять нечего: выгрузите расшифровку с текстом.
+                  """,
+                exitCode: 1)
         }
 
         // Такая расшифровка уже может лежать в архиве.

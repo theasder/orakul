@@ -1063,6 +1063,22 @@ describe('orakul landing (ru)', () => {
       `page says ${onPage[1]}, the code asks for ${limit[1]}`);
   });
 
+  test('the "empty file" message distinguishes who emptied it', () => {
+    // Из того же класса, что записан в плане: уверенная фраза о файле,
+    // который человек может открыть и увидеть, что она неверна.
+    assert.match(text, /только когда он правда пустой/,
+      'the page no longer promises the distinction');
+    assert.match(text, /пустым файл стал у нас/,
+      'the page no longer says who emptied it');
+
+    const cli = stripComments(readFileSync(
+      resolve(here, '..', 'mvp', 'Sources', 'OrakulCore', 'CommandLineApp.swift'), 'utf8'));
+    assert.match(cli, /let fileWasEmpty = raw\.trimmingCharacters/,
+      'the two causes are conflated again — a file with markup reads as empty');
+    assert.match(cli, /В файле нет реплик/,
+      'the message for a markup-only file is gone');
+  });
+
   test('the encoding promise covers both surfaces and still refuses binary', () => {
     // Обещание про кодировки держится на двух разных читателях файлов —
     // командной строке и импортёре контекста приложения. Правка, дошедшая до
