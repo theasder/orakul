@@ -31,6 +31,28 @@ overlaps itself.[^qna] A question that goes stale in a day is a question whose
 answer is never found again by the next person with the same problem — the
 searchability failure and the response-time failure are one failure.
 
+**Измерено нами 2026-08-13, а не взято из чужого обзора.** Первая страница
+ленты новых вопросов Хабр Q&A — двадцать штук — покрывает **семь дней**: от «8
+минут назад» до 6 августа.[^qna-new] Это меньше трёх вопросов в сутки на весь
+русскоязычный IT-сервис вопросов и ответов. Для сравнения: у Stack Overflow на
+пике счёт шёл на тысячи в день.
+
+Состав ленты важнее объёма. Из двадцати вопросов к разработке программ
+относятся семь: axis в Pandas, выборочное копирование колонок со страницы,
+автообновление при выборе option, react против его фреймворков, редактируемые
+поля, дублирование select в Firefox, ChatGPT как репетитор по архитектуре.
+Ещё семь — сети и администрирование (VPN, 3X-UI, Asterisk, RDS, ядро), шесть —
+общая техподдержка: «Что это за разъём Wi-Fi?», «Как исправить прилипание
+крышки MacBook Air M1?». То есть вопросов по разработке — около одного в сутки.
+
+Лента вопросов без ответа даёт вторую половину картины: на её первой странице
+рядом с вопросом восьмиминутной давности лежат вопросы от 2 июля.[^qna-noanswer]
+Полтора месяца без ответа — и это не хвост архива, а первая страница.
+
+**Оговорка, без которой число врёт:** это один замер одного дня и только первых
+страниц двух лент. Не временной ряд и не выборка по всему сайту. Проверяется
+руками за минуту по двум адресам в сносках — и на том стоит.
+
 **What this means for orakul:** the opportunity is not "build a better forum".
 The forum model is what died. The opportunity is answering from the material a
 team already produces — its calls, its repos, its trackers — where the answer is
@@ -684,6 +706,8 @@ GitHub отвечает 422 части токенов, а версия API фи�
 [^so-decline]: [Stack Overflow умирает? Как ИИ вытесняет живые сообщества разработчиков — Хабр](https://habr.com/ru/companies/ru_mts/articles/912160/)
 [^so-mod]: [Убивают ли LLM сайт StackOverflow? — Хабр](https://habr.com/ru/articles/875760/); [Почему умирает Stack Overflow — Skillbox Media](https://skillbox.ru/media/code/pochemu-umiraet-stack-overflow-i-kuda-teper-idti-za-otvetami/)
 [^qna]: [Как правильно оформить вопрос на QNA.Habr — Хабр Q&A](https://qna.habr.com/q/1391680); [Правила — Хабр Q&A](https://qna.habr.com/help/rules)
+[^qna-new]: Лента новых вопросов Хабр Q&A, первая страница, замер 2026-08-13: https://qna.habr.com/questions
+[^qna-noanswer]: Лента вопросов без ответа, первая страница, замер 2026-08-13: https://qna.habr.com/questions/without_answer
 [^calls-quiet]: [Продуктивность в тишине: Отказ от совещаний как идеал — Хабр](https://habr.com/ru/articles/800645/); [Сколько раз в неделю – норма? О производственных совещаниях — Хабр](https://habr.com/ru/articles/834136/)
 [^calls-manage]: [Как не бесить разработчиков и чётко управлять проектом](https://www.novostiitkanala.ru/news/detail.php?ID=196819)
 [^calls-agreements]: [Про звонки и совещания — vc.ru](https://vc.ru/dev/1997848-effektivnye-zvonki-i-soveshchaniya-v-komande); [Созвоны, аватарки и немного тревожности — Хабр/YADRO](https://habr.com/ru/companies/yadro/articles/1062334/)

@@ -141,6 +141,29 @@ describe('RESEARCH-AND-PLAN', () => {
       `the Russian text contains characters from another script: ${[...new Set(stray)].join(' ')}`);
   });
 
+  test('every source it cites resolves, and every source it lists is cited', () => {
+    // Сноска без определения выглядит как ссылка на источник и не является ею:
+    // markdown печатает «[^tag]» как есть, и утверждение остаётся голым. Живость
+    // адресов здесь не проверяется — для этого нужна сеть, а проверки идут и
+    // без неё; проверяется то, что ломается при правке: разъехавшиеся пары.
+    const refs = new Set([...doc.matchAll(/\[\^([a-z0-9-]+)\](?!:)/g)].map((m) => m[1]));
+    const defs = new Set([...doc.matchAll(/^\[\^([a-z0-9-]+)\]: /gm)].map((m) => m[1]));
+    assert.ok(refs.size >= 10, `found only ${refs.size} citations — the check would be hollow`);
+
+    const undefined_ = [...refs].filter((tag) => !defs.has(tag));
+    assert.deepEqual(undefined_, [], `cited but never defined: ${undefined_.join(', ')}`);
+
+    const unused = [...defs].filter((tag) => !refs.has(tag));
+    assert.deepEqual(unused, [], `defined but never cited: ${unused.join(', ')}`);
+
+    // Определение без адреса — это «мы что-то читали», а не источник.
+    const addressless = [...doc.matchAll(/^\[\^([a-z0-9-]+)\]: (.*)$/gm)]
+      .filter(([, , body]) => !/https?:\/\//.test(body))
+      .map(([, tag]) => tag);
+    assert.deepEqual(addressless, [],
+      `sources with no address, so nothing can be checked: ${addressless.join(', ')}`);
+  });
+
   test('the recurring defect class is recorded with real cases', () => {
     // Раздел стоит не ради красивого обобщения: он предсказывает, где
     // появится следующая ошибка того же рода. Обобщение без случаев быстро

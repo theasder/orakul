@@ -181,6 +181,35 @@ describe('orakul landing (ru)', () => {
       'the page offers a download; verify the URL actually serves before allowing it');
   });
 
+  test('the Q&A measurement on the page matches the one recorded in the plan', () => {
+    // Число, измеренное руками, живёт в двух местах: на странице и в плане.
+    // Такие пары и разъезжаются — правят одно, забывают второе. Здесь заодно
+    // держится и оговорка: замер названного дня, а не постоянная величина.
+    const plan = readFileSync(resolve(here, '..', 'docs', 'RESEARCH-AND-PLAN.md'), 'utf8');
+
+    const planDate = /Измерено нами (\d{4}-\d{2}-\d{2})/.exec(plan);
+    assert.ok(planDate, 'the plan no longer says when the Q&A feed was measured');
+
+    const [, year, month, day] = planDate[1].match(/(\d{4})-(\d{2})-(\d{2})/);
+    const months = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
+                    'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+    const spelled = `${Number(day)} ${months[Number(month) - 1]} ${year}`;
+    assert.ok(html.includes(spelled),
+      `the plan measured on ${spelled}, and the page does not say so`);
+
+    // Обе ленты должны остаться названными: без адреса замер не перепроверить.
+    for (const feed of ['https://qna.habr.com/questions',
+                        'https://qna.habr.com/questions/without_answer']) {
+      assert.ok(plan.includes(feed), `the plan stopped naming ${feed}`);
+    }
+
+    // Число вопросов и число «про разработку» — из одного замера.
+    assert.match(plan, /двадцать штук[\s\S]{0,60}семь дней/,
+      'the plan no longer states the twenty-questions-over-seven-days measurement');
+    assert.match(html, /двадцать штук[\s\S]{0,60}семь дней/,
+      'the page no longer states the same measurement as the plan');
+  });
+
   test('the dependency counts README states are the ones the manifests declare', () => {
     // README говорил «внешних зависимостей нет ни одной» прямо перед быстрым
     // стартом. Для `mvp/` это правда, для `app/` — нет: там четыре пакета,
