@@ -130,13 +130,35 @@ struct SessionStore {
     }
 
     /// All sessions, newest first. Unreadable files are skipped, never fatal.
-    func list() -> [SavedSession] {
+    func list() -> [SavedSession] { listWithUnreadable().sessions }
+
+    /// Sessions plus the names of files that would not decode.
+    ///
+    /// Пропустить нечитаемый файл — правильно: один испорченный звонок не
+    /// должен ронять весь архив. Но пропустить МОЛЧА — нет. Раньше здесь стоял
+    /// `compactMap { try? decode }`, и имя такого файла не сохранялось никуда:
+    /// приложение отвечало «в сохранённых звонках об этом не говорили» поверх
+    /// архива, часть которого не открылась, и человек уходил уверенным, что не
+    /// обсуждали.
+    ///
+    /// Случай не выдуманный: страница зовёт открывать архив руками — «обычные
+    /// JSON-файлы, их можно читать и без нас», — а значит, испорченный файл
+    /// появится. Командная строка про такой файл уже говорит.
+    func listWithUnreadable() -> (sessions: [SavedSession], unreadable: [String]) {
         guard let files = try? FileManager.default.contentsOfDirectory(
-            at: root, includingPropertiesForKeys: nil) else { return [] }
-        return files
-            .filter { $0.pathExtension == "json" }
-            .compactMap { try? decoder.decode(SavedSession.self, from: Data(contentsOf: $0)) }
-            .sorted { $0.startedAt > $1.startedAt }
+            at: root, includingPropertiesForKeys: nil) else { return ([], []) }
+
+        var sessions: [SavedSession] = []
+        var unreadable: [String] = []
+        for file in files where file.pathExtension == "json" {
+            guard let data = try? Data(contentsOf: file),
+                  let session = try? decoder.decode(SavedSession.self, from: data) else {
+                unreadable.append(file.lastPathComponent)
+                continue
+            }
+            sessions.append(session)
+        }
+        return (sessions.sorted { $0.startedAt > $1.startedAt }, unreadable.sorted())
     }
 
     func load(id: UUID) -> SavedSession? {

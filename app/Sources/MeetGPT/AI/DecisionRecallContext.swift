@@ -40,7 +40,13 @@ enum DecisionRecallContext {
         guard matchesRecallIntent(prompt) else { return nil }
         let hits = DecisionRecallService.recall(query: prompt, store: store,
                                                 embedder: embedder, limit: limit)
-        guard !hits.isEmpty else { return nil }
+
+        // Файлы архива, которые не открылись. Модели об этом надо сказать
+        // ДАЖЕ когда находок нет: иначе она уверенно ответит «в сохранённых
+        // звонках об этом не говорили» поверх записи, часть которой ей не
+        // показали.
+        let unreadable = store.listWithUnreadable().unreadable
+        guard !hits.isEmpty || !unreadable.isEmpty else { return nil }
 
         let formatter = DateFormatter()
         formatter.dateStyle = .medium
@@ -52,6 +58,14 @@ enum DecisionRecallContext {
                      "record does not answer the question, say so plainly instead of guessing."]
         for hit in hits {
             lines.append("— [\(hit.sessionTitle) · \(formatter.string(from: hit.startedAt))] “\(hit.excerpt)”")
+        }
+        if !unreadable.isEmpty {
+            // Прямая инструкция, а не намёк: без неё модель видит неполный
+            // список и всё равно отвечает «не обсуждали» с полной уверенностью.
+            lines.append("INCOMPLETE RECORD: \(unreadable.count) saved session file(s) "
+                + "could not be read (\(unreadable.joined(separator: ", "))). "
+                + "If the record does not answer the question, say the archive is "
+                + "partially unreadable rather than stating it was not discussed.")
         }
         return lines.joined(separator: "\n")
     }

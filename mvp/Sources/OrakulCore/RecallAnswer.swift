@@ -27,13 +27,28 @@ public enum RecallAnswer {
     ///
     /// Значение по умолчанию — false, чтобы не переписывать десяток мест,
     /// где архив заведомо не пуст. Оба настоящих вызова передают его явно.
+    /// `unreadable` — файлы архива, которые не открылись.
+    ///
+    /// Страница зовёт открывать архив руками: «обычные JSON-файлы, их можно
+    /// читать и без нас». Раз зовёт, файл рано или поздно окажется испорченным
+    /// — недописанным при сбое, перекодированным редактором. `orakul список`
+    /// про такой файл говорил, а ответ на вопрос — нет: выходило уверенное «в
+    /// сохранённых звонках об этом не говорили» поверх архива, часть которого
+    /// не открывали. Для продукта, у которого честность ответа и есть продукт,
+    /// это хуже пустого результата: человек уходит уверенным, что не обсуждали.
+    ///
+    /// Предупреждение приписывается к ЛЮБОМУ ответу, включая найденный: то,
+    /// что нашлось, могло быть не всем, что есть.
     public static func compose(query: String, hits: [RecallIndex.Hit],
-                               archiveIsEmpty: Bool = false) -> String {
+                               archiveIsEmpty: Bool = false,
+                               unreadable: [String] = []) -> String {
         guard !archiveIsEmpty else {
-            return "Архив пуст — искать пока негде. Добавьте расшифровку: orakul добавить <файл>"
+            return withWarning(
+                "Архив пуст — искать пока негде. Добавьте расшифровку: orakul добавить <файл>",
+                unreadable)
         }
         let grounded = hits.filter { !$0.excerpt.isEmpty }
-        guard !grounded.isEmpty else { return notFound(hits: hits) }
+        guard !grounded.isEmpty else { return withWarning(notFound(hits: hits), unreadable) }
 
         var lines: [String] = []
         for hit in grounded.prefix(maximumMeetings) {
@@ -45,7 +60,20 @@ public enum RecallAnswer {
             let rest = grounded.count - maximumMeetings
             lines.append("Ещё \(rest) \(callsWord(rest)) с упоминанием — в архиве.")
         }
-        return lines.joined(separator: "\n")
+        return withWarning(lines.joined(separator: "\n"), unreadable)
+    }
+
+    /// Приписать к ответу строку о том, что часть архива не открылась.
+    ///
+    /// Приписывается, а не заменяет ответ: находки — это находки, их человек
+    /// обязан получить. И только когда есть о чём предупреждать: строка,
+    /// которая печатается всегда, перестаёт читаться за день.
+    private static func withWarning(_ answer: String, _ unreadable: [String]) -> String {
+        guard !unreadable.isEmpty else { return answer }
+        let files = unreadable.sorted().joined(separator: ", ")
+        let word = unreadable.count == 1 ? "файл" : "файла(ов)"
+        return answer + "\n\nНе смог прочитать \(unreadable.count) \(word) в архиве, "
+            + "ответ может быть неполным: \(files)"
     }
 
     /// Почему ответа нет — разными словами для разных причин.

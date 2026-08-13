@@ -198,9 +198,13 @@ public struct CommandLineApp {
         // приложения. Двух разных «форматов ответа» у продукта быть не должно,
         // поэтому и разницу «архив пуст» против «не говорили» проводит он же,
         // а не эта команда: у приложения на первом запуске ровно тот же случай.
+        // Архив читается ОДИН раз: и чтобы отличить пустой от непустого, и
+        // чтобы узнать, что не открылось. Дважды — это дважды обойти папку.
+        let archive = store.load()
         let answer = RecallAnswer.compose(query: query,
                                           hits: store.index().search(query),
-                                          archiveIsEmpty: store.load().sessions.isEmpty)
+                                          archiveIsEmpty: archive.sessions.isEmpty,
+                                          unreadable: archive.skipped)
         // Ничего не нашлось — это результат, а не сбой: код возврата нулевой.
         return Result(output: answer, exitCode: 0)
     }

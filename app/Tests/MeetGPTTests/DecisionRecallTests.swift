@@ -33,6 +33,39 @@ struct DecisionRecallTests {
 
     private let embedder = HashingSkillTextEmbedder()
 
+    @Test("модели говорят, что часть архива не открылась")
+    func recordSaysWhenItIsIncomplete() throws {
+        // Раньше `SessionStore.list()` выбрасывал нечитаемый файл через
+        // `compactMap { try? decode }` и не запоминал даже его имени. Модель
+        // получала неполную запись без единого признака этого — и уверенно
+        // отвечала «не обсуждали». Для продукта, который обещает не выдумывать,
+        // это худший вид выдумки: не добавленный факт, а отсутствующий.
+        let store = try scratchStore()
+        try store.save(session(title: "Планёрка по тарифам", daysAgo: 3,
+                               digest: "Решили поднять месячный тариф на пятнадцать процентов."))
+        let broken = store.root.appendingPathComponent("сломанный.json")
+        try Data("{\"id\": \"x\", \"tit".utf8).write(to: broken)
+
+        let block = try #require(DecisionRecallContext.block(
+            for: "what did we decide about pricing", store: store, embedder: embedder))
+        #expect(block.contains("INCOMPLETE RECORD"),
+                "модели не сказали, что запись неполная: «\(block)»")
+        #expect(block.contains("сломанный.json"), "не назван файл, который не открылся")
+    }
+
+    @Test("на целом архиве запись остаётся прежней")
+    func intactArchiveAddsNoWarning() throws {
+        // Граница: предупреждение в каждом запросе — это лишние токены и шум,
+        // который модель начнёт повторять пользователю без повода.
+        let store = try scratchStore()
+        try store.save(session(title: "Pricing sync", daysAgo: 3,
+                               digest: "Decided to move to usage-based pricing at two cents per credit."))
+
+        let block = try #require(DecisionRecallContext.block(
+            for: "what did we decide about usage-based pricing", store: store, embedder: embedder))
+        #expect(!block.contains("INCOMPLETE"), "жалуется на целом архиве: «\(block)»")
+    }
+
     @Test("официальное имя базы находит русскую речь о ней")
     func infrastructureNamesCrossAlphabet() throws {
         // Приложение — то, что скачивают, а не клонируют, и разбор слов у него

@@ -919,6 +919,38 @@ describe('orakul landing (ru)', () => {
     }
   });
 
+  test('the "partly unreadable archive" promise reaches both surfaces', () => {
+    // Обещание проверяемо только по коду обеих поверхностей: командная строка
+    // и приложение читают архив РАЗНЫМИ хранилищами, и правка, дошедшая до
+    // одного, оставляет второе врать. Ровно это и было: ядро имя файла
+    // запоминало, приложение выбрасывало его через `compactMap { try? decode }`.
+    assert.match(text, /ответ может быть неполным/,
+      'the page no longer shows what a partly unreadable archive reads like');
+    assert.match(text, /не добавленный факт, а отсутствующий/,
+      'the page no longer explains why silence here is the worse lie');
+
+    const answer = stripComments(readFileSync(
+      resolve(here, '..', 'mvp', 'Sources', 'OrakulCore', 'RecallAnswer.swift'), 'utf8'));
+    assert.match(answer, /unreadable: \[String\]/,
+      'the shared answer no longer accepts the unreadable list');
+    assert.match(answer, /guard !unreadable\.isEmpty else \{ return answer \}/,
+      'the warning is unconditional — a line printed always stops being read');
+
+    // Приложение: хранилище обязано ИМЕНОВАТЬ нечитаемые файлы, а не глотать.
+    const store = stripComments(readFileSync(
+      resolve(here, '..', 'app', 'Sources', 'MeetGPT', 'Persistence', 'SessionStore.swift'), 'utf8'));
+    assert.doesNotMatch(store, /compactMap \{ try\? decoder\.decode/,
+      'the app store silently drops unreadable files again');
+    assert.match(store, /func listWithUnreadable/,
+      'the app store no longer reports which files failed');
+
+    // …и это должно доходить до модели, иначе она уверенно скажет «не обсуждали».
+    const context = stripComments(readFileSync(
+      resolve(here, '..', 'app', 'Sources', 'MeetGPT', 'AI', 'DecisionRecallContext.swift'), 'utf8'));
+    assert.match(context, /INCOMPLETE RECORD/,
+      'the model is no longer told the record is partial');
+  });
+
   test('the "writing is stricter than reading" promise is in the write path', () => {
     // Обещание про запись проверяемо только по коду записи. Тихая подстановка
     // нуля вместо номера доски — это не косметика: запись уходит в чужой
