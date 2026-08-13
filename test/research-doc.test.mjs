@@ -253,8 +253,15 @@ describe('RESEARCH-AND-PLAN', () => {
     // Without that, each one gets re-attempted by the next person. Dates
     // matter because "we checked" ages, and the reader deserves to know how
     // old the check is.
-    for (const deadEnd of [/Pyrus/, /WEEEK/, /Telegram/, /GitHub/]) {
+    for (const deadEnd of [/Pyrus/, /WEEEK/, /Telegram/, /GitHub/, /Мегаплан/, /GigaChat/]) {
       assert.match(doc, deadEnd, 'a researched dead end vanished from the doc');
+    }
+
+    // Тупик без причины — это «мы не стали», а не результат исследования.
+    // У каждого должно быть сказано, что именно закрыло путь.
+    for (const [name, cause] of [['Мегаплан', /долгоживущего ключа нет/i],
+                                 ['GigaChat', /Russian Trusted Root CA/]]) {
+      assert.match(doc, cause, `${name} is listed as a dead end with no stated cause`);
     }
     const dated = doc.match(/проверено \d{4}-\d{2}-\d{2}/g) ?? [];
     assert.ok(dated.length >= 3,
