@@ -2002,6 +2002,21 @@ describe('orakul landing (ru)', () => {
       `download from ${download[1]}, sources from ${clone[1]}`);
   });
 
+  test('nothing on the page still promises the publication that already happened', () => {
+    // Страница писалась, когда репозитория ещё не было, и обещала будущее:
+    // «репозиторий уйдёт в открытый доступ». Он ушёл. Обещание, сбывшееся
+    // и оставшееся обещанием, читается как «до сих пор не сделали».
+    for (const promise of ['уйдёт в открытый доступ', 'будет опубликован',
+                           'ещё не опубликован', 'пока не опубликован',
+                           'когда репозиторий появится']) {
+      assert.ok(!text.includes(promise),
+        `страница всё ещё обещает то, что сделано: «${promise}»`);
+    }
+    // И наоборот: раз обещание сбылось, адрес обязан быть на странице.
+    assert.match(html, /https:\/\/github\.com\/[\w-]+\/[\w-]+/,
+      'на странице нет адреса репозитория');
+  });
+
   test('names the licence, because "open source" alone is not a licence', () => {
     assert.match(text, /Apache 2\.0/);
   });
