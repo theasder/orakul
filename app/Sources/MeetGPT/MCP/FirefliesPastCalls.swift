@@ -49,18 +49,24 @@ enum FirefliesPastCalls {
     /// Tolerates the three shapes the tool has been observed to return: a bare
     /// array, an object wrapping one under `transcripts`/`data`/`meetings`, and
     /// either of those with prose around it.
-    static func parseMeetingList(_ text: String) -> [MeetingSummary] {
-        guard let json = looseJSON(text) else { return [] }
+    /// Пустой список и «не разобрали» — разные вещи, и различать их обязан
+    /// вызывающий. Пока разбор отдавал `[]` на оба случая, смена схемы у
+    /// Fireflies или ответ-ошибка показывались человеку как «прошлых звонков
+    /// нет», и он делал вывод, что импортировать нечего.
+    ///
+    /// `nil` — ответ не понят. Пустой массив — поняли, встреч нет.
+    static func parsedMeetingList(_ text: String) -> [MeetingSummary]? {
+        guard let json = looseJSON(text) else { return nil }
         let rows: [[String: Any]]
         if let array = json as? [[String: Any]] {
             rows = array
         } else if let dict = json as? [String: Any] {
-            rows = (dict["transcripts"] as? [[String: Any]])
+            guard let known = (dict["transcripts"] as? [[String: Any]])
                 ?? (dict["data"] as? [[String: Any]])
-                ?? (dict["meetings"] as? [[String: Any]])
-                ?? []
+                ?? (dict["meetings"] as? [[String: Any]]) else { return nil }
+            rows = known
         } else {
-            rows = []
+            return nil
         }
 
         let summaries: [MeetingSummary] = rows.compactMap { row in
@@ -92,6 +98,16 @@ enum FirefliesPastCalls {
             case (nil, nil): return left.displayTitle < right.displayTitle
             }
         }
+    }
+
+    /// Прежняя форма: непонятый ответ неотличим от пустого списка.
+    ///
+    /// Оставлена для мест, где различать нечего — разбор образцов в проверках.
+    /// Путь импорта пользуется `parsedMeetingList` и на `nil` поднимает ошибку:
+    /// человеку нельзя показывать «прошлых звонков нет», когда правда в том,
+    /// что ответ не разобрали.
+    static func parseMeetingList(_ text: String) -> [MeetingSummary] {
+        parsedMeetingList(text) ?? []
     }
 
     // MARK: - Parsing one transcript

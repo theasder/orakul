@@ -304,7 +304,14 @@ extension MCPConnectionManager {
         guard !text.isEmpty else {
             throw MCPConnectionError.toolFailed(list.name, "no transcripts found")
         }
-        return FirefliesPastCalls.parseMeetingList(text)
+        // `nil` — ответ не разобрали. Пустой список тут означал бы «прошлых
+        // звонков нет», и человек решил бы, что импортировать нечего, тогда
+        // как схема у сервиса могла просто смениться.
+        guard let meetings = FirefliesPastCalls.parsedMeetingList(text) else {
+            throw MCPConnectionError.toolFailed(
+                list.name, "не удалось разобрать список встреч Fireflies")
+        }
+        return meetings
     }
 
     /// One past meeting as a saved session: the transcript with its speakers,

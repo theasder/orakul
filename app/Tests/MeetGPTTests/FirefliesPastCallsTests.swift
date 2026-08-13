@@ -276,3 +276,34 @@ struct FirefliesPastCallsTests {
         #expect(store.list().contains { $0.id == session.id })
     }
 }
+
+@Suite("Непонятый ответ Fireflies — не «звонков нет»")
+struct FirefliesUnparsedIsNotEmptyTests {
+    /// Пустой список и «не разобрали» показывались одинаково. При смене схемы
+    /// у сервиса человек видел «прошлых звонков нет» и делал вывод, что
+    /// импортировать нечего, — при том что звонки на месте.
+    @Test("непонятый ответ отличается от пустого списка",
+          arguments: ["<html>502 Bad Gateway</html>",
+                      #"{"error":"invalid api key"}"#,
+                      #"{"unexpected":{"shape":1}}"#,
+                      "просто текст без json"])
+    func unparsedYieldsNil(payload: String) {
+        #expect(FirefliesPastCalls.parsedMeetingList(payload) == nil,
+                "непонятый ответ выдан за разобранный: \(payload)")
+    }
+
+    @Test("настоящий пустой список остаётся пустым списком",
+          arguments: ["[]", #"{"transcripts":[]}"#, #"{"data":[]}"#, #"{"meetings":[]}"#])
+    func genuineEmptyStaysEmpty(payload: String) {
+        let parsed = FirefliesPastCalls.parsedMeetingList(payload)
+        #expect(parsed != nil, "разобранный пустой список принят за ошибку: \(payload)")
+        #expect(parsed?.isEmpty == true)
+    }
+
+    /// Прежняя форма остаётся ровно для тех мест, где различать нечего.
+    @Test("совместимая форма по-прежнему возвращает список")
+    func compatibilityWrapperStillWorks() {
+        #expect(FirefliesPastCalls.parseMeetingList(#"[{"id":"x","title":"Q3"}]"#).count == 1)
+        #expect(FirefliesPastCalls.parseMeetingList("мусор").isEmpty)
+    }
+}
