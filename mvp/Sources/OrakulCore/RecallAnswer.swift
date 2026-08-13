@@ -53,7 +53,12 @@ public enum RecallAnswer {
         var lines: [String] = []
         for hit in grounded.prefix(maximumMeetings) {
             lines.append("«\(hit.session.title)», \(humanDate(hit.session.date))")
-            lines.append("    \(hit.excerpt)")
+            // Отступ каждой строке, а не только первой: цитата стала бывать
+            // из двух реплик — вопрос и то, что на него ответили, — и вторая
+            // без отступа выпадала из колонки.
+            for row in hit.excerpt.split(separator: "\n", omittingEmptySubsequences: false) {
+                lines.append("    \(row)")
+            }
         }
 
         if grounded.count > maximumMeetings {

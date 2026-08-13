@@ -217,14 +217,17 @@ public struct RecallIndex: Sendable {
         var best = ""
         var bestOverlap = 0
         var bestLength = 0
+        var bestLineIndex = -1
+        var bestWasQuestion = false
 
-        for line in digest.split(separator: "\n") {
+        let lines = digest.split(separator: "\n")
+        for (lineIndex, line) in lines.enumerated() {
             let (speaker, body) = splitSpeaker(String(line))
-            let sentences = body.split(whereSeparator: { ".!?".contains($0) })
-                .map { $0.trimmingCharacters(in: .whitespaces) }
-                .filter { !$0.isEmpty }
+            // Знак конца нужен дальше: по нему видно, что реплика была
+            // вопросом. `split` его выбрасывает, поэтому запоминаем отдельно.
+            let sentences = splitSentences(body)
 
-            for sentence in sentences {
+            for (sentence, endedWithQuestion) in sentences {
                 let overlap = Set(tokens(sentence)).intersection(queryTokens).count
                 guard overlap > 0 else { continue }
                 // При равном совпадении берётся более содержательное
@@ -244,9 +247,47 @@ public struct RecallIndex: Sendable {
                 bestOverlap = overlap
                 bestLength = sentence.count
                 best = speaker.map { "\($0): \(sentence)" } ?? sentence
+                bestLineIndex = lineIndex
+                bestWasQuestion = endedWithQuestion
             }
         }
-        return best
+
+        // Если нашёлся ВОПРОС — показываем и следующую реплику.
+        //
+        // Найдено прогоном быстрого старта из README дословно: на «что решили
+        // по тарифам» продукт цитировал строку Ани «По тарифам — что решили в
+        // итоге», то есть сам вопрос. Решение стояло следующей строкой и со
+        // словами запроса не пересекалось вовсе — отвечающий не повторяет
+        // тему, — поэтому словарным поиском оно недостижимо в принципе.
+        //
+        // Это не додумывание: следующая реплика берётся дословно и с именем
+        // говорящего, человек видит, кто что сказал, и может проверить.
+        // Приписывается только к вопросу: приклеивать соседа к каждой находке
+        // значит топить ответ в чужих репликах.
+        guard bestWasQuestion, bestLineIndex >= 0, bestLineIndex + 1 < lines.count else {
+            return best
+        }
+        let next = String(lines[bestLineIndex + 1]).trimmingCharacters(in: .whitespaces)
+        guard !next.isEmpty else { return best }
+        return best + "\n" + next
+    }
+
+    /// Предложения строки и признак «кончилось вопросительным знаком».
+    static func splitSentences(_ body: String) -> [(String, Bool)] {
+        var result: [(String, Bool)] = []
+        var current = ""
+        for character in body {
+            if ".!?".contains(character) {
+                let trimmed = current.trimmingCharacters(in: .whitespaces)
+                if !trimmed.isEmpty { result.append((trimmed, character == "?")) }
+                current = ""
+            } else {
+                current.append(character)
+            }
+        }
+        let tail = current.trimmingCharacters(in: .whitespaces)
+        if !tail.isEmpty { result.append((tail, false)) }
+        return result
     }
 
     /// «Борис: Обсудили деплой» → («Борис», «Обсудили деплой»).

@@ -1193,6 +1193,26 @@ describe('orakul landing (ru)', () => {
     }
   });
 
+  test('the headline example shows the answer, and the rule behind it', () => {
+    // Главный пример на странице — первое, что видит пришедший. Он показывал
+    // решение Бориса, а быстрый старт из README на своём же примере возвращал
+    // строку Ани, то есть сам вопрос: отвечающий не повторяет тему, и
+    // словарный поиск до ответа не дотягивается.
+    assert.match(text, /Аня: По тарифам — что решили в итоге/,
+      'the headline example no longer shows the question it answers');
+    assert.match(text, /Борис: Годовой не трогаем до декабря/,
+      'the headline example no longer shows the answer');
+    assert.match(text, /вопрос без ответа остаётся один/,
+      'the page no longer states the boundary that keeps this honest');
+
+    const index = stripComments(readFileSync(
+      resolve(here, '..', 'mvp', 'Sources', 'OrakulCore', 'RecallIndex.swift'), 'utf8'));
+    assert.match(index, /guard bestWasQuestion/,
+      'the next line is attached to every hit, or to none — both make the page wrong');
+    assert.match(index, /character == "\?"/,
+      'a question is no longer told apart from a statement');
+  });
+
   test('the three quoted answers are the three the product really gives', () => {
     // Страница цитирует ответы дословно, и раньше уже расходилась с
     // программой на одном слове. Третий ответ — про пустой архив — добавлен
