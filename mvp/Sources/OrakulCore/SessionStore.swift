@@ -62,11 +62,18 @@ public struct SessionStore: Sendable {
         }
     }
 
-    public func delete(id: String) throws {
+    /// Удаляет встречу. Возвращает false, если такой встречи не было.
+    ///
+    /// Раньше отсутствие файла молча считалось успехом, и команда печатала
+    /// «Удалено: <идентификатор>» про запись, которой никогда не существовало.
+    /// Для `orakul удалить $id && дальше` это означало, что опечатка в
+    /// идентификаторе не останавливает сценарий.
+    @discardableResult
+    public func delete(id: String) throws -> Bool {
         let url = url(for: id)
-        if FileManager.default.fileExists(atPath: url.path) {
-            try FileManager.default.removeItem(at: url)
-        }
+        guard FileManager.default.fileExists(atPath: url.path) else { return false }
+        try FileManager.default.removeItem(at: url)
+        return true
     }
 
     // MARK: - Чтение

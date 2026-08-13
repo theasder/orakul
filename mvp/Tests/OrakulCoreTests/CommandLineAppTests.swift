@@ -8,6 +8,68 @@ import Testing
 @Suite("Командная строка")
 struct CommandLineAppTests {
 
+    // MARK: - Первые пять минут
+
+    @Test("удаление несуществующего не выдаётся за успех")
+    func deletingWhatIsNotThereFails() throws {
+        // Было: «Удалено: нет-такого» и код возврата ноль. То есть команда
+        // сообщала об удалении записи, которой никогда не было, — и `orakul
+        // удалить $id && дальше` продолжал работу по опечатке в
+        // идентификаторе. Хранилище молча пропускает отсутствующий файл, а
+        // команда трактовала отсутствие ошибки как выполненную работу.
+        let (app, _) = makeApp()
+        let result = app.run(["удалить", "нет-такого-идентификатора"])
+
+        #expect(result.exitCode != 0, "удаление пустоты вернуло успех")
+        #expect(!result.output.contains("Удалено"),
+                "сказано «удалено» про то, чего не было: «\(result.output)»")
+        #expect(result.output.contains("нет-такого-идентификатора"),
+                "не названо, что именно не нашлось")
+    }
+
+    @Test("удаление существующего по-прежнему успех")
+    func deletingWhatIsThereSucceeds() throws {
+        // Обратная сторона: если ужесточить проверку неаккуратно, перестанет
+        // работать обычное удаление.
+        let (app, _) = makeApp(files: ["з.txt": "Аня: Решили поднять лимиты."])
+        let added = app.run(["добавить", "з.txt", "Планёрка"])
+        let id = try #require(added.output.split(separator: "(").last?.dropLast(),
+                              "не разобрать идентификатор из «\(added.output)»")
+
+        let result = app.run(["удалить", String(id)])
+        #expect(result.exitCode == 0, "обычное удаление сломалось: «\(result.output)»")
+        #expect(result.output.contains("Удалено"))
+    }
+
+    @Test("пустой архив не выдаётся за архив без совпадений")
+    func emptyArchiveSaysSo() {
+        // «В сохранённых звонках об этом не говорили» — правда, когда звонки
+        // есть. На пустом архиве это утверждение о несуществующих записях, и
+        // первым, кто его читает, оказывается человек, запустивший `найти`
+        // раньше `добавить`. `список` эту разницу уже проводит.
+        let (app, _) = makeApp()
+        let result = app.run(["найти", "что", "решили", "по", "тарифам"])
+
+        #expect(result.output.contains("пуст"),
+                "на пустом архиве ответ про несуществующие звонки: «\(result.output)»")
+        #expect(result.output.contains("добавить"),
+                "не сказано, что делать дальше: «\(result.output)»")
+        #expect(result.exitCode == 0, "пустой архив — не сбой")
+    }
+
+    @Test("архив не пуст, но совпадений нет — прежний ответ")
+    func nonEmptyArchiveKeepsTheHonestAnswer() {
+        // Именно тот случай, ради которого фраза и написана: звонки есть,
+        // просто про это не говорили. Придумывать ответ по-прежнему нельзя.
+        let (app, _) = makeApp(files: ["з.txt": "Аня: Обсудили дизайн главной."])
+        _ = app.run(["добавить", "з.txt", "Планёрка по дизайну"])
+
+        let result = app.run(["найти", "что", "решили", "по", "тарифам"])
+        #expect(result.output.contains("не говорили"),
+                "потеряли честный ответ при непустом архиве: «\(result.output)»")
+        #expect(!result.output.contains("пуст"), "непустой архив назван пустым")
+    }
+
     private struct StubEngine: Transcriber {
         let text: String
         func transcribe(samples: [Float]) async throws -> String { text }

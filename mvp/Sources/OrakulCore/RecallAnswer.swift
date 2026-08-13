@@ -17,7 +17,21 @@ public enum RecallAnswer {
     public static let maximumMeetings = 3
 
     /// Текст, который видит пользователь.
-    public static func compose(query: String, hits: [RecallIndex.Hit]) -> String {
+    /// Ответ на вопрос.
+    ///
+    /// `archiveIsEmpty` отделяет «звонки есть, но про это не говорили» от
+    /// «звонков ещё нет вовсе». Разные вещи и разные следующие шаги: искать
+    /// иначе или сперва что-нибудь добавить. Параметр, а не догадка по
+    /// `hits.isEmpty`: пустая выдача бывает и на полном архиве, и по ней
+    /// пустоту архива не отличить.
+    ///
+    /// Значение по умолчанию — false, чтобы не переписывать десяток мест,
+    /// где архив заведомо не пуст. Оба настоящих вызова передают его явно.
+    public static func compose(query: String, hits: [RecallIndex.Hit],
+                               archiveIsEmpty: Bool = false) -> String {
+        guard !archiveIsEmpty else {
+            return "Архив пуст — искать пока негде. Добавьте расшифровку: orakul добавить <файл>"
+        }
         let grounded = hits.filter { !$0.excerpt.isEmpty }
         guard !grounded.isEmpty else { return notFound(hits: hits) }
 

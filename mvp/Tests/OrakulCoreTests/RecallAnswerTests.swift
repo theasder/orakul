@@ -140,4 +140,50 @@ struct RecallAnswerTests {
             #expect(!answer.lowercased().contains(invented), "в ответе появилось «\(invented)»")
         }
     }
+
+    // MARK: - Пустой архив
+
+    @Test("пустой архив не выдаётся за архив без совпадений")
+    func emptyArchiveIsItsOwnAnswer() {
+        let answer = RecallAnswer.compose(query: "что решили по тарифам", hits: [],
+                                          archiveIsEmpty: true)
+        #expect(answer.contains("пуст"), "не сказано, что архив пуст: «\(answer)»")
+        #expect(answer.contains("добавить"), "не сказано, что делать: «\(answer)»")
+        #expect(!answer.contains("не говорили"),
+                "утверждение о несуществующих звонках: «\(answer)»")
+    }
+
+    @Test("непустой архив без совпадений отвечает по-прежнему")
+    func nonEmptyArchiveKeepsTheHonestRefusal() {
+        // Граница: если объявить пустым всё, где нет находок, пропадёт
+        // честный отказ — тот, ради которого продукт и existsует.
+        let answer = RecallAnswer.compose(query: "что решили по тарифам", hits: [],
+                                          archiveIsEmpty: false)
+        #expect(answer.contains("не говорили"), "потерян честный отказ: «\(answer)»")
+        #expect(!answer.contains("Архив пуст"), "непустой архив назван пустым")
+    }
+
+    @Test("обе поверхности продукта передают признак пустоты")
+    func bothSurfacesPassTheFlag() throws {
+        // Смысл общего составителя ответа в том, что правка доходит до обоих.
+        // Значение по умолчанию (false) делает молчаливый пропуск возможным:
+        // забывший его вызов собирается и печатает старую фразу. Здесь
+        // проверяется, что оба настоящих вызова передают признак явно.
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()   // OrakulCoreTests
+            .deletingLastPathComponent()   // Tests
+            .deletingLastPathComponent()   // mvp
+        for (file, surface) in [("Sources/OrakulCore/CommandLineApp.swift", "командная строка"),
+                                ("Sources/OrakulApp/OrakulApp.swift", "приложение")] {
+            let source = try String(contentsOf: root.appendingPathComponent(file),
+                                    encoding: .utf8)
+            guard let call = source.range(of: "RecallAnswer.compose") else {
+                Issue.record("\(surface) больше не зовёт общий составитель ответа")
+                continue
+            }
+            let tail = source[call.lowerBound...].prefix(320)
+            #expect(tail.contains("archiveIsEmpty:"),
+                    "\(surface) не передаёт признак пустоты: на первом запуске человек снова прочитает про несуществующие звонки")
+        }
+    }
 }

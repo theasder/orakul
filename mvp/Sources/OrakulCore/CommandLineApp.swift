@@ -194,8 +194,12 @@ public struct CommandLineApp {
             return Result(output: "Нужен вопрос: orakul найти что решили по тарифам", exitCode: 2)
         }
         // Ответ собирает RecallAnswer — тот же текст, что увидит пользователь
-        // приложения. Двух разных «форматов ответа» у продукта быть не должно.
-        let answer = RecallAnswer.compose(query: query, hits: store.index().search(query))
+        // приложения. Двух разных «форматов ответа» у продукта быть не должно,
+        // поэтому и разницу «архив пуст» против «не говорили» проводит он же,
+        // а не эта команда: у приложения на первом запуске ровно тот же случай.
+        let answer = RecallAnswer.compose(query: query,
+                                          hits: store.index().search(query),
+                                          archiveIsEmpty: store.load().sessions.isEmpty)
         // Ничего не нашлось — это результат, а не сбой: код возврата нулевой.
         return Result(output: answer, exitCode: 0)
     }
@@ -222,7 +226,12 @@ public struct CommandLineApp {
                           exitCode: 2)
         }
         do {
-            try store.delete(id: id)
+            guard try store.delete(id: id) else {
+                return Result(output: """
+                Такой встречи нет: \(id)
+                Посмотреть, что есть: orakul список
+                """, exitCode: 1)
+            }
         } catch {
             return Result(output: "Не смог удалить: \(error)", exitCode: 1)
         }
