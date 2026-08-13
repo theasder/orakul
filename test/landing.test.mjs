@@ -1957,6 +1957,27 @@ describe('orakul landing (ru)', () => {
     }
   });
 
+  test('the clone command on the page is the one README was verified with', () => {
+    // Страница показывает три строки как рабочие. Если README поправят, а
+    // страницу забудут — человек скопирует то, что уже не работает, и узнает
+    // об этом на своей машине.
+    const onPage = /git clone (\S+) orakul/.exec(text);
+    assert.ok(onPage, 'the page stopped showing how to get the source');
+    const readme = readFileSync(resolve(here, '..', 'README.md'), 'utf8');
+    const inReadme = /git clone (\S+) orakul/.exec(readme);
+    assert.ok(inReadme, 'README stopped showing the clone command');
+    assert.equal(onPage[1], inReadme[1],
+      `page clones ${onPage[1]}, README clones ${inReadme[1]}`);
+    assert.match(onPage[1], /^https:\/\/github\.com\//,
+      'the clone URL is not a public GitHub address');
+
+    // И кнопка ведёт туда же, где лежит то, что предлагают клонировать.
+    const button = /<a class="btn ghost" href="(https:\/\/[^"]+)"/.exec(html);
+    assert.ok(button, 'the header button no longer points at the repository');
+    assert.ok(onPage[1].startsWith(button[1]),
+      `the button goes to ${button[1]}, the command clones ${onPage[1]}`);
+  });
+
   test('names the licence, because "open source" alone is not a licence', () => {
     assert.match(text, /Apache 2\.0/);
   });
@@ -2056,8 +2077,19 @@ describe('orakul landing (ru)', () => {
     // CDN or an analytics host on load. No external origins at all — that is
     // checkable, unlike "мы уважаем вашу приватность".
     assert.doesNotMatch(html, /<script/i, 'no scripts');
-    assert.doesNotMatch(html, /(src|href)="https?:\/\//i, 'no external origins');
+    assert.doesNotMatch(html, /src="https?:\/\//i, 'nothing is fetched from another host');
+    assert.doesNotMatch(html, /<link[^>]+href="https?:\/\//i, 'no remote stylesheet or icon');
     assert.doesNotMatch(html, /@import|url\(https?:/i, 'no remote CSS or fonts');
+
+    // Ссылка — не загрузка: по ней переходят, её не тянут при открытии
+    // страницы. Поэтому <a href> сюда не попадает, но и открытым его не
+    // оставляем: чужой хост в ссылке — это счётчик, пришедший через заднюю
+    // дверь. Разрешён ровно один, и это репозиторий.
+    const hosts = [...html.matchAll(/<a[^>]+href="https?:\/\/([^/"]+)/gi)].map((m) => m[1]);
+    const allowed = new Set(['github.com']);
+    for (const host of hosts) {
+      assert.ok(allowed.has(host), `the page links out to ${host}`);
+    }
   });
 
   test('respects reduced motion and keyboard focus', () => {

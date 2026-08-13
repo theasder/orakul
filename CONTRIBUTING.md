@@ -8,7 +8,7 @@
 ## Быстрый старт
 
 ```bash
-git clone <репозиторий> orakul && cd orakul
+git clone https://github.com/theasder/orakul.git orakul && cd orakul
 cd app && swift build          # Swift 5.9+ (Xcode 15+)
 swift test                     # тесты приложения
 cd ../mvp && swift test        # тесты ядра: словарь, поиск, коннекторы
