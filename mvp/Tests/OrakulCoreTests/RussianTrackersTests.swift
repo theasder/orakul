@@ -519,3 +519,37 @@ struct VendorErrorInsideSuccessTests {
         #expect(issues.map(\.key) == ["7"])
     }
 }
+
+@Suite("Незнакомая форма ответа — не пустая выдача")
+struct UnknownShapeIsAnErrorTests {
+    private func client(_ service: RussianTrackers.Service, json: String) -> RussianTrackers {
+        RussianTrackers(service: service, token: "t0ken",
+                        secondary: service == .bitrix24 ? "company.bitrix24.ru"
+                                 : service == .kaiten ? "team.kaiten.ru" : "1234567") { request in
+            (Data(json.utf8), HTTPURLResponse(url: request.url!, statusCode: 200,
+                                              httpVersion: nil, headerFields: nil)!)
+        }
+    }
+
+    /// Объект без единого знакомого ключа раньше превращался в пустой список,
+    /// то есть в «в трекере ничего не нашлось». Правда — «мы не поняли ответ».
+    /// Для того, кто ищет свою задачу, это разные вещи: в первом случае он
+    /// поверит, что задачи нет, и заведёт вторую.
+    @Test("объект без знакомых ключей — ошибка",
+          arguments: RussianTrackers.Service.allCases)
+    func unknownObjectIsAnError(service: RussianTrackers.Service) async {
+        await #expect(throws: RussianTrackers.TrackerError.unreadable(service)) {
+            _ = try await client(service, json: "{\"detail\": \"Not found\"}").search("тарифы")
+        }
+    }
+
+    /// Настоящая пустая выдача обязана остаться пустой выдачей: знакомая форма
+    /// с нулём строк — это ответ, а не сбой.
+    @Test("знакомая форма с нулём строк проходит как пустая выдача")
+    func knownEmptyShapesPass() async throws {
+        #expect(try await client(.yougile, json: "{\"content\": []}").search("q").isEmpty)
+        #expect(try await client(.kaiten, json: "[]").search("q").isEmpty)
+        #expect(try await client(.bitrix24, json: "{\"result\": {\"tasks\": []}}")
+            .search("q").isEmpty)
+    }
+}

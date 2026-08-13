@@ -484,11 +484,24 @@ public struct RussianTrackers {
             let unwrapped = (object["result"] as? [String: Any]) ?? object
             // YouGile отдаёт список под "content", Яндекс — массивом,
             // Kaiten — массивом; "tasks"/"data" оставлены на случай смены формы.
-            rows = (unwrapped["content"] as? [[String: Any]])
+            // Ни одного знакомого ключа — это не «задач нет», а «мы не поняли
+            // ответ». Пустой список сказал бы человеку, что в трекере ничего
+            // не нашлось, хотя правда в том, что спросить не получилось.
+            //
+            // Так устроены остальные четыре семейства коннекторов: у заметок
+            // и своих серверов на неожиданную форму стоит `throw`, и у
+            // GitHub отдельно ловится конверт ошибки. Здесь эта же дисциплина
+            // держалась на `?? []` — то есть не держалась.
+            //
+            // Пустая выдача остаётся пустой выдачей: `{"content": []}` и
+            // `[]` — знакомая форма с нулём строк, и они проходят.
+            guard let list = (unwrapped["content"] as? [[String: Any]])
                 ?? (unwrapped["tasks"] as? [[String: Any]])
                 ?? (unwrapped["data"] as? [[String: Any]])
-                ?? (object["result"] as? [[String: Any]])
-                ?? []
+                ?? (object["result"] as? [[String: Any]]) else {
+                throw TrackerError.unreadable(service)
+            }
+            rows = list
         } else {
             throw TrackerError.unreadable(service)
         }
