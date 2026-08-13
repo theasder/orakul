@@ -28,15 +28,32 @@ struct ProductNameTests {
     /// кавычках почти всегда попадает на экран.
     private func literals(of file: URL) -> [String] {
         guard let text = try? String(contentsOf: file, encoding: .utf8) else { return [] }
-        return text
-            .split(separator: "\n")
-            .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
-            .flatMap { line -> [String] in
-                line.split(separator: "\"", omittingEmptySubsequences: false)
-                    .enumerated()
-                    .filter { $0.offset % 2 == 1 }       // нечётные куски — внутри кавычек
-                    .map { String($0.element) }
+
+        // Разбор по кавычкам не видит многострочные блоки: у `\"\"\"`-текста
+        // кавычек внутри нет. Всплывающие подсказки живут именно там, и чужое
+        // имя в них проходило мимо этой проверки целиком — при том что имя
+        // и есть смысл форка. Проверено мутацией: «Cruxwing» внутри `.help`
+        // не ловился.
+        var result: [String] = []
+        var insideBlock = false
+        for rawLine in text.split(separator: "\n") {
+            let line = String(rawLine)
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.contains("\"\"\"") {
+                insideBlock.toggle()
+                continue
             }
+            guard !trimmed.hasPrefix("//") else { continue }
+            if insideBlock {
+                if !trimmed.isEmpty { result.append(trimmed) }
+                continue
+            }
+            for (offset, chunk) in line.split(separator: "\"", omittingEmptySubsequences: false)
+                .enumerated() where offset % 2 == 1 {   // нечётные куски — внутри кавычек
+                result.append(String(chunk))
+            }
+        }
+        return result
     }
 
     private func swiftFiles(under directory: String) -> [URL] {
