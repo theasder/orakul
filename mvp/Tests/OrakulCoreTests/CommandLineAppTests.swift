@@ -634,9 +634,16 @@ struct ProductVocabularyTests {
             for line in text.split(separator: "\n", omittingEmptySubsequences: false) {
                 let trimmed = line.trimmingCharacters(in: .whitespaces)
                 guard !trimmed.hasPrefix("//") else { continue }
-                // Строковые литералы и многострочные блоки — то, что видит человек.
-                guard line.contains("\"") || line.contains("orakul —") else { continue }
-                if line.lowercased().contains("созвон") {
+                // Кавычка как признак «это текст» не годится: подсказка и
+                // сообщения об ошибках лежат в многострочных блоках, где
+                // кавычек на строке нет. Первая версия проверки требовала
+                // кавычку и пропустила «Такой встречи нет» — мутация прошла
+                // зелёной. Русские слова вне комментариев в Swift и есть текст
+                // для человека: имена типов и переменных здесь латиницей.
+                // Два слова, одно правило: у записанного звонка одно имя.
+                // Страница проверяет ровно это — «созвон» и «встреча» там
+                // запрещены оба, потому что читаются как два разных продукта.
+                for second in ["созвон", "встреч"] where line.lowercased().contains(second) {
                     offenders.append("\(path): \(trimmed.prefix(60))")
                 }
             }
@@ -650,5 +657,7 @@ struct ProductVocabularyTests {
     func usageUsesTheProductWord() {
         #expect(CommandLineApp.usage.contains("звонкам"))
         #expect(!CommandLineApp.usage.lowercased().contains("созвон"))
+        #expect(!CommandLineApp.usage.lowercased().contains("встреч"),
+                "«встреча» — второе имя тому же звонку")
     }
 }
