@@ -24,6 +24,13 @@ const workspace = resolve(here, '..', '..');
 const cruxwingPlist = resolve(workspace, 'cruxwing-app', 'Support', 'Info.plist');
 const cruxwingDmg = resolve(workspace, 'cruxwing-app', 'dmg.sh');
 
+// Cruxwing — соседний репозиторий, которого у клонирующего нет. Сравнение с
+// ним осмысленно только в рабочей области автора; в клоне оно падало ENOENT и
+// красило CI на каждом чужом pull request. Пропуск с причиной, не молчаливый.
+const needsCruxwing = existsSync(cruxwingPlist)
+  ? {}
+  : { skip: 'Cruxwing лежит в соседнем репозитории — в клоне его нет' };
+
 function cruxwingBundleId() {
   if (!existsSync(cruxwingPlist)) return null;
   const plist = readFileSync(cruxwingPlist, 'utf8');
@@ -42,7 +49,7 @@ describe('orakul app identity', () => {
     assert.equal(identity.app.volumeName, 'orakul');
   });
 
-  test('shares no identifier with Cruxwing', () => {
+  test('shares no identifier with Cruxwing', needsCruxwing, () => {
     const theirs = cruxwingBundleId();
     assert.ok(theirs, 'could not read Cruxwing bundle id — the comparison would be fake');
     assert.notEqual(identity.app.bundleId, theirs);

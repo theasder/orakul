@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
@@ -16,6 +16,19 @@ const catalog = JSON.parse(
   readFileSync(resolve(here, '..', 'config', 'prompts.ru.json'), 'utf8'),
 );
 const { buttons } = catalog;
+
+// Демо-фильм лежит в соседнем репозитории маркетинга, которого у клонирующего
+// нет. Две проверки ниже сверяются с ним — и у клонирующего они падали не
+// «не сошлось», а ENOENT, то есть CI краснел на КАЖДОМ чужом pull request.
+// Для проекта, который меряется вкладом сообщества, это дороже самих проверок.
+//
+// Пропуск — с причиной, а не молчаливый `return`: node печатает его строкой
+// «skipped», и видно, что проверка не запускалась, а не прошла.
+const filmScene = resolve(here, '..', '..', 'cruxwing-marketing',
+                          'public', 'demo-film', 'scene.ru.js');
+const needsFilm = existsSync(filmScene)
+  ? {}
+  : { skip: 'демо-фильм лежит в соседнем репозитории маркетинга — в клоне его нет' };
 
 describe('orakul quick-action buttons (ru)', () => {
   test('the catalogue is well formed and every id is unique', () => {
@@ -58,7 +71,7 @@ describe('orakul quick-action buttons (ru)', () => {
     }
   });
 
-  test('speaks the product\u2019s Russian, not a second dialect of it', () => {
+  test('speaks the product\u2019s Russian, not a second dialect of it', needsFilm, () => {
     // The demo film is the shipped Russian voice, so it is the authority —
     // and the test reads the real file rather than a copy, so the two cannot
     // drift. Two words for one thing ("созвон" here, "звонок" in the film)
@@ -139,7 +152,7 @@ describe('QuickPrompt titles', () => {
       `эти кнопки видно на главном экране, и они не переведены: ${english.join(', ')}`);
   });
 
-  test('названия совпадают со словарём демо-фильма', () => {
+  test('названия совпадают со словарём демо-фильма', needsFilm, () => {
     // Фильм — источник продуктового словаря (инструкция владельца). Если
     // название разошлось с ним, разошлись и продукт с тем, что показано людям.
     const film = readFileSync(
