@@ -223,6 +223,35 @@ describe('open-source furniture', () => {
       'OrakulCore is declared as a dependency but never linked');
   });
 
+  describe('правила поведения', () => {
+    const coc = resolve(here, '..', 'CODE_OF_CONDUCT.md');
+
+    test('файл есть — иначе GitHub считает проект не готовым к людям', () => {
+      assert.ok(existsSync(coc), 'CODE_OF_CONDUCT.md нет');
+    });
+
+    // Смысл файла — не в списке недопустимого (его даёт Contributor Covenant),
+    // а в двух обязательствах мейнтейнера. Без них останется шаблон, который
+    // защищает площадку от человека, — ровно то, из-за чего уходят с форумов.
+    test('обещает объяснять решения и разрешает их обжаловать', () => {
+      const text = readFileSync(coc, 'utf8');
+      assert.match(text, /объясняется|объяснить/,
+        'пропало обязательство объяснять каждое закрытие');
+      assert.match(text, /обжаловать|пересмотр/,
+        'пропало право потребовать пересмотра');
+      assert.match(text, /дубликат/i,
+        'закрытие дубликатом — самый частый случай, он должен быть назван');
+      assert.match(text, /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i,
+        'некуда написать — правила без адреса не работают');
+    });
+
+    test('README ведёт к нему, а не оставляет его для одного GitHub', () => {
+      const readme = readFileSync(resolve(here, '..', 'README.md'), 'utf8');
+      assert.match(readme, /\(CODE_OF_CONDUCT\.md\)/,
+        'README не ссылается на правила поведения');
+    });
+  });
+
   describe('security policy', () => {
     const security = read('SECURITY.md');
 
