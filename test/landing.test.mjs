@@ -283,9 +283,14 @@ describe('orakul landing (ru)', () => {
     // noticed. Written out in words, because that is how the sentence reads.
     const ratchet = readFileSync(
       resolve(here, '..', 'app', 'Tests', 'MeetGPTTests', 'RussianCopyTests.swift'), 'utf8');
-    const remaining = Number(
-      /remainingEnglishPhrases = (\d+)/.exec(ratchet)?.[1] ?? NaN);
-    assert.ok(Number.isFinite(remaining), 'the Swift ratchet no longer states a number');
+    // Считается по САМОМУ списку, а не по числу рядом с ним: храповик теперь
+    // пришпиливает набор фраз, и число выводится из него. Регулярка на
+    // `= (\d+)` после этого перестала совпадать — а страница молча осталась бы
+    // с прежней цифрой, если бы проверку не поправили.
+    const listed = /deliberateEnglish: Set<String> = \[([\s\S]*?)\n    \]/.exec(ratchet);
+    assert.ok(listed, 'the Swift ratchet no longer pins the list of phrases');
+    const remaining = listed[1].split('\n').filter((line) => line.trim().startsWith('"')).length;
+    assert.ok(remaining > 0, 'the pinned list is empty — the page would claim a false zero');
 
     // Anchored to the sentence that states the count, not loose anywhere on the
     // page. A bare word match was worthless: "пять" already occurs three times
