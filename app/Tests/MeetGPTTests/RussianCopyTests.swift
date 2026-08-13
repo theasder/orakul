@@ -203,7 +203,31 @@ struct RussianCopyTests {
     /// `label: "System audio"` и целые тернарники по-английски. Их нашли,
     /// запустив приложение. Настоящее число — вот это, и прятать его за
     /// зелёным тестом было бы враньём себе.
-    static let remainingEnglishPhrases = 8
+    /// Английские фразы, которые остаются английскими намеренно.
+    ///
+    /// Их восемь, и каждая — не недоделка перевода:
+    ///
+    /// - `Google Calendar` — имя продукта, по-русски его не называют;
+    /// - пять строк вида `platform.openai.com → API keys` — это МАРШРУТ по
+    ///   чужому сайту, и сайт английский. «API keys» здесь надпись на кнопке,
+    ///   которую человек будет искать глазами. Перевести её значит отправить
+    ///   его искать то, чего на странице нет;
+    /// - `orakul, RICE, ARR, Kubernetes…` — пример перечисления терминов.
+    ///
+    /// Поэтому число проверяется на равенство: и рост, и «улучшение»
+    /// переводом требуют объяснения.
+    static let deliberateEnglish: Set<String> = [
+        "Google Calendar",
+        "aistudio.google.com → Get API key",
+        "console.anthropic.com → API keys",
+        "dashscope.console.aliyun.com → API-KEY",
+        "orakul, RICE, ARR, Kubernetes…",
+        "platform.deepseek.com → API keys",
+        "platform.moonshot.cn → API keys",
+        "platform.openai.com → API keys",
+    ]
+
+    static let remainingEnglishPhrases = deliberateEnglish.count
 
     /// Шаблон DateFormatter, а не текст для человека.
     ///
@@ -254,12 +278,26 @@ struct RussianCopyTests {
             guard !isDateFormat(text) else { continue }
             phrases.insert(text)
         }
-        #expect(phrases.count <= Self.remainingEnglishPhrases,
-                "английских фраз стало больше: \(phrases.count) вместо \(Self.remainingEnglishPhrases)")
-        // И храповик не должен ржаветь: если перевели заметно больше, число
-        // здесь пора опустить, иначе проверка снова перестанет ловить.
-        #expect(phrases.count > Self.remainingEnglishPhrases - 25,
-                "переведено \(Self.remainingEnglishPhrases - phrases.count) фраз — опустите счётчик")
+        // Ровно столько, не «не больше».
+        //
+        // Второй половиной храповика было `count > remainingEnglishPhrases - 25`.
+        // При счётчике 8 это `> -17` — условие, которое не может не выполниться.
+        // Проверка, которая не умеет упасть, — не проверка; в этом репозитории
+        // за такими отдельно охотятся (см. проверку про «пройдено, ничего не
+        // выполнив»). Запас в 25 имел смысл, пока фраз было три десятка.
+        //
+        // Равенство заставляет объяснять любое движение в обе стороны: новая
+        // английская фраза на экране роняет проверку, и перевод одной из
+        // восьми — тоже, потому что переводить их нельзя (см. ниже).
+        // Не количество, а сам список.
+        //
+        // Счёт ловит появление новой фразы, но не подмену: заменить одну
+        // английскую строку другой — восемь так и остаётся восемью. Проверено
+        // мутацией. Раз причины перечислены поимённо, пусть список и будет
+        // тем, что проверяется: тогда любое движение — добавили, убрали,
+        // подменили — придётся объяснить.
+        #expect(phrases == Self.deliberateEnglish,
+                "список английских фраз изменился: \(phrases.symmetricDifference(Self.deliberateEnglish).sorted().joined(separator: " | "))")
     }
 
     @Test("интерфейс говорит по-русски, а не наполовину")
