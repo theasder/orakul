@@ -38,3 +38,22 @@ done
 echo ""
 echo ">> both architectures done (${built[*]}):"
 ls -1 "$ROOT/dist/"*.zip "$ROOT/dist/"*.dmg 2>/dev/null || true
+
+# Разложить собранное туда, откуда оно уезжает на сервер.
+#
+# Раньше этого шага здесь не было, и он делался руками — то есть иногда не
+# делался. `scripts/audit-dmg.sh` поймал это дважды за один вечер: сборка
+# зелёная, DMG на месте, а в папке публикации лежит вчерашний файл с прошлым
+# хешем исходников. Собрать и забыть выложить — самая незаметная из ошибок,
+# потому что все признаки успеха налицо.
+PUBLISH="$ROOT/../../cruxwing-marketing/public/download"
+if [ -d "$PUBLISH" ]; then
+    for dmg in "$ROOT/dist/"orakul-*.dmg; do
+        [ -f "$dmg" ] || continue
+        cp "$dmg" "$PUBLISH/"
+        echo ">> опубликовано: $(basename "$dmg")"
+    done
+    echo ">> сверить с исходниками: bash scripts/audit-dmg.sh"
+else
+    echo "!! папка публикации не найдена ($PUBLISH) — DMG остались только в dist/"
+fi

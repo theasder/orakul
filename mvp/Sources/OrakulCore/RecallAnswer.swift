@@ -29,24 +29,29 @@ public enum RecallAnswer {
 
         if grounded.count > maximumMeetings {
             let rest = grounded.count - maximumMeetings
-            lines.append("Ещё \(rest) \(meetingsWord(rest)) с упоминанием — в архиве.")
+            lines.append("Ещё \(rest) \(callsWord(rest)) с упоминанием — в архиве.")
         }
         return lines.joined(separator: "\n")
     }
 
     /// Почему ответа нет — разными словами для разных причин.
     ///
-    /// «Не нашёл» и «нашёл встречу, но там про это не сказано» — разные
+    /// «Не нашёл» и «нашёл звонок, но там про это не сказано» — разные
     /// сообщения, и человек принимает по ним разные решения: искать иначе или
     /// перестать искать.
+    ///
+    /// Слово на всё одно — «звонок». В этом файле их было три: «созвон» здесь,
+    /// «встреча» в счёте ниже и «звонок» на странице и в README. Из-за этого же
+    /// README цитировал отказ со словом «звонках» и расходился с тем, что
+    /// программа печатает на самом деле.
     static func notFound(hits: [RecallIndex.Hit]) -> String {
         if hits.isEmpty {
-            return "В сохранённых созвонах об этом не говорили. Ответ придумывать не буду."
+            return "В сохранённых звонках об этом не говорили. Ответ придумывать не буду."
         }
         let titles = hits.prefix(maximumMeetings)
             .map { "«\($0.session.title)»" }
             .joined(separator: ", ")
-        return "Похожие созвоны есть — \(titles), — но точных слов по вашему вопросу "
+        return "Похожие звонки есть — \(titles), — но точных слов по вашему вопросу "
             + "в расшифровке нет, поэтому цитировать нечего."
     }
 
@@ -61,14 +66,14 @@ public enum RecallAnswer {
         return "\(day) \(months[month - 1]) \(parts[0])"
     }
 
-    /// Русский счёт: 1 встреча, 2 встречи, 5 встреч.
-    static func meetingsWord(_ count: Int) -> String {
+    /// Русский счёт: 1 звонок, 2 звонка, 5 звонков.
+    static func callsWord(_ count: Int) -> String {
         let hundred = count % 100
-        if (11...14).contains(hundred) { return "встреч" }
+        if (11...14).contains(hundred) { return "звонков" }
         switch count % 10 {
-        case 1: return "встреча"
-        case 2, 3, 4: return "встречи"
-        default: return "встреч"
+        case 1: return "звонок"
+        case 2, 3, 4: return "звонка"
+        default: return "звонков"
         }
     }
 }

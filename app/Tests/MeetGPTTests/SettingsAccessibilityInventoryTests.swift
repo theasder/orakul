@@ -72,11 +72,18 @@ struct SettingsAccessibilityInventoryTests {
 
     @Test("AI model and every live co-pilot switch have stable identities")
     func aiControls() throws {
+        // Ключи провайдеров — первое, что человек делает в готовом
+        // установщике: без ключа модель не отвечает. Строка, потерявшая
+        // идентификатор, невидима и для теста, и для доступности.
+        // Перечислять руками нельзя: новый провайдер добавят в каталог, а сюда
+        // забудут, и его строка окажется вне проверки.
+        let keyRows = LLMProvider.allCases.map { "settings.ai.key.\($0.rawValue).add" }
+        #expect(keyRows.count >= 8, "провайдеров стало меньше — список сузился незаметно")
         require([
-            "settings.ai.provider", "settings.ai.manage-plan",
+            "settings.ai.provider",
             "settings.ai.brainstorm", "settings.ai.agenda", "settings.ai.fact-check",
             "settings.ai.rhetoric", "settings.ai.facilitation",
-        ], in: try inspected(tab: .ai))
+        ] + keyRows, in: try inspected(tab: .ai))
 
         let savedProvider = Config.selectedProvider
         let savedVersion = Config.selectedVersion

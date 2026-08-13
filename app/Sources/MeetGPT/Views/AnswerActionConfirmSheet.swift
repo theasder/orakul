@@ -64,7 +64,7 @@ struct AnswerActionConfirmSheet: View {
                 .fixedSize(horizontal: false, vertical: true)
             // Name the destination plainly — the user is authorising a write to
             // a system other people can see.
-            Text("Writes to \(pending.action.serverName) · \(pending.action.toolName)")
+            Text("Запишет в \(pending.action.serverName) · \(pending.action.toolName)")
                 .font(Typo.caption)
                 .foregroundStyle(Theme.inkTertiary)
         }
@@ -128,7 +128,9 @@ struct AnswerActionConfirmSheet: View {
 
     private var footer: some View {
         HStack(spacing: Space.s) {
-            Text(pending.action.isProposed ? "Proposed for this answer" : "Matched from \(pending.action.serverName)'s tools")
+            Text(pending.action.isProposed
+                 ? "Предложено к этому ответу"
+                 : "Подобрано среди действий \(pending.action.serverName)")
                 .font(Typo.caption)
                 .foregroundStyle(Theme.inkTertiary)
             Spacer()

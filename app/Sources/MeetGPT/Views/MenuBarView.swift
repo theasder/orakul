@@ -87,7 +87,7 @@ struct MenuBarView: View {
                 openWindow(id: "main")
                 NSApp.activate(ignoringOtherApps: true)
             } label: {
-                menuRow(icon: "macwindow", title: "Open Cruxwing")
+                menuRow(icon: "macwindow", title: "Открыть orakul")
             }
             .buttonStyle(QuietButtonStyle())
 
@@ -95,10 +95,10 @@ struct MenuBarView: View {
                 overlay.toggle(state: state, mcp: mcp)
             } label: {
                 menuRow(icon: "rectangle.inset.topright.filled",
-                        title: overlay.isShown ? "Скрыть плашку" : "Show overlay")
+                        title: overlay.isShown ? "Скрыть плашку" : "Показать поверх окон")
             }
             .buttonStyle(QuietButtonStyle())
-            .help("Floating co-pilot card that stays on top of your meeting")
+            .help("Карточка ко-пилота поверх окна звонка")
 
             // Copy, never send: Cruxwing composes the week and a human decides
             // which window it lands in. The submenu is the audience choice —
@@ -108,10 +108,10 @@ struct MenuBarView: View {
                     Button(audience.heading) { state.copyWeeklyDigest(audience: audience) }
                 }
             } label: {
-                menuRow(icon: "doc.on.clipboard", title: "Copy this week's digest")
+                menuRow(icon: "doc.on.clipboard", title: "Скопировать сводку за неделю")
             }
             .menuStyle(.borderlessButton)
-            .help("Decisions and commitments from the last 7 days, ready to paste")
+            .help("Решения и договорённости за неделю — можно сразу вставить")
 
             if let notice = state.digestCopyNotice {
                 Text(notice)
@@ -124,7 +124,7 @@ struct MenuBarView: View {
             settingsButton
 
             Button { NSApp.terminate(nil) } label: {
-                menuRow(icon: "power", title: "Quit")
+                menuRow(icon: "power", title: "Выйти")
             }
             .buttonStyle(QuietButtonStyle())
             .keyboardShortcut("q")
@@ -135,14 +135,14 @@ struct MenuBarView: View {
     private var settingsButton: some View {
         if #available(macOS 14.0, *) {
             SettingsLink {
-                menuRow(icon: "gearshape", title: "Settings…")
+                menuRow(icon: "gearshape", title: "Настройки…")
             }
             .buttonStyle(QuietButtonStyle())
         } else {
             Button {
                 NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
             } label: {
-                menuRow(icon: "gearshape", title: "Settings…")
+                menuRow(icon: "gearshape", title: "Настройки…")
             }
             .buttonStyle(QuietButtonStyle())
         }
@@ -161,22 +161,22 @@ struct MenuBarView: View {
 
     private var recordLabel: String {
         switch state.status {
-        case .idle, .error: return "Start recording"
+        case .idle, .error: return "Начать запись"
         case .starting:     return "Запускаю…"
-        case .recording:    return "Stop recording"
-        case .paused:       return "Stop recording"
-        case .stopping:     return "Stopping…"
+        case .recording:    return "Остановить запись"
+        case .paused:       return "Остановить запись"
+        case .stopping:     return "Останавливаю…"
         }
     }
 
     private var statusTitle: String {
         switch state.status {
-        case .idle:          return "Idle"
+        case .idle:          return "Не записывает"
         case .starting:      return "Запускаю…"
-        case .recording:     return "Recording"
-        case .paused:        return "Paused"
-        case .stopping:      return "Stopping…"
-        case .error:         return "Error — open the app"
+        case .recording:     return "Идёт запись"
+        case .paused:        return "Пауза"
+        case .stopping:      return "Останавливаю…"
+        case .error:         return "Ошибка — откройте приложение"
         }
     }
 

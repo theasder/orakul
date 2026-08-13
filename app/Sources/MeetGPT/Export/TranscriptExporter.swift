@@ -16,13 +16,13 @@ enum TranscriptExporter {
         clock.dateFormat = "HH:mm:ss"
 
         let day = DateFormatter()
-        day.locale = Locale(identifier: "en_US_POSIX")
+        day.locale = DisplayFormatting.locale
         day.timeZone = timeZone
-        day.dateFormat = "EEEE, d MMMM yyyy 'at' HH:mm"
+        day.dateFormat = "EEEE, d MMMM yyyy, HH:mm"
 
         let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         var lines: [String] = [
-            cleanTitle.isEmpty ? "Meeting transcript" : cleanTitle,
+            cleanTitle.isEmpty ? "Транскрипт звонка" : cleanTitle,
             day.string(from: date),
             "",
         ]
@@ -42,7 +42,7 @@ enum TranscriptExporter {
     /// A filesystem-safe `.txt` name derived from the meeting title + date.
     static func suggestedFilename(title: String, date: Date) -> String {
         let day = DateFormatter()
-        day.locale = Locale(identifier: "en_US_POSIX")
+        day.locale = DisplayFormatting.locale
         day.dateFormat = "yyyy-MM-dd"
 
         let base = title.trimmingCharacters(in: .whitespacesAndNewlines)

@@ -67,7 +67,7 @@ struct MinutesPipelineTests {
         #expect(minutes.decisions?.last?.contains("Team lunch") == true)
         // The owned, dated commitment leads the wish.
         #expect(minutes.actionItems?.first?.owner == "Priya")
-        #expect(minutes.markdown.contains("### Needs an owner"))
+        #expect(minutes.markdown.contains("### Нужен владелец"))
     }
 
     @Test("a figure the room never said is flagged on the way out")
@@ -75,7 +75,7 @@ struct MinutesPipelineTests {
         let invented = modelJSON.replacingOccurrences(of: "Book the follow-up",
                                                       with: "Target 40% activation by Q3")
         let minutes = try await minutes(from: invented, transcript: transcript)
-        #expect(minutes.markdown.contains("Verify these figures"))
+        #expect(minutes.markdown.contains("Проверьте эти цифры"))
         #expect(minutes.unverifiedFigures?.contains("40%") == true)
         // The figure the transcript DOES contain must not be flagged.
         #expect(minutes.unverifiedFigures?.contains("$499") != true)
@@ -85,6 +85,6 @@ struct MinutesPipelineTests {
     func noFalseWarning() async throws {
         let minutes = try await minutes(from: modelJSON, transcript: transcript)
         #expect(minutes.unverifiedFigures == nil)
-        #expect(!minutes.markdown.contains("Verify these figures"))
+        #expect(!minutes.markdown.contains("Проверьте эти цифры"))
     }
 }

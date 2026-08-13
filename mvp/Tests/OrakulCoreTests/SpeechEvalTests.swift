@@ -140,9 +140,11 @@ struct SpeechEvalTests {
     /// терминов, на которых они разошлись. Разногласие доказывает ошибку,
     /// единогласие ничего не доказывает — и вывод не должен притворяться,
     /// что доказывает.
-    @Test("замер: расхождение движков на русском корпусе")
+    @Test("замер: расхождение движков на русском корпусе",
+          .enabled(if: ProcessInfo.processInfo.environment["CRUXWING_RU_CORPUS"] != nil))
     func probeRussianCorpus() throws {
-        guard let dir = ProcessInfo.processInfo.environment["CRUXWING_RU_CORPUS"] else { return }
+        // Наличие гарантирует трейт выше — без переменной тело не соберётся.
+        let dir = ProcessInfo.processInfo.environment["CRUXWING_RU_CORPUS"]!
         let terms = ["LLM", "API", "промпт", "агент", "фильтр", "токен", "инъекция",
                      "прод", "MCP", "RAG", "модель", "модели", "пайплайн", "деплой",
                      "релиз", "бэкенд", "джейлбрейк"]

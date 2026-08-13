@@ -33,14 +33,16 @@ struct CreditBadgeStateTests {
         #expect(!CreditBadge.unavailable.isActionable)
 
         let signedOut = CreditBadge.signedOut.help.lowercased()
-        #expect(signedOut.contains("sign in"))
+        // Текст переведён на русский; проверяется то же, что и раньше —
+        // названо действие, а не состояние.
+        #expect(signedOut.contains("войдите"))
         // The specific confusion to pre-empt: connected apps are a separate
         // sign-in, which is why the workspace looked authenticated.
-        #expect(signedOut.contains("connected apps"))
+        #expect(signedOut.contains("подключённые приложения входят отдельно"))
 
         // A billing outage must not read as "you have no credits".
         let unavailable = CreditBadge.unavailable.help.lowercased()
-        #expect(unavailable.contains("unaffected") || unavailable.contains("couldn't reach"))
+        #expect(unavailable.contains("не дозвонились") || unavailable.contains("не влияет"))
     }
 
     @Test("no balance state ever renders as a credit count")

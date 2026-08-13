@@ -332,11 +332,11 @@ struct SettingsDuringCallTests {
 @Suite("Recording settings isolation", .serialized)
 struct RecordingSettingsIsolationTests {
     @Test("configured values are immutable for one recording")
-    func immutableSnapshot() {
+    func immutableSnapshot() async {
         // Writes transcription Config keys that LocalWhisperModelTests reads.
         // Same process-wide UserDefaults, different suites, so `.serialized`
         // does not cover it.
-        SharedDefaults.withExclusiveAccess { immutableSnapshotBody() }
+        await SharedDefaults.withExclusiveAccess { immutableSnapshotBody() }
     }
 
     private func immutableSnapshotBody() {
@@ -383,6 +383,14 @@ struct RecordingSettingsIsolationTests {
 
     @Test("all streamers retain glossary A after Config changes to B")
     func glossarySnapshots() async {
+        // Тот же ключ, что читает `ConnectedGlossarySuggestionTests` внутри
+        // своего `await` — и «Falcon» отсюда попадал туда в готовый глоссарий,
+        // из-за чего служба отбрасывала одноимённый термин-кандидат как уже
+        // известный. Замок берётся на весь тест, а не только на запись.
+        await SharedDefaults.withExclusiveAccess { await glossarySnapshotsBody() }
+    }
+
+    private func glossarySnapshotsBody() async {
         let saved = Config.transcriptionGlossary
         defer { Config.transcriptionGlossary = saved }
         Config.transcriptionGlossary = "Falcon, Kubernetes"

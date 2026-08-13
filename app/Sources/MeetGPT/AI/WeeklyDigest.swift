@@ -100,7 +100,7 @@ enum WeeklyDigest {
             .prefix(maxDecisions)
 
         if !decisions.isEmpty {
-            lines.append("\n## Decisions")
+            lines.append("\n## Решения")
             for decision in decisions {
                 // An investor update reports the company, not the org chart —
                 // so no meeting attribution and, with it, no names.
@@ -115,7 +115,7 @@ enum WeeklyDigest {
         switch audience {
         case .team:
             if !commitments.isEmpty {
-                lines.append("\n## Commitments")
+                lines.append("\n## Договорённости")
                 let ordered = commitments.sorted { $0.promisedAt > $1.promisedAt }
                 for commitment in ordered.prefix(maxCommitments) {
                     let owner = commitment.owner ?? "no owner"
@@ -128,7 +128,7 @@ enum WeeklyDigest {
             // conversation for the team, never a line in an external update.
             let repeats = OpenCommitments.repeatedPromises(in: allSessions)
             if !repeats.isEmpty {
-                lines.append("\n## Still open from earlier")
+                lines.append("\n## Осталось с прошлого раза")
                 for promise in repeats.prefix(maxRepeats) {
                     let owner = promise.owner ?? "no owner"
                     lines.append("- Promised \(promise.count)× — \(clipped(promise.title, to: maxDecisionCharacters)) (\(owner))")
@@ -141,7 +141,7 @@ enum WeeklyDigest {
             // meant to prevent.
             let firm = commitments.filter { $0.owner != nil && $0.due != nil }
             if !firm.isEmpty {
-                lines.append("\n## Commitments")
+                lines.append("\n## Договорённости")
                 for commitment in firm.prefix(maxCommitments) {
                     lines.append("- \(clipped(commitment.title, to: maxDecisionCharacters)) — \(commitment.owner ?? "") (due \(commitment.due ?? ""))")
                 }

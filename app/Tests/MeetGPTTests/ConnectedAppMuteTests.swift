@@ -248,8 +248,8 @@ struct TrialCreditBadgeTests {
     func helpNamesTheCatch() {
         // The one thing a balance alone never says.
         let help = CreditBadge.trial(remaining: 12, monthly: 15).help.lowercased()
-        #expect(help.contains("not renew") || help.contains("do not renew"))
-        #expect(help.contains("no account"))
+        #expect(help.contains("не восполняется"))
+        #expect(help.contains("аккаунт не нужен"))
     }
 
     @Test("a trial is actionable, like signed-out and unlike a broken balance")

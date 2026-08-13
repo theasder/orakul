@@ -22,7 +22,7 @@ import Foundation
 /// have no skill and fall back to the base instructions.
 struct PromptSkill: Identifiable, Equatable, Sendable {
     let id: String        // == the QuickPrompt id it augments
-    let name: String      // short label, e.g. "Meeting facilitation"
+    let name: String      // short label, e.g. "Ведение звонка"
     let guidance: String  // appended to SystemInstructions.base when this button runs
 }
 
@@ -49,9 +49,9 @@ enum PromptSkills {
     // MARK: - The twelve skills (one per built-in button)
 
     static let agenda = PromptSkill(
-        id: "agenda", name: "Meeting facilitation",
+        id: "agenda", name: "Ведение звонка",
         guidance: """
-        SKILL — Meeting facilitation. Maintain a live, outcome-first agenda. Give each block an
+        SKILL — Ведение звонка. Maintain a live, outcome-first agenda. Give each block an
         owner, a type (decide / inform / explore), a timebox with buffer, and one exit condition —
         the decision or artifact that must land before advancing. Seed blocks from prior-meeting
         unresolved items, open commitments, and any linked agenda doc when that context is present,
@@ -62,7 +62,7 @@ enum PromptSkills {
         """)
 
     static let brainstorm = PromptSkill(
-        id: "brainstorm", name: "Design-thinking ideation",
+        id: "brainstorm", name: "Генерация идей по дизайн-мышлению",
         guidance: """
         SKILL — Ideation. Before diverging, name the one measurable outcome and the opportunity or
         pain each idea must serve — hang ideas off opportunities, not vibes. Diverge wide, then
@@ -75,7 +75,7 @@ enum PromptSkills {
         """)
 
     static let unresolved = PromptSkill(
-        id: "unresolved", name: "Open-loops auditor (RAID+)",
+        id: "unresolved", name: "Аудит незакрытых вопросов (RAID+)",
         guidance: """
         SKILL — Open-loops auditor. Extract every unresolved item and tag each {decision-pending |
         blocked-external | question-unanswered | owner-unassigned}, keeping truly blocked separate
@@ -87,7 +87,7 @@ enum PromptSkills {
         """)
 
     static let whatToAsk = PromptSkill(
-        id: "whattoask", name: "Socratic discovery (assumption-first)",
+        id: "whattoask", name: "Сократический разбор (сначала допущения)",
         guidance: """
         SKILL — Socratic discovery. Behind every candidate question, silently extract the assumption
         it targets and map it across risk axes (desirability / viability / feasibility / usability,
@@ -100,7 +100,7 @@ enum PromptSkills {
         """)
 
     static let factCheck = PromptSkill(
-        id: "factcheck", name: "Claim verification (disconfirming)",
+        id: "factcheck", name: "Проверка утверждений на опровержение",
         guidance: """
         SKILL — Verification. Isolate each checkable claim and restate it as one falsifiable
         statement. Verify against sources in hand — provided docs, prior transcripts, and any live
@@ -112,7 +112,7 @@ enum PromptSkills {
         """)
 
     static let rhetoric = PromptSkill(
-        id: "rhetoric", name: "Argumentation analysis",
+        id: "rhetoric", name: "Разбор аргументации",
         guidance: """
         SKILL — Rhetoric analysis. Decompose the argument via Toulmin (claim, grounds, warrant,
         qualifier, rebuttal), then stress-test the warrant: restate it as one falsifiable proposition
@@ -125,7 +125,7 @@ enum PromptSkills {
         """)
 
     static let answer = PromptSkill(
-        id: "answer", name: "Executive answer (BLUF, sourced)",
+        id: "answer", name: "Ответ для руководителя (BLUF, со ссылками)",
         guidance: """
         SKILL — Executive answer. Lead with the direct answer in one sentence (BLUF), then at most
         two supporting lines. Before answering, retrieve the fact from context — transcript, linked
@@ -136,7 +136,7 @@ enum PromptSkills {
         """)
 
     static let dispute = PromptSkill(
-        id: "dispute", name: "Interest-based mediation",
+        id: "dispute", name: "Медиация по интересам сторон",
         guidance: """
         SKILL — Mediation. First anchor facts: use the prior transcript, decision doc, or ticket in
         context to settle any 'we agreed X vs Y' before touching interests. Gate on reversibility —
@@ -149,7 +149,7 @@ enum PromptSkills {
         """)
 
     static let risks = PromptSkill(
-        id: "risks", name: "Risk management (assumption→SEV)",
+        id: "risks", name: "Управление рисками (допущение → severity)",
         guidance: """
         SKILL — Risk assessment. First extract the plan's core assumptions across market, execution,
         customer, competitive, financial, and dependency — each unquestioned assumption plus its
@@ -163,7 +163,7 @@ enum PromptSkills {
         """)
 
     static let advice = PromptSkill(
-        id: "advice", name: "Strategic advisory (decision-mode)",
+        id: "advice", name: "Стратегический совет (режим решения)",
         guidance: """
         SKILL — Strategic advisory. Infer the real objective; lead with two or three high-leverage
         moves, each with why-it-matters, an impact metric, effort, the first concrete step, and the
@@ -176,7 +176,7 @@ enum PromptSkills {
         """)
 
     static let tasks = PromptSkill(
-        id: "tasks", name: "Delivery / PM (capture + INVEST)",
+        id: "tasks", name: "Поставка и управление (захват задач + INVEST)",
         guidance: """
         SKILL — Delivery management. Log a DACI per decision. Extract action items in the speaker's
         own wording; never invent an owner or due — flag [OWNER?] / [DUE?] when unstated. Gate each
@@ -188,9 +188,9 @@ enum PromptSkills {
         """)
 
     static let logDecision = PromptSkill(
-        id: "logdecision", name: "Decision logging",
+        id: "logdecision", name: "Запись решений",
         guidance: """
-        SKILL — Decision logging. A ledger entry must survive scrutiny months later. Capture the
+        SKILL — Запись решений. A ledger entry must survive scrutiny months later. Capture the
         decision as it was actually made: a quote-faithful statement, the stated rationale
         (including dissent — 'decided over X's objection that …'), the options genuinely raised
         (marking rejected ones), voiced risks, and the people involved. Distinguish decided (the
@@ -200,7 +200,7 @@ enum PromptSkills {
         """)
 
     static let summary = PromptSkill(
-        id: "summary", name: "Executive minutes (traceable)",
+        id: "summary", name: "Протокол для руководителя (со ссылками на источник)",
         guidance: """
         SKILL — Executive minutes. Normalize the transcript to speaker + timestamp, then produce a
         3-bullet TL;DR plus Decisions / Actions / Questions / Risks / Continuity / Next agenda.
@@ -212,7 +212,7 @@ enum PromptSkills {
         """)
 
     static let steelman = PromptSkill(
-        id: "steelman", name: "Adversarial review (steelman)",
+        id: "steelman", name: "Разбор с позиции оппонента (steelman)",
         guidance: """
         SKILL — Steelmanning. The value here is disagreement the room can trust, so the position
         must be stated at its strongest BEFORE it is attacked — if the restatement is one its
@@ -227,7 +227,7 @@ enum PromptSkills {
         """)
 
     static let commitments = PromptSkill(
-        id: "commitments", name: "Follow-through tracking",
+        id: "commitments", name: "Контроль исполнения",
         guidance: """
         SKILL — Follow-through. Teams rarely fail to decide; they fail to notice a commitment
         quietly dying. Work backwards from what was promised previously, not forwards from what is

@@ -15,7 +15,17 @@ import Testing
 @Suite("Glossary restore — cost on a real transcript")
 struct GlossaryRestorePerformanceTests {
 
-    private var enabled: Bool { ProcessInfo.processInfo.environment["CRUXWING_PERF"] != nil }
+    /// Точные замеры — по требованию: на шумной машине один и тот же вызов
+    /// давали 2.4 с и 4.6 с, и держать по такому числу узкий бюджет нельзя.
+    ///
+    /// Раньше это был `guard enabled else { return }` в теле, то есть
+    /// пропущенный тест отчитывался как ПРОЙДЕННЫЙ. Шесть таких проверок
+    /// молчали во всех прогонах и в CI, и «250 сессий укладываются в бюджет»
+    /// означало ровно ничего. Трейт `.enabled(if:)` печатает «skipped» —
+    /// разница между «проверено» и «не запускалось» снова видна.
+    static var preciseRunEnabled: Bool {
+        ProcessInfo.processInfo.environment["CRUXWING_PERF"] != nil
+    }
 
     /// Two hours of talk at a normal speaking rate.
     private static let transcriptCharacters = 110_000
@@ -50,9 +60,9 @@ struct GlossaryRestorePerformanceTests {
         return best
     }
 
-    @Test("a two-hour transcript restores inside the post-call budget")
+    @Test("a two-hour transcript restores inside the post-call budget",
+          .enabled(if: Self.preciseRunEnabled))
     func restoreStaysCheap() {
-        guard enabled else { return }
         let transcript = longTranscript()
         // The worst realistic vocabulary: ICP lexicon + the two packs this text
         // signals (payments and infrastructure) + a user glossary.
@@ -74,9 +84,9 @@ struct GlossaryRestorePerformanceTests {
                 "restore took \(elapsed)s on a two-hour transcript — the user is waiting on this")
     }
 
-    @Test("pack activation itself is not the expensive part")
+    @Test("pack activation itself is not the expensive part",
+          .enabled(if: Self.preciseRunEnabled))
     func packRoutingIsCheap() {
-        guard enabled else { return }
         let transcript = longTranscript()
         let elapsed = fastest { _ = DomainLexicon.casingOnlyTerms(for: transcript) }
         print(String(format: "pack routing over %d chars: %.3fs (best of 3)", transcript.count, elapsed))

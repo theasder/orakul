@@ -22,33 +22,42 @@ struct FactCheckSheet: View {
                 Spacer()
                 Button("Готово") { dismiss() }.buttonStyle(QuietButtonStyle())
             }
-            Text("Claims from the transcript, checked only against the context you added for this call.")
+            Text("Утверждения со звонка, проверенные только по тому контексту, который вы приложили.")
                 .font(Typo.caption).foregroundStyle(Theme.inkTertiary)
 
-            // Item 11: the explicit, per-request web opt-in. This button is the
-            // ONLY path that sets searchWeb — the background loop never does —
-            // so nothing reaches a search engine without this exact click.
-            HStack(spacing: Space.s) {
-                Button {
-                    state.runFactCheck(searchWeb: true)
-                } label: {
-                    Label("Проверить в вебе", systemImage: "globe")
-                }
-                .buttonStyle(QuietButtonStyle())
-                .disabled(state.factChecking)
-                .help("Re-checks unsettled claims against web search — sends their queries to a search provider and uses search credits.")
-                if let search = state.factCheckSearch {
-                    if search.ran == true {
-                        Text("Searched \(search.sources?.count ?? 0) web sources")
-                            .font(Typo.caption).foregroundStyle(Theme.inkTertiary)
-                    } else if let reason = search.reason, !reason.isEmpty {
-                        Text(reason)
-                            .font(Typo.caption).foregroundStyle(Theme.amber)
-                            .lineLimit(2)
-                            .help(reason)
+            // Явное согласие на веб — на каждый запрос отдельно. Эта кнопка —
+            // единственный путь, который включает searchWeb: фоновый цикл его
+            // не ставит никогда, так что без этого клика в поисковик ничего не
+            // уходит.
+            //
+            // Кнопки нет, когда искать некому. Поиск живёт на сервере
+            // (`FactCheckService.check` уходит туда только при непустом адресе),
+            // а у orakul сервера нет: клик молча свёлся бы к обычной проверке по
+            // приложенному контексту и вернул «источников: 0». Это худший вид
+            // неработающей кнопки — та, которая отвечает.
+            if !Config.backendBaseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                HStack(spacing: Space.s) {
+                    Button {
+                        state.runFactCheck(searchWeb: true)
+                    } label: {
+                        Label("Проверить в вебе", systemImage: "globe")
                     }
+                    .buttonStyle(QuietButtonStyle())
+                    .disabled(state.factChecking)
+                    .help("Перепроверит спорные утверждения поиском в вебе — их запросы уйдут поисковому провайдеру.")
+                    if let search = state.factCheckSearch {
+                        if search.ran == true {
+                            Text("Просмотрено источников в сети: \(search.sources?.count ?? 0)")
+                                .font(Typo.caption).foregroundStyle(Theme.inkTertiary)
+                        } else if let reason = search.reason, !reason.isEmpty {
+                            Text(reason)
+                                .font(Typo.caption).foregroundStyle(Theme.amber)
+                                .lineLimit(2)
+                                .help(reason)
+                        }
+                    }
+                    Spacer()
                 }
-                Spacer()
             }
 
             if state.factChecking && state.factClaims.isEmpty {
@@ -151,7 +160,7 @@ private struct FactClaimRow: View {
                         Label("Веб", systemImage: "globe")
                             .font(Typo.label)
                             .foregroundStyle(Theme.inkTertiary)
-                            .help("Checked against a retrieved web page, not your attached context")
+                            .help("Проверено по найденной странице в сети, а не по вашему контексту")
                     }
                     if let confidence = claim.confidence {
                         Text(confidence.label)
@@ -160,7 +169,7 @@ private struct FactClaimRow: View {
                             .padding(.horizontal, Space.s).padding(.vertical, 1)
                             .background(Theme.canvas, in: Capsule())
                             .overlay(Capsule().strokeBorder(Theme.hairline, lineWidth: 1))
-                            .help("How solid this verdict is, given the evidence")
+                            .help("Насколько твёрд вывод при таких доводах")
                     }
                     Spacer()
                 }
@@ -199,7 +208,7 @@ private struct FactClaimRow: View {
                         .font(Typo.caption)
                         .foregroundStyle(Theme.inkSecondary)
                         .fixedSize(horizontal: false, vertical: true)
-                        .help("Ask this to confirm or falsify the claim")
+                        .help("Спросите это, чтобы подтвердить или опровергнуть утверждение")
                 }
             }
         }

@@ -1,4 +1,5 @@
 import Foundation
+import OrakulCore
 
 /// What to ask each connector, and what to read its answer FOR.
 ///
@@ -121,8 +122,23 @@ enum ConnectorProbeStrategy: Sendable {
             strongFor: [.engineering, .strategy, .legal]),
     ]
 
+    /// Российские трекеры. Один Probe на все пять: разница между ними в
+    /// протоколе, а не в вопросе — задача, которую уже завели, одинаково
+    /// противоречит обещанию на звонке и в Kaiten, и в Яндекс Трекере.
+    ///
+    /// По-русски, в отличие от остальных: сюда попадают расшифровки русских
+    /// звонков, и ответ тоже нужен русский. Инструкция на другом языке — это
+    /// лишний перевод в середине рассуждения.
+    static let trackerProbe = Probe(
+        queryHint: "открытые задачи, что уже в работе, недавние баги по обсуждаемому",
+        readFor: "не заведена ли уже задача на то, что обещают на звонке, и нет ли задачи, которая этому противоречит — особенно если у неё другой владелец или срок",
+        strongFor: [.engineering, .product, .standup, .strategy])
+
     static func probe(forServerID id: String) -> Probe? { byServerID[id] }
     static func probe(forTeamService raw: String) -> Probe? { byTeamService[raw] }
+    static func probe(forTracker raw: String) -> Probe? {
+        RussianTrackers.Service(rawValue: raw) == nil ? nil : trackerProbe
+    }
 
     /// The query actually sent to the connector. The goal leads, because it is
     /// what the user cares about; the hint follows to bias the connector's own
@@ -130,7 +146,9 @@ enum ConnectorProbeStrategy: Sendable {
     /// queries, matching on stray terms rather than the subject.
     static func query(goal: String, serverID: String, maxChars: Int = 320) -> String {
         let base = goal.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let hint = byServerID[serverID]?.queryHint ?? byTeamService[serverID]?.queryHint else {
+        guard let hint = byServerID[serverID]?.queryHint
+            ?? byTeamService[serverID]?.queryHint
+            ?? probe(forTracker: serverID)?.queryHint else {
             return String(base.prefix(maxChars))
         }
         guard !base.isEmpty else { return String(hint.prefix(maxChars)) }

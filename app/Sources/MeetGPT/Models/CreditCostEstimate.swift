@@ -43,6 +43,13 @@ enum CreditCostEstimate {
         "deepseek-v4-pro": 1,
         "qwen3.7-max": 3,
         "glm-5.2": 2,
+        // Цена опубликована Яндексом в рублях за 1000 токенов (проверено
+        // 2026-08-12): Lite 0,20 ₽, Pro 0,80 ₽ — то есть 200 ₽ и 800 ₽ за
+        // миллион. В таблице ниже единицы долларовые, пересчёт по ~80 ₽/$:
+        // примерно $2,5 и $10 за миллион. Курс приблизительный и записан
+        // здесь, чтобы число можно было пересчитать, а не гадать, откуда оно.
+        "yandexgpt-lite": 2,
+        "yandexgpt": 5,
     ]
 
     /// USD per million input tokens, used for the above-baseline surcharge.
@@ -61,6 +68,10 @@ enum CreditCostEstimate {
         "deepseek-v4-pro": 0.435,
         "qwen3.7-max": 2.5,
         "glm-5.2": 1.4,
+        // Яндекс берёт одну цену за токен, без разделения на вход и выход,
+        // поэтому здесь и ниже числа совпадают.
+        "yandexgpt-lite": 2.5,
+        "yandexgpt": 10,
     ]
 
     /// USD per million output tokens. Output is normally the expensive side of
@@ -80,6 +91,8 @@ enum CreditCostEstimate {
         "deepseek-v4-pro": 0.87,
         "qwen3.7-max": 7.5,
         "glm-5.2": 4.4,
+        "yandexgpt-lite": 2.5,
+        "yandexgpt": 10,
     ]
 
     /// Credits charged for input above the baseline. 1 credit ≈ 1 US cent of

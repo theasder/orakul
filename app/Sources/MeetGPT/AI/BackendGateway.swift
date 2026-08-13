@@ -265,11 +265,25 @@ final class BackendGateway: LLMGateway {
 /// Picks how chat requests are served: direct provider clients (keys baked
 /// into the app) or the backend's managed, tier-enforcing gateway.
 enum LLMGatewayFactory {
+    /// Куда пойдёт запрос. Отдельно от `make()`, чтобы это можно было
+    /// проверить тестом: сам собранный конвейер обёрнут несколькими слоями и
+    /// снаружи не разбирается, а ошибка именно здесь уже стоила установщика,
+    /// который выглядел настроенным и не отвечал ни на что.
+    enum Selection: Equatable { case ensemble, backend, direct }
+
+    static var selection: Selection {
+        if Config.llmViaEnsemble { return .ensemble }
+        if Config.llmViaBackend { return .backend }
+        return .direct
+    }
+
     static func make() -> LLMGateway {
         let base: LLMGateway
-        if Config.llmViaEnsemble { base = EnsembleGateway() }
-        else if Config.llmViaBackend { base = BackendGateway() }
-        else { base = LLMRouter() }
+        switch selection {
+        case .ensemble: base = EnsembleGateway()
+        case .backend:  base = BackendGateway()
+        case .direct:   base = LLMRouter()
+        }
         // The orchestrator is a pass-through unless the selected model is
         // "auto" — checked per request, so switching in Settings applies live.
         let orchestrated = AutoOrchestrator(inner: base)

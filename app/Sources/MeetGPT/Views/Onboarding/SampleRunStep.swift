@@ -176,7 +176,7 @@ struct SampleRunStep: View {
                         .font(Typo.caption).foregroundStyle(Theme.inkSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                     if state.samplePinnedDecision == nil {
-                        Button("📌 Log decision") { state.pinSampleDecision() }
+                        Button("📌 Записать решение") { state.pinSampleDecision() }
                             .buttonStyle(PrimaryButtonStyle())
                             .accessibilityLabel("Записать пример решения")
                     } else {
@@ -189,7 +189,7 @@ struct SampleRunStep: View {
             }
 
             if !suggestionVisible {
-                Text("Blind spots arrive while the call is live — you don't have to ask for them.")
+                Text("Слепые зоны приходят по ходу звонка — просить о них не нужно.")
                     .font(Typo.caption).foregroundStyle(Theme.inkTertiary)
                     .fixedSize(horizontal: false, vertical: true)
             }

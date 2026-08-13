@@ -109,7 +109,7 @@ struct AIStudioView: View {
                 }
                 .buttonStyle(IconButtonStyle())
                 .accessibilityLabel("Отправить задачи в трекер")
-                .help("Create these tasks in Linear, Jira, or Asana")
+                .help("Завести эти задачи в трекере")
             }
             // Refine the visible answer (item 20). User-invoked only; hidden
             // for structured answers (a DACI, a fact check) whose contract a
@@ -126,7 +126,7 @@ struct AIStudioView: View {
                     }
                     .buttonStyle(IconButtonStyle())
                     .accessibilityLabel("Вернуть исходный")
-                    .help("Restore the answer as it was before refining")
+                    .help("Вернуть ответ, каким он был до правки")
                 }
                 if state.canRefineCurrentAnswer {
                     Menu {
@@ -144,7 +144,7 @@ struct AIStudioView: View {
                     .menuIndicator(.hidden)
                     .fixedSize()
                     .accessibilityLabel("Уточнить ответ")
-                    .help("Condense or elaborate this answer — a new AI pass you can undo")
+                    .help("Сжать или развернуть ответ — ещё один проход ИИ, его можно отменить")
                 }
             }
             // One share control rather than a separate Export menu and copy
@@ -203,7 +203,7 @@ struct AIStudioView: View {
                             Button {
                                 exportTo { await state.undoLastSpreadsheetExport() }
                             } label: {
-                                Label("Move “\(title)” to Trash", systemImage: "arrow.uturn.backward")
+                                Label("Убрать «\(title)» в корзину", systemImage: "arrow.uturn.backward")
                             }
                         }
                         // Notion — only when Notion is integrated with a create tool.
@@ -230,7 +230,7 @@ struct AIStudioView: View {
                 .fixedSize()
                 .disabled(exportingDOCX || exportingElsewhere)
                 .accessibilityLabel("Поделиться ответом")
-                .help("Copy this answer, or export it — with its prompt and blind spots — to Word, Google Docs, or Notion")
+                .help("Скопировать ответ или выгрузить его — вместе с запросом и слепыми зонами — в Word, Google Docs или Notion")
             }
         }
     }
@@ -273,9 +273,9 @@ struct AIStudioView: View {
                 let document = try await state.prepareCurrentAnswerExport()
                 let data = try AssistantDOCXExporter.makeDocument(document)
                 let panel = NSSavePanel()
-                panel.title = "Export assistant answer"
-                panel.message = "Save the answer, its original prompt, the blind spots, and an LLM-created title as a Word document."
-                panel.prompt = "Export"
+                panel.title = "Выгрузить ответ ассистента"
+                panel.message = "Сохранит в документ Word ответ, исходный запрос, слепые зоны и заголовок, придуманный моделью."
+                panel.prompt = "Выгрузить"
                 panel.canCreateDirectories = true
                 panel.isExtensionHidden = false
                 if let docx = UTType(filenameExtension: "docx") {
@@ -290,7 +290,7 @@ struct AIStudioView: View {
                 guard panel.runModal() == .OK, let url = panel.url else { return }
                 try data.write(to: url, options: .atomic)
             } catch {
-                state.lastError = "DOCX export failed: \(error.localizedDescription)"
+                state.lastError = "Выгрузка в Word не удалась: \(error.localizedDescription)"
             }
         }
     }
@@ -561,19 +561,19 @@ private struct AskComposer: View {
         .menuStyle(.button)   // .borderlessButton is deprecated; .button is the native style
         .menuIndicator(.hidden)
         .fixedSize()
-        .help("Attach an image, file, folder, audio, video — or insert a prompt")
+        .help("Приложить картинку, файл, папку, аудио, видео — или вставить подсказку")
     }
 
     // MARK: Dictation
 
     private var dictationPlaceholder: String {
         if state.dictationWindowStart != nil {
-            return "Capturing from the call — press again to use it"
+            return "Беру со звонка — нажмите ещё раз, чтобы применить"
         }
         switch state.dictation.state {
-        case .listening:    return "Listening — press again to stop"
+        case .listening:    return "Слушаю — нажмите ещё раз, чтобы остановить"
         case .transcribing: return "Расшифровываю…"
-        default:            return "Ask anything, attach, or start from a prompt…"
+        default:            return "Спросите что угодно, приложите файл или начните с подсказки…"
         }
     }
 
@@ -615,12 +615,12 @@ private struct AskComposer: View {
         }
         .buttonStyle(.plain)
         .disabled(busy)
-        .accessibilityLabel(capturing ? "Stop capturing" : "Dictate the prompt")
+        .accessibilityLabel(capturing ? "Остановить захват" : "Продиктовать запрос")
         .help(capturing
-              ? "Stop and insert what was said"
+              ? "Остановить и вставить сказанное"
               : (state.isRecording
-                 ? "Capture what is being said in the call as your prompt"
-                 : "Dictate instead of typing"))
+                 ? "Взять то, что говорят на звонке, как запрос"
+                 : "Продиктовать вместо набора"))
         .animation(Motion.quick, value: capturing)
         .animation(Motion.quick, value: dictation.level)
     }
@@ -637,8 +637,8 @@ private struct AskComposer: View {
         .disabled(!canSend)
         .accessibilityLabel("Отправить")
         .help(attachmentFeedback.hasImportingItems
-              ? "Wait for attachments to finish"
-              : (canSend ? "Ask (↵)" : "Attach or type a message"))
+              ? "Дождитесь, пока вложения загрузятся"
+              : (canSend ? "Ask (↵)" : "Приложите файл или напишите сообщение"))
     }
 
     // MARK: Importer
@@ -665,7 +665,7 @@ private struct AskComposer: View {
         attachKind = nil
         switch result {
         case .failure(let error):
-            state.lastError = "Import failed: \(error.localizedDescription)"
+            state.lastError = "Не удалось загрузить: \(error.localizedDescription)"
         case .success(let urls):
             guard let kind, !urls.isEmpty else { return }
             // This mutation is deliberately before Task creation: the very
@@ -736,11 +736,11 @@ struct ComposerAttachmentStatusChip: View {
         switch item.phase {
         case .importing:
             if item.kind == .audio || item.kind == .video { return "Расшифровываю…" }
-            return item.kind == .folder ? "Indexing…" : "Importing…"
+            return item.kind == .folder ? "Строю индекс…" : "Загружаю…"
         case .ready:
             return "Готово"
         case .failed:
-            return "Import failed"
+            return "Импорт не удался"
         }
     }
 
@@ -769,8 +769,8 @@ struct ComposerAttachmentStatusChip: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel(item.phase == .importing
-                                ? "Cancel \(item.name)"
-                                : "Remove \(item.name)")
+                                ? "Отменить \(item.name)"
+                                : "Убрать \(item.name)")
         }
         .padding(.horizontal, Space.s)
         .frame(height: 44)
@@ -779,7 +779,7 @@ struct ComposerAttachmentStatusChip: View {
         .overlay(RoundedRectangle(cornerRadius: Radius.s, style: .continuous)
             .strokeBorder(Theme.hairline, lineWidth: 1))
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Attachment \(item.name), \(status)")
+        .accessibilityLabel("Вложение \(item.name), \(status)")
         .help("\(item.name) — \(status)")
     }
 }
@@ -809,7 +809,7 @@ struct ComposerFolderChip: View {
                     .foregroundStyle(Theme.inkTertiary)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Remove folder \(folder.name)")
+            .accessibilityLabel("Убрать папку \(folder.name)")
         }
         .padding(.horizontal, Space.s)
         .frame(height: 44)
@@ -818,8 +818,8 @@ struct ComposerFolderChip: View {
         .overlay(RoundedRectangle(cornerRadius: Radius.s, style: .continuous)
             .strokeBorder(Theme.hairline, lineWidth: 1))
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Folder attachment \(folder.name), \(folder.files.count) files indexed")
-        .help("Relevant excerpts are selected per prompt; the whole folder is not sent")
+        .accessibilityLabel("Папка \(folder.name), файлов в индексе: \(folder.files.count)")
+        .help("Под каждый запрос берутся подходящие куски; папка целиком не отправляется")
     }
 }
 

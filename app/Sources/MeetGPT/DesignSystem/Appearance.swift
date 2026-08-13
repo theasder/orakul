@@ -10,9 +10,9 @@ enum AppAppearance: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .auto:  return "Auto (sunrise / sunset)"
-        case .light: return "Light"
-        case .dark:  return "Dark"
+        case .auto:  return "Автоматически (по рассвету и закату)"
+        case .light: return "Светлая"
+        case .dark:  return "Тёмная"
         }
     }
 

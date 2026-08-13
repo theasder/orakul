@@ -21,18 +21,20 @@ struct RecordingConsentSheet: View {
 
             VStack(alignment: .leading, spacing: Space.m) {
                 bullet("person.2.wave.2",
-                       "Recording captures everyone on the call — your microphone and the meeting's system audio.")
+                       "Запись берёт всех участников: ваш микрофон и системный звук звонка.")
                 bullet("checkmark.shield",
-                       "Many jurisdictions require every participant's consent to record. You are responsible for telling participants and obtaining consent where the law requires it.")
+                       "Во многих странах записывать разговор можно только с согласия всех участников. Предупредить их и получить согласие, где этого требует закон, — ваша ответственность.")
                 bullet("lock.laptopcomputer",
-                       "Transcription runs on this Mac by default. Transcript excerpts leave your device only when you run an AI action.")
+                       "Расшифровка по умолчанию идёт на этом компьютере. Куски транскрипта уходят наружу только когда вы сами запускаете действие ИИ.")
             }
 
             HStack {
-                Link("Privacy policy", destination: URL(string: "https://cruxwing.com/privacy")!)
-                    .font(Typo.caption)
-                Link("Terms", destination: URL(string: "https://cruxwing.com/terms")!)
-                    .font(Typo.caption)
+                // Ссылок на политику и условия здесь нет намеренно. Раньше они
+                // вели на cruxwing.com — чужой документ про чужую обработку
+                // данных, и к orakul он отношения не имеет: у orakul нет
+                // сервера, куда что-то уходит. Своих страниц пока нет, а
+                // ссылка в никуда на экране про согласие хуже её отсутствия.
+                // Существенное сказано выше, списком.
                 Spacer()
                 Button("Не сейчас") { dismiss() }
                     .buttonStyle(QuietButtonStyle())

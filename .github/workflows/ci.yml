@@ -1,0 +1,70 @@
+# Прогон тестов на каждый пулл-реквест.
+#
+# Зачем. В проекте 2668 тестов на приложение, 120 на mvp и 62 на страницу и
+# документацию — и до сих пор их запускал только автор у себя. Для человека со
+# стороны это значит, что сломанный пулл-реквест выясняется в переписке, через
+# день, на словах: худший способ узнать. CI переносит ответ на минуту после
+# `git push` и делает набор тестов инструментом участника, а не частным
+# ритуалом сопровождающего.
+#
+# macOS, а не Linux: приложение нативное (SwiftUI, ScreenCaptureKit, Связка
+# ключей). На Linux оно не собирается вовсе, и «зелёный» Linux-прогон означал бы
+# ровно ничего.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Пулл-реквест, обновлённый дважды подряд, не должен занимать раннеры двумя
+# прогонами — первый отменяется. На main отмена запрещена: там у каждого
+# коммита должен быть собственный ответ.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  swift:
+    name: Тесты приложения (macOS)
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Версия Swift
+        run: swift --version
+
+      # Кэш сборки. В репозитории `.build/` игнорируется намеренно — это
+      # промежуточные файлы компилятора, и однажды они уже попали в историю и
+      # раздули её до 114 МБ. Здесь тот же каталог уместен: он живёт в кэше
+      # раннера, а не в репозитории.
+      - name: Кэш SwiftPM
+        uses: actions/cache@v4
+        with:
+          path: app/.build
+          key: swiftpm-${{ runner.os }}-${{ hashFiles('app/Package.resolved') }}
+          restore-keys: swiftpm-${{ runner.os }}-
+
+      - name: Тесты приложения
+        working-directory: app
+        run: swift test
+
+      - name: Тесты mvp
+        working-directory: mvp
+        run: swift test
+
+  node:
+    name: Тесты документации и страницы
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # Ни одной зависимости: набор написан на `node --test`. Ставить нечего, и
+      # `npm ci` здесь упал бы на отсутствующем package-lock.json.
+      - name: Тесты страницы, README и плана
+        run: npm test

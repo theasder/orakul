@@ -379,6 +379,7 @@ final class AutoOrchestrator: LLMGateway {
         case .qwen: return normalized == "qwen"
         case .zhipu: return normalized == "zhipu" || normalized == "zhipu glm"
         case .moonshot: return normalized == "moonshot"
+        case .yandexGPT: return normalized == "yandexgpt" || normalized == "yandex"
         }
     }
 

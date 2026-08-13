@@ -108,7 +108,7 @@ struct TeamSourcesView: View {
                         .font(Typo.caption.weight(.medium))
                 }
                 .buttonStyle(QuietButtonStyle())
-                .help("Reveal team-watch.log in Finder")
+                .help("Показать team-watch.log в Finder")
             }
         }
         .padding(Space.m)
@@ -134,12 +134,12 @@ struct TeamSourcesView: View {
 
     private var watcherStatusLine: String {
         if !watcher.isRunning {
-            if !watchEnabled { return "Off — flip the switch to start watching." }
-            return "Add at least one keyword rule to start."
+            if !watchEnabled { return "Выключено — включите переключатель, чтобы начать следить." }
+            return "Добавьте хотя бы одно ключевое слово."
         }
         return hasWatchableChannels
-            ? "Scanning your designated channels every 60s."
-            : "Running, but no Slack channels are connected to scan."
+            ? "Просматривает выбранные каналы раз в минуту."
+            : "Работает, но не выбрано ни одного канала для просмотра."
     }
 
     // MARK: - Actions
@@ -224,8 +224,8 @@ private struct ConnectorRow: View {
         switch service {
         case .slack:
             let n = channelCount ?? 0
-            return n == 0 ? "Connected · no channels set" : "Connected · \(n) channel\(n == 1 ? "" : "s") watched"
-        case .confluence: return "Connected · page search"
+            return n == 0 ? "Подключено · каналы не выбраны" : "Connected · \(n) channel\(n == 1 ? "" : "s") watched"
+        case .confluence: return "Подключено · поиск по страницам"
         }
     }
 }
@@ -262,11 +262,11 @@ private struct AutoAckBadge: View {
         HStack(spacing: Space.xs) {
             Image(systemName: on ? "arrowshape.turn.up.left.fill" : "arrowshape.turn.up.left")
                 .font(.system(size: 10))
-            Text(on ? "Auto-ack on" : "Auto-ack off")
+            Text(on ? "Автоответ включён" : "Автоответ выключен")
                 .font(Typo.caption.weight(.medium))
         }
         .foregroundStyle(on ? Theme.accentText : Theme.inkTertiary)
-        .help("Auto-acknowledge into the channel on a match.")
+        .help("Автоматически отвечать в канал при совпадении.")
     }
 }
 
@@ -289,7 +289,7 @@ private struct KeywordChip: View {
                     .foregroundStyle(hovering ? Theme.danger : Theme.inkTertiary)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Remove \(word)")
+            .accessibilityLabel("Убрать \(word)")
         }
         .padding(.leading, Space.s)
         .padding(.trailing, Space.xs)

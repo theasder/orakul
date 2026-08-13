@@ -8,8 +8,8 @@ enum SourceKind: Int, Identifiable {
 
     var title: String {
         switch self {
-        case .doc:    return "Google Doc"
-        case .sheet:  return "Google Sheet"
+        case .doc:    return "Документ Google"
+        case .sheet:  return "Таблица Google"
         case .notion: return "Страница Notion"
         }
     }
@@ -63,13 +63,21 @@ struct ContextSection: View {
                             .font(.system(size: 11))
                     }
                     .buttonStyle(IconButtonStyle(size: 18))
-                    .help("Clear all context (files and notes)")
+                    .help("Очистить весь контекст — файлы и заметки")
                     .accessibilityLabel("Очистить контекст")
                 }
             }
 
-            // Two stable controls only — this row cannot overflow the sidebar.
-            // Import actions (incl. Fireflies/Agenda) live inside Add source.
+            // Два стабильных элемента, и всё равно ряд не помещался: по-русски
+            // «Добавить источник» + «Наборы» это 250 pt при 232 доступных, а
+            // `.fixedSize()` у «Наборов» запрещает сжиматься — подпись вылезала
+            // за свою иконку. По-английски «Add source» + «Sets» помещалось,
+            // отсюда и комментарий, который раньше здесь стоял: «этот ряд не
+            // может переполнить панель». Мог.
+            //
+            // Слово «источник» убрано: ряд стоит под заголовком «КОНТЕКСТ», и
+            // добавить тут можно только источник. Действия импорта (Fireflies,
+            // повестка) лежат внутри самого меню.
             HStack(spacing: Space.xs) {
                 addSourceMenu
                 if busy { ProgressView().controlSize(.small).scaleEffect(0.7) }
@@ -107,7 +115,7 @@ struct ContextSection: View {
             case .success(let urls):
                 Task { await state.importContext(from: urls) }
             case .failure(let error):
-                state.lastError = "Import failed: \(error.localizedDescription)"
+                state.lastError = "Не удалось загрузить: \(error.localizedDescription)"
             }
         }
         .fileImporter(isPresented: $showFolderImporter,
@@ -118,7 +126,7 @@ struct ContextSection: View {
                 guard let url = urls.first else { return }
                 Task { await state.attachContextFolder(url: url) }
             case .failure(let error):
-                state.lastError = "Could not attach folder: \(error.localizedDescription)"
+                state.lastError = "Не удалось подключить папку: \(error.localizedDescription)"
             }
         }
         .sheet(item: $promptKind) { kind in SourcePromptSheet(kind: kind) }
@@ -141,8 +149,8 @@ struct ContextSection: View {
                 Button { Task { await state.importAndEnhanceWithFireflies() } } label: {
                     Label(
                         state.transcript.isEmpty
-                            ? "Latest Fireflies transcript"
-                            : "Fireflies + enhance transcript",
+                            ? "Последний транскрипт из Fireflies"
+                            : "Fireflies + улучшить транскрипт",
                         systemImage: "flame"
                     )
                 }
@@ -155,7 +163,7 @@ struct ContextSection: View {
                 .disabled(state.calendarImporting)
             }
         } label: {
-            Label("Добавить источник", systemImage: "plus")
+            Label("Добавить", systemImage: "plus")
         }
         .menuStyle(.button)
         .buttonStyle(QuietButtonStyle(prominent: true))
@@ -201,7 +209,7 @@ private struct SourcePromptSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.l) {
-            Label("Attach a \(kind.title)", systemImage: kind.systemImage)
+            Label("Приложить: \(kind.title)", systemImage: kind.systemImage)
                 .font(Typo.title)
                 .foregroundStyle(Theme.ink)
             Text("Вставьте ссылку — её текст станет источником контекста.")
@@ -274,7 +282,7 @@ private struct SaveSetSheet: View {
             Label("Сохранить набор контекста", systemImage: "square.stack.3d.up")
                 .font(Typo.title)
                 .foregroundStyle(Theme.ink)
-            Text("Save the current files + notes as a reusable set you can apply to a future call.")
+            Text("Сохранить нынешние файлы и заметки набором, который можно приложить к другому звонку.")
                 .font(Typo.callout)
                 .foregroundStyle(Theme.inkSecondary)
             TextField("", text: $name, prompt: Text("например, еженедельный созвон Acme"))
@@ -319,7 +327,7 @@ private struct FileChip: View {
             }
             .buttonStyle(IconButtonStyle(size: 18))
             .opacity(hovering ? 1 : 0.4)
-            .accessibilityLabel("Remove \(file.name)")
+            .accessibilityLabel("Убрать \(file.name)")
             .help("Убрать")
         }
         .padding(.horizontal, Space.s)
@@ -373,15 +381,15 @@ private struct FolderChip: View {
             .buttonStyle(IconButtonStyle(size: 18))
             .disabled(busy)
             .opacity(hovering ? 1 : 0.4)
-            .accessibilityLabel("Refresh \(folder.name)")
-            .help("Re-read this folder")
+            .accessibilityLabel("Обновить \(folder.name)")
+            .help("Перечитать папку")
             Button(action: onRemove) {
                 Image(systemName: "xmark")
                     .font(.system(size: 9, weight: .bold))
             }
             .buttonStyle(IconButtonStyle(size: 18))
             .opacity(hovering ? 1 : 0.4)
-            .accessibilityLabel("Detach \(folder.name)")
+            .accessibilityLabel("Отвязать \(folder.name)")
             .help("Detach")
         }
         .padding(.horizontal, Space.s)

@@ -104,7 +104,7 @@ struct WorkflowStep: Identifiable, Equatable {
     /// A concise VoiceOver description. Deliberately excludes `detail`, which
     /// may contain long or sensitive meeting/context content.
     var accessibilitySummary: String {
-        var parts = [Self.cleaned(label, fallback: "Workflow step")]
+        var parts = [Self.cleaned(label, fallback: "Шаг работы")]
 
         if let app {
             let appName = Self.cleaned(app.name)

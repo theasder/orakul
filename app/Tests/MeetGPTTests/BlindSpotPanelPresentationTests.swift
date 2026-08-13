@@ -33,8 +33,8 @@ struct BlindSpotPanelPresentationTests {
         )
 
         #expect(panel.isVisible)
-        #expect(panel.heading == "Suggestions off")
-        #expect(panel.statusMessage == "Turn on Blind Spot in Settings to resume.")
+        #expect(panel.heading == "Подсказки выключены")
+        #expect(panel.statusMessage == "Включите поиск слепых зон в настройках, чтобы продолжить.")
         #expect(panel.statusKind == .informational)
         #expect(!panel.showsCards)
         #expect(!panel.canPause)
@@ -49,16 +49,16 @@ struct BlindSpotPanelPresentationTests {
 
         #expect(panel.isVisible)
         #expect(panel.showsCards)
-        #expect(panel.heading == "Suggestions off")
-        #expect(panel.statusMessage == "Turn on Blind Spot in Settings to resume.")
+        #expect(panel.heading == "Подсказки выключены")
+        #expect(panel.statusMessage == "Включите поиск слепых зон в настройках, чтобы продолжить.")
     }
 
     @Test("per-call pause keeps cards and offers resume")
     func pausedWithCards() {
         let panel = presentation(snoozed: true, hasSuggestions: true)
 
-        #expect(panel.heading == "Suggestions paused")
-        #expect(panel.statusMessage == "Paused for this call.")
+        #expect(panel.heading == "Подсказки приостановлены")
+        #expect(panel.statusMessage == "Приостановлены на этот звонок.")
         #expect(panel.showsCards)
         #expect(!panel.canPause)
         #expect(panel.canResume)
@@ -69,7 +69,7 @@ struct BlindSpotPanelPresentationTests {
         let failure = "Blind Spot couldn't reach an AI provider. Retrying automatically."
         let panel = presentation(failureMessage: failure)
 
-        #expect(panel.heading == "Live suggestions")
+        #expect(panel.heading == "Подсказки по ходу")
         #expect(panel.statusMessage == failure)
         #expect(panel.statusKind == .providerFailure)
         #expect(panel.canPause)
@@ -84,7 +84,7 @@ struct BlindSpotPanelPresentationTests {
             quotaMessage: quota
         )
 
-        #expect(panel.heading == "Suggestions paused")
+        #expect(panel.heading == "Подсказки приостановлены")
         #expect(panel.statusMessage == quota)
         #expect(panel.statusKind == .quota)
         #expect(!panel.canPause)
@@ -103,7 +103,7 @@ struct BlindSpotPanelPresentationTests {
             quotaMessage: quota
         )
 
-        #expect(panel.heading == "Suggestions off")
+        #expect(panel.heading == "Подсказки выключены")
         #expect(panel.statusMessage == quota)
         #expect(panel.statusKind == .quota)
         #expect(panel.showsCards)

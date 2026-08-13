@@ -26,8 +26,8 @@ struct OverlayView: View {
 
             if latest.isEmpty {
                 Text(state.isRecording
-                     ? (goal.isEmpty ? "Set a goal in Cruxwing to get live suggestions." : "Watching for blind spots…")
-                     : "Not recording.")
+                     ? (goal.isEmpty ? "Задайте цель в orakul, чтобы подсказки шли по ходу звонка." : "Ищу слепые зоны…")
+                     : "Запись не идёт.")
                     .font(Typo.caption)
                     .foregroundStyle(Theme.inkTertiary)
             } else {
@@ -70,8 +70,8 @@ struct OverlayView: View {
             }
             .buttonStyle(IconButtonStyle(size: 22))
             .disabled(state.isBusy)
-            .accessibilityLabel(state.isRecording ? "Stop recording" : "Start recording")
-            .help(state.isRecording ? "Stop recording" : "Start recording")
+            .accessibilityLabel(state.isRecording ? "Остановить запись" : "Начать запись")
+            .help(state.isRecording ? "Остановить запись" : "Начать запись")
             Button(action: onClose) {
                 Image(systemName: "xmark")
             }
@@ -132,7 +132,7 @@ private struct OverlaySuggestionRow: View {
             .buttonStyle(IconButtonStyle(size: 18))
             .opacity(hovering ? 1 : 0.35)
             .accessibilityLabel("Спросить ассистента об этой подсказке")
-            .help("Send to the assistant")
+            .help("Отправить ассистенту")
             Button(action: onDismiss) {
                 Image(systemName: "xmark")
             }

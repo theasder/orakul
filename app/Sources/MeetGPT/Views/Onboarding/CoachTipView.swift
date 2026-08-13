@@ -56,7 +56,7 @@ struct CoachTipView: View {
                     Spacer(minLength: 0)
                     Button("Понятно") { retire(tip) }
                         .buttonStyle(QuietButtonStyle(prominent: true))
-                        .accessibilityLabel("Dismiss tip: \(tip.title)")
+                        .accessibilityLabel("Скрыть подсказку: \(tip.title)")
                 }
             }
             .padding(Space.m)

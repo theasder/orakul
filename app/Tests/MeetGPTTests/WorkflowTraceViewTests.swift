@@ -56,7 +56,7 @@ struct WorkflowTraceViewTests {
         ]
         let sut = try WorkflowTracePanel(steps: steps, streaming: false, initiallyExpanded: true).inspect()
 
-        #expect(throws: Never.self) { try sut.find(text: "How this answer was made") }
+        #expect(throws: Never.self) { try sut.find(text: "Как получился этот ответ") }
         #expect(throws: Never.self) { try sut.find(text: "2/2 complete") }
         #expect(throws: Never.self) {
             try sut.find(viewWithAccessibilityLabel:

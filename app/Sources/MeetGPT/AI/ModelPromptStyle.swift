@@ -88,6 +88,11 @@ enum ModelPromptStyle {
                  + "section headings exactly as the request spells them."
         case .openAI:
             return nil
+        case .yandexGPT:
+            // Своей характерной ошибки на этих подсказках мы у него не мерили,
+            // а придумывать её — значит подсказывать модели то, чего у неё,
+            // возможно, и нет. Появится замер — появится строка.
+            return nil
         }
     }
 }

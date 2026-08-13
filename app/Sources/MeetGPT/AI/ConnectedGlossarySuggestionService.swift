@@ -57,8 +57,19 @@ enum ConnectedGlossarySuggestionService {
     static let maxSuggestions = 24
     static let maxPromptChars = 6_000
     static let maxOutputTokens = 384
-    static let sourceDeadline: TimeInterval = 12
-    static let modelDeadline: TimeInterval = 20
+    /// Сроки — настоящие секунды стенных часов, и потому они входят в условие
+    /// каждого теста, который идёт через `AppState`: там срок не передашь, он
+    /// берётся отсюда. В полном прогоне эти двенадцать и двадцать секунд
+    /// делятся с 2668 другими тестами, и под нагрузкой источники не успевали.
+    /// Служба возвращала таймаут, подсказок выходило ноль, а падало на «нечего
+    /// принимать» — в месте, которое про сроки ничего не говорит.
+    ///
+    /// `@TaskLocal`, чтобы тест, проверяющий не срок, а маршрут, мог связать
+    /// себе запас. Продакшен читает те же двенадцать и двадцать: подмены там
+    /// нет. Тест, который проверяет именно таймаут, передаёт срок явно
+    /// параметром — так он и остаётся честным.
+    @TaskLocal static var sourceDeadline: TimeInterval = 12
+    @TaskLocal static var modelDeadline: TimeInterval = 20
 
     struct PreparedRequest: Equatable, Sendable {
         let system: String

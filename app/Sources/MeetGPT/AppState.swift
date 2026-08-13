@@ -4,6 +4,7 @@ import Foundation
 import MCP
 import os
 import SwiftUI
+import OrakulCore
 
 /// Audio callbacks can arrive hundreds of times per second. Gate meter work on
 /// that callback thread so RMS calculation and MainActor publication happen at
@@ -322,7 +323,20 @@ final class DeepgramHandoffState: @unchecked Sendable {
     /// switch. Deepgram's reconnect loop is intentionally unbounded for an
     /// established stream, but during a handoff the previous engine is still
     /// available and is the safer place to return after this deadline.
-    static let readinessTimeoutNanoseconds: UInt64 = 12_000_000_000
+    /// Сколько ждать готовности обеих дорожек, прежде чем откатиться.
+    ///
+    /// `@TaskLocal`, чтобы тест мог его отодвинуть. Двенадцать секунд — это
+    /// настоящие секунды стенных часов, и в тесте они шли параллельно с 2668
+    /// другими: при полной загрузке машины `DeepgramHandoffIntegrationTests`
+    /// не успевал дойти от `startDeepgram` до отметки готовности за это время,
+    /// таймер срабатывал первым, `drainForRollback` переводил буфер в
+    /// `.rollback`, и `commitSuccessful` возвращал пустой массив. Наружу это
+    /// выглядело как пустой транскрипт и «плавающий» тест, который в одиночку
+    /// всегда проходил — потому что в одиночку двенадцати секунд хватало.
+    ///
+    /// Продакшен читает то же значение: `Task {}` наследует task-local, а
+    /// подмены там нет, поэтому остаются те же двенадцать секунд.
+    @TaskLocal static var readinessTimeoutNanoseconds: UInt64 = 12_000_000_000
 
     private let lock = NSLock()
     private var readyTracks: Set<Track> = []
@@ -757,6 +771,38 @@ final class AppState: ObservableObject {
     }
     @Published var lastError: String?
 
+    /// Пропал ли звук собеседников посреди записи.
+    ///
+    /// Отдельно от `lastError`, потому что это не ошибка операции, а состояние
+    /// идущего звонка: запись продолжается, но пишется половина. Сбрасывается
+    /// при старте следующей записи — иначе предупреждение с прошлого звонка
+    /// встретит человека на следующем и будет врать.
+    @Published private(set) var systemAudioLostDuringRecording = false
+
+    /// Пропал ли микрофон посреди записи.
+    ///
+    /// Отдельно от системного звука, потому что пропадает другая половина
+    /// разговора и человек должен понимать какая: «вас не слышно» и «их не
+    /// слышно» требуют разных действий.
+    @Published private(set) var microphoneLostDuringRecording = false
+
+    /// Микрофон не удалось вернуть после смены аудиоустройства.
+    func noteMicrophoneLost() {
+        guard isRecording else { return }
+        microphoneLostDuringRecording = true
+        lastError = "Микрофон пропал — записываются только собеседники. "
+            + "Обычно это отключившиеся наушники или вынутый USB-микрофон; "
+            + "проверьте устройство ввода и начните запись заново."
+    }
+
+    /// Единственное место, где этот флаг поднимается.
+    func noteSystemAudioLost() {
+        guard isRecording else { return }   // после «Стоп» это не новость
+        systemAudioLostDuringRecording = true
+        lastError = "Звук собеседников пропал — запись продолжается только с микрофона. "
+            + "Обычно это отозванное разрешение «Запись экрана» или отключённый дисплей."
+    }
+
     /// Connected work-apps (MCP), attached by the app root so prompt-button
     /// workflows can ground from live sources. Weak: the app scene owns it.
     weak var mcp: MCPConnectionManager? {
@@ -949,7 +995,7 @@ final class AppState: ObservableObject {
     @Published private(set) var hasDetectedRecordingContext = false
 
     var effectiveRecordingContextLabel: String {
-        recordingContextSelection.resolvedLabel(detected: detectedRecordingContext)
+        recordingContextSelection.resolvedDisplayLabel(detected: detectedRecordingContext)
     }
 
     var effectiveRecordingContextKind: RecordingContextKind? {
@@ -3446,7 +3492,7 @@ final class AppState: ObservableObject {
         callNotifier.configure()
         callNotifier.onStartRecording = { [weak self] in self?.startFromNotification() }
         callNotifier.onNotificationsDenied = { [weak self] in
-            self?.lastError = "Notifications are off for Cruxwing. Enable them in System Settings → Notifications to get call and meeting alerts."
+            self?.lastError = "Уведомления для orakul выключены. Включите их в «Системные настройки → Уведомления», чтобы получать напоминания о звонках."
         }
         callDetector.onCallDetected = { [weak self] appName in
             guard let self, !self.isRecording, !self.isBusy else { return }
@@ -3919,7 +3965,7 @@ final class AppState: ObservableObject {
                     user: AnswerRefine.userPrompt(answer: original),
                     model: Config.selectedModel, onDelta: { _ in })
             }), !refined.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                lastError = "Couldn't refine the answer — the original is unchanged."
+                lastError = "Не удалось уточнить ответ — исходный остался как был."
                 return
             }
             // Recorded only on SUCCESS, and paired with the produced text so a
@@ -3994,7 +4040,7 @@ final class AppState: ObservableObject {
             try sessionStore.save(session)
             savedSessions = sessionStore.list()
         } catch {
-            lastError = "Couldn't save this meeting: \(error.localizedDescription)"
+            lastError = "Не удалось сохранить звонок: \(error.localizedDescription)"
         }
     }
 
@@ -4280,7 +4326,7 @@ final class AppState: ObservableObject {
             || transcriptionEngineAvailability(engine)
         guard available else {
             pendingEngineChange = nil
-            lastError = "\(engine.advantageTitle) is not available for this account. The active call is still using \(previousEngine.advantageTitle)."
+            lastError = "«\(engine.advantageTitle)» недоступно для этой учётной записи. Звонок продолжается на «\(previousEngine.advantageTitle)»."
             return false
         }
 
@@ -4306,7 +4352,7 @@ final class AppState: ObservableObject {
             Config.transcriptionEngineValue = previousConfigured
             selectedTranscriptionEngine = previousConfigured
             pendingEngineChange = nil
-            lastError = "Couldn't switch this call to \(engine.advantageTitle). It is still using \(previousEngine.advantageTitle)."
+            lastError = "Не удалось переключить звонок на «\(engine.advantageTitle)». Он продолжается на «\(previousEngine.advantageTitle)»."
             return false
         }
 
@@ -4361,6 +4407,9 @@ final class AppState: ObservableObject {
         generation: Int = 1
     ) {
         guard Self.isUnderTest else { return }
+        // Флаг с прошлого звонка не должен встречать следующий.
+        systemAudioLostDuringRecording = false
+        microphoneLostDuringRecording = false
         status = .recording
         activeRecordingSettings = settings
         activeSessionEngine = settings.engine
@@ -4479,14 +4528,14 @@ final class AppState: ObservableObject {
         defer { ledgerLoading = false }
         let base = Config.backendBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let token = await wheesprAccessToken() else {
-            if !quiet { lastError = "Sign in to see your Decision Ledger." }
+            if !quiet { lastError = "Войдите, чтобы увидеть журнал решений." }
             return
         }
         do {
             ledgerDecisions = try await DecisionLogService.recentDecisions(base: base, token: token)
             lastError = nil
         } catch {
-            lastError = "Couldn't load the ledger: \(error.localizedDescription)"
+            lastError = "Не удалось загрузить журнал: \(error.localizedDescription)"
         }
     }
 
@@ -5692,6 +5741,9 @@ final class AppState: ObservableObject {
         guard status == .paused else { return }
         let now = Date()
         recordingElapsed.resume(at: now)
+        // Флаг с прошлого звонка не должен встречать следующий.
+        systemAudioLostDuringRecording = false
+        microphoneLostDuringRecording = false
         status = .recording
         // Back to whatever the co-pilot setting actually is, not
         // unconditionally on: a call paused with automation off must resume
@@ -5871,13 +5923,13 @@ final class AppState: ObservableObject {
     /// pointing at a directory did something.
     func attachContextFolder(url: URL) async {
         guard !contextImporting else {
-            lastError = "Another context source is still indexing. Wait or cancel it first."
+            lastError = "Другой источник ещё индексируется. Дождитесь или отмените его."
             return
         }
         let canonicalPath = url.resolvingSymlinksInPath().standardizedFileURL.path
         let replacesExisting = contextFolders.contains { $0.path == canonicalPath }
         guard replacesExisting || contextFolders.count < Self.maxAttachedContextFolders else {
-            lastError = "You can attach up to \(Self.maxAttachedContextFolders) folders. Remove one before adding another."
+            lastError = "Можно подключить не больше \(Self.maxAttachedContextFolders) папок. Уберите одну, чтобы добавить новую."
             return
         }
         contextImporting = true
@@ -5904,7 +5956,7 @@ final class AppState: ObservableObject {
             // not turn an intentional Cancel into a red global error banner.
         } catch {
             // Do not surface the raw path (or an NSError that may contain it).
-            lastError = "Could not attach \"\(url.lastPathComponent)\". Check that the folder is readable and try again."
+            lastError = "Не удалось подключить «\(url.lastPathComponent)». Проверьте, что папка читается, и попробуйте снова."
         }
     }
 
@@ -5918,7 +5970,7 @@ final class AppState: ObservableObject {
     /// a freshness nobody asked for mid-call.
     func rescanContextFolder(id: UUID) async {
         guard !contextImporting else {
-            lastError = "Another context source is still indexing. Wait or cancel it first."
+            lastError = "Другой источник ещё индексируется. Дождитесь или отмените его."
             return
         }
         guard let folder = contextFolders.first(where: { $0.id == id }) else { return }
@@ -5946,7 +5998,7 @@ final class AppState: ObservableObject {
         } catch {
             // Scanner errors can carry the absolute path in NSError metadata;
             // the folder name is sufficient and safe for the UI.
-            lastError = "Could not refresh \"\(displayName)\". Re-attach it if access changed."
+            lastError = "Не удалось обновить «\(displayName)». Подключите заново, если доступ изменился."
         }
     }
 
@@ -5954,8 +6006,8 @@ final class AppState: ObservableObject {
     /// folder. Say it once, at attach and refresh time.
     private func reportFolderSkips(_ folder: ContextFolder) {
         guard !folder.skipped.isEmpty else { return }
-        lastError = "\"\(folder.name)\": attached \(folder.files.count) file(s); "
-            + "\(folder.skipped.count) left out (folder budget)."
+        lastError = "«\(folder.name)»: подключено файлов — \(folder.files.count); "
+            + "не вошло — \(folder.skipped.count) (не хватило места)."
     }
 
     private static let contextFoldersKey = "context.folders"
@@ -5993,7 +6045,7 @@ final class AppState: ObservableObject {
         }
         persistContextFolders()
         if !lost.isEmpty {
-            lastError = "Lost access to \(lost.joined(separator: ", ")) — re-attach to grant access again."
+            lastError = "Потерян доступ к \(lost.joined(separator: ", ")) — подключите заново, чтобы выдать его снова."
         }
     }
 
@@ -6015,7 +6067,7 @@ final class AppState: ObservableObject {
             }
             pendingImages.append(Attachment(name: url.lastPathComponent, imageData: data))
         }
-        if !errors.isEmpty { lastError = "Image issues — " + errors.joined(separator: "; ") }
+        if !errors.isEmpty { lastError = "С картинками не вышло — " + errors.joined(separator: "; ") }
     }
 
     func removeImage(id: UUID) {
@@ -6177,7 +6229,7 @@ final class AppState: ObservableObject {
         // lastError is transient; the notice persists until acknowledged, so a
         // sign-out cannot be missed by looking away for a moment.
         noteSignedOut(.expired)
-        lastError = "Session expired — sign in again"
+        lastError = "Сессия истекла — войдите снова"
     }
 
     private func installSessionLifecycleObservers() {
@@ -6205,7 +6257,7 @@ final class AppState: ObservableObject {
     /// Returns true on success; failures land in lastError.
     func deleteAccount() async -> Bool {
         guard let token = await wheesprAccessToken() else {
-            lastError = "Sign in before deleting the account."
+            lastError = "Войдите, прежде чем удалять аккаунт."
             return false
         }
         switch await AccountDeletion.perform(baseURL: Config.backendBaseURL, token: token) {
@@ -6276,7 +6328,7 @@ final class AppState: ObservableObject {
                 try? await Task.sleep(nanoseconds: 100_000_000)
             }
             guard !authWorking else {
-                lastError = "Sign-in is still finishing — check your browser window."
+                lastError = "Вход ещё не завершён — проверьте окно браузера."
                 return
             }
         }
@@ -6420,7 +6472,7 @@ final class AppState: ObservableObject {
             applyCalendarAgenda(agenda)
             lastError = nil
         } catch {
-            lastError = "Couldn't load \(title): \(error.localizedDescription)"
+            lastError = "Не удалось загрузить \(title): \(error.localizedDescription)"
         }
     }
 
@@ -6449,7 +6501,7 @@ final class AppState: ObservableObject {
             return nil
         }
         guard Config.googleScopeVersion >= GoogleAuth.scopeVersion else {
-            lastError = "Reconnect Google (Settings) to grant Docs & Sheets access."
+            lastError = "Переподключите Google в настройках, чтобы выдать доступ к Docs и Sheets."
             return nil
         }
         do {
@@ -6470,12 +6522,12 @@ final class AppState: ObservableObject {
     /// error (connect / reconnect Google) — never silently.
     func exportAssistantAnswerToGoogleDocs() async {
         guard googleConnected else {
-            lastError = "Connect Google in Settings to create a Doc."
+            lastError = "Подключите Google в настройках, чтобы создать документ."
             return
         }
         guard Config.googleScopeVersion >= GoogleAuth.scopeVersion,
               Config.googleGrantedServices.contains(GoogleService.docs.rawValue) else {
-            lastError = "Reconnect Google (Settings) with Docs enabled to create a Doc."
+            lastError = "Переподключите Google в настройках с доступом к Docs, чтобы создать документ."
             return
         }
         do {
@@ -6491,7 +6543,7 @@ final class AppState: ObservableObject {
                 NSWorkspace.shared.open(url)
             }
         } catch {
-            lastError = "Google Docs export failed: \(error.localizedDescription)"
+            lastError = "Выгрузка в Google Docs не удалась: \(error.localizedDescription)"
         }
     }
 
@@ -6513,11 +6565,11 @@ final class AppState: ObservableObject {
             // Every other case belongs to a different executor. Silently doing
             // "something close" with a proposal the user confirmed is exactly
             // the failure this boundary exists to prevent.
-            lastError = "That action can't be performed here."
+            lastError = "Это действие здесь недоступно."
             return
         }
         guard googleConnected else {
-            lastError = "Connect Google in Settings to create a spreadsheet."
+            lastError = "Подключите Google в настройках, чтобы создать таблицу."
             return
         }
         guard let token = await freshGoogleToken() else { return }   // sets lastError
@@ -6528,7 +6580,7 @@ final class AppState: ObservableObject {
             lastCreatedSpreadsheetTitle = title
             if let url = URL(string: created.url) { NSWorkspace.shared.open(url) }
         } catch {
-            lastError = "Couldn't create the spreadsheet: \(error.localizedDescription)"
+            lastError = "Не удалось создать таблицу: \(error.localizedDescription)"
         }
     }
 
@@ -6547,7 +6599,7 @@ final class AppState: ObservableObject {
             lastCreatedSpreadsheet = nil
             lastCreatedSpreadsheetTitle = nil
         } catch {
-            lastError = "Couldn't move it to Trash: \(error.localizedDescription)"
+            lastError = "Не удалось отправить в корзину: \(error.localizedDescription)"
         }
     }
 
@@ -6555,7 +6607,7 @@ final class AppState: ObservableObject {
     /// the connected Notion MCP server, then open it. Fails soft.
     func exportAssistantAnswerToNotion() async {
         guard let mcp, mcp.canExportToNotion else {
-            lastError = "Connect Notion in Settings to create a page."
+            lastError = "Подключите Notion в настройках, чтобы создать страницу."
             return
         }
         do {
@@ -6570,7 +6622,7 @@ final class AppState: ObservableObject {
                 NSWorkspace.shared.open(url)
             }
         } catch {
-            lastError = "Notion export failed: \(error.localizedDescription)"
+            lastError = "Выгрузка в Notion не удалась: \(error.localizedDescription)"
         }
     }
 
@@ -6598,7 +6650,7 @@ final class AppState: ObservableObject {
 
     func importGoogleDoc(from urlString: String) async {
         guard let id = SourceURL.googleDocID(from: urlString) else {
-            lastError = "That doesn't look like a Google Doc link."
+            lastError = "Это не похоже на ссылку Google Docs."
             return
         }
         await withImporting {
@@ -6610,7 +6662,7 @@ final class AppState: ObservableObject {
 
     func importGoogleSheet(from urlString: String) async {
         guard let id = SourceURL.googleSheetID(from: urlString) else {
-            lastError = "That doesn't look like a Google Sheet link."
+            lastError = "Это не похоже на ссылку Google Sheets."
             return
         }
         await withImporting {
@@ -6621,7 +6673,7 @@ final class AppState: ObservableObject {
     }
 
     private func appendContext(name: String, text: String) {
-        guard !text.isEmpty else { lastError = "\(name) had no readable text."; return }
+        guard !text.isEmpty else { lastError = "В «\(name)» нет читаемого текста."; return }
         contextFiles.append(ImportedContextFile(name: name, text: text))
     }
 
@@ -7137,7 +7189,7 @@ final class AppState: ObservableObject {
         var images = pendingImages.map { $0.imageData }
         pendingImages.removeAll()
         if !images.isEmpty, !Config.selectedModel.supportsVision {
-            lastError = "The selected model doesn't support images — sending as text-only."
+            lastError = "Выбранная модель не понимает картинки — отправляю только текст."
             images = []
         }
         let prompt = trimmed.isEmpty ? "Describe the attached image(s)." : trimmed
@@ -7269,7 +7321,7 @@ final class AppState: ObservableObject {
     func prepareAnswerAction(_ action: AnswerActionPlanner.Action) {
         guard let mcp,
               let tool = mcp.tools(for: action.serverID).first(where: { $0.name == action.toolName }) else {
-            lastError = "\(action.serverName) is no longer connected."
+            lastError = "\(action.serverName) больше не подключён."
             return
         }
         let items = action.isPerItem ? AnswerActionItems.parse(aiResponse) : []
@@ -7390,7 +7442,7 @@ final class AppState: ObservableObject {
                 }
             }
         } catch {
-            lastError = "\(pending.action.title) failed — \(error.localizedDescription)"
+            lastError = "\(pending.action.title): не удалось — \(error.localizedDescription)"
         }
     }
 
@@ -7588,9 +7640,9 @@ final class AppState: ObservableObject {
                 for: document.title, date: document.exportedAt)
 
             let panel = NSSavePanel()
-            panel.title = "Export assistant answer"
-            panel.message = "Save the answer, its original prompt, the blind spots, and an LLM-created title as a Word document."
-            panel.prompt = "Export"
+            panel.title = "Выгрузить ответ ассистента"
+            panel.message = "Сохранит в документ Word ответ, исходный запрос, слепые зоны и заголовок, придуманный моделью."
+            panel.prompt = "Выгрузить"
             panel.canCreateDirectories = true
             panel.isExtensionHidden = false
             if let docx = UTType(filenameExtension: "docx") {
@@ -7604,7 +7656,7 @@ final class AppState: ObservableObject {
             try data.write(to: url, options: .atomic)
             answerActionResult = "Saved \(url.lastPathComponent)."
         } catch {
-            lastError = "Word export failed: \(error.localizedDescription)"
+            lastError = "Выгрузка в Word не удалась: \(error.localizedDescription)"
         }
     }
 
@@ -7674,7 +7726,7 @@ final class AppState: ObservableObject {
         if dictation.isListening {
             guard let spoken = await dictation.stopAndTranscribe() else {
                 if case .failed(let reason) = dictation.state {
-                    lastError = "Dictation failed — \(reason)"
+                    lastError = "Диктовка не удалась — \(reason)"
                     dictation.clearError()
                 }
                 return
@@ -7685,7 +7737,7 @@ final class AppState: ObservableObject {
         do {
             try dictation.start()
         } catch {
-            lastError = "Could not start dictation — \(error.localizedDescription)"
+            lastError = "Не удалось начать диктовку — \(error.localizedDescription)"
         }
     }
 
@@ -7699,7 +7751,7 @@ final class AppState: ObservableObject {
         dictationWindowStart = nil
         let spoken = spokenSinceWindow(start: start)
         guard !spoken.isEmpty else {
-            lastError = "Nothing was transcribed in that window."
+            lastError = "За это время ничего не расшифровано."
             return
         }
         appendToComposer(spoken, into: text)
@@ -8086,12 +8138,15 @@ final class AppState: ObservableObject {
         let snapshot = transcript
         var context = promptContext(
             query: prompt + "\n" + effectiveCallGoal)
-        // Cross-meeting recall (roadmap F1): a "what did we decide about…"
-        // prompt gets the prior-meeting record prepended, so the answer cites
-        // saved sessions instead of relitigating from a blank context.
-        if let recallBlock = DecisionRecallContext.block(for: prompt, store: sessionStore) {
-            context = recallBlock + "\n\n" + context
-        }
+        // Cross-meeting recall (roadmap F1) считается ниже, внутри `aiTask`, и
+        // НЕ на главном акторе.
+        //
+        // Здесь он стоял синхронно, а `AppState` — `@MainActor`: каждый вопрос
+        // «что мы решили…» читал с диска все сохранённые звонки и считал по ним
+        // эмбеддинги, пока интерфейс стоял. Собственный замер приложения даёт
+        // 2.26 с на 250 звонках — столько окно и не отвечало, причём ровно в тот
+        // момент, когда человек только что задал вопрос на звонке.
+        let recallStore = sessionStore
         // Layer the system prompt: base + call theme + role + distilled button
         // skill + capped open-source SKILL.md methodology.
         let themeGuidance = activeCallTheme.guidance
@@ -8119,6 +8174,15 @@ final class AppState: ObservableObject {
             var deltaPump: Task<Void, Never>?
             defer { deltaPump?.cancel() }
             do {
+                // Кросс-встречный поиск: отдельной оторванной задачей, чтобы
+                // чтение всех звонков и эмбеддинги шли не на главном акторе.
+                // `Task { }` тут не годится — созданная в @MainActor-контексте,
+                // она наследует его изоляцию и точно так же держала бы окно.
+                let recallBlock = await Task.detached(priority: .userInitiated) {
+                    DecisionRecallContext.block(for: prompt, store: recallStore)
+                }.value
+                let context = recallBlock.map { $0 + "\n\n" + context } ?? context
+
                 // Stage 1 — button-specific grounding from connected apps.
                 var groundedContext = context
                 if let workflow, let promptID, !query.isEmpty {
@@ -8696,16 +8760,29 @@ final class AppState: ObservableObject {
             try await systemCapture.start { buffer in
                 systemCaptureDiagnostics.record(buffer)
                 systemChunker?.append(buffer)
+            } onStopped: { [weak self] _ in
+                // Запись продолжается — микрофон жив, и обрывать сессию из-за
+                // половины источников хуже, чем сохранить половину. Но молчать
+                // нельзя: без этого человек узнавал бы о потере собеседников из
+                // расшифровки, когда звонок уже кончился.
+                Task { @MainActor in self?.noteSystemAudioLost() }
             }
             try micCapture.start(
-                noiseSuppressionEnabled: sessionSettings.microphoneNoiseSuppression
-            ) { buffer in
-                micCaptureDiagnostics.record(buffer)
-                micChunker?.append(buffer)
-                guard micLevelUpdateGate.shouldSample() else { return }
-                let level = AudioLevel.rms(buffer)
-                Task { @MainActor in audioMeter.update(level) }
-            }
+                noiseSuppressionEnabled: sessionSettings.microphoneNoiseSuppression,
+                onBuffer: { buffer in
+                    micCaptureDiagnostics.record(buffer)
+                    micChunker?.append(buffer)
+                    guard micLevelUpdateGate.shouldSample() else { return }
+                    let level = AudioLevel.rms(buffer)
+                    Task { @MainActor in audioMeter.update(level) }
+                },
+                // Микрофон не вернулся после смены устройства: наушники
+                // отключились, USB-микрофон вынули. Запись продолжается —
+                // собеседники пишутся, — но своей половины у человека уже нет,
+                // и знать об этом он должен сейчас, а не из расшифровки.
+                onStopped: { [weak self] _ in
+                    Task { @MainActor in self?.noteMicrophoneLost() }
+                })
             // Voice-processed audio is 10–30 dB quieter than raw — with the
             // default −42 dBFS gate every chunk got VAD-dropped and the
             // transcript starved. Match the gate to what VP actually outputs.
@@ -8720,6 +8797,9 @@ final class AppState: ObservableObject {
             recordingStartedAt = Date()
             sessionUsedAI = false
             recordingElapsed.start(at: recordingStartedAt ?? Date())
+            // Флаг с прошлого звонка не должен встречать следующий.
+            systemAudioLostDuringRecording = false
+            microphoneLostDuringRecording = false
             status = .recording
             let recordingContextSessionID = currentSessionID
             Task { [weak self] in
@@ -8762,7 +8842,7 @@ final class AppState: ObservableObject {
                     Config.transcriptionEngineValue = capturedEngine
                     selectedTranscriptionEngine = capturedEngine
                     pendingEngineChange = nil
-                    lastError = "Couldn't switch this call to \(requested.advantageTitle). It is still using \(capturedEngine.advantageTitle)."
+                    lastError = "Не удалось переключить звонок на «\(requested.advantageTitle)». Он продолжается на «\(capturedEngine.advantageTitle)»."
                 }
             } else {
                 pendingEngineChange = nil
@@ -9411,7 +9491,7 @@ final class AppState: ObservableObject {
                 await MainActor.run {
                     guard ObjectIdentifier(self.transcriber) == preparationID else { return }
                     self.transcriptionState = .failed(error.localizedDescription)
-                    self.lastError = "On-device transcription model couldn't load: \(error.localizedDescription) — check your connection, or switch the transcription engine in Settings."
+                    self.lastError = "Модель распознавания не загрузилась: \(error.localizedDescription) — проверьте сеть или смените движок в настройках."
                 }
             }
         }
@@ -9755,7 +9835,7 @@ final class AppState: ObservableObject {
             }
         }
         Task { await failedInstantTranscriber.shutdown() }
-        lastError = "Instant transcription couldn't start: \(message) Continued with \(settings.engine.advantageTitle)."
+        lastError = "Мгновенная расшифровка не запустилась: \(message) Продолжаем на «\(settings.engine.advantageTitle)»."
     }
 
     /// Prepare the snapshot selected for a fresh recording. Reuse a matching
@@ -9968,7 +10048,7 @@ final class AppState: ObservableObject {
                 guard let self,
                       self.recordingGenerationToken === generationToken,
                       self.status == .starting || self.status == .recording else { return }
-                self.lastError = "Deepgram microphone: \(message)"
+                self.lastError = "Deepgram, микрофон: \(message)"
             }
         }
         mic.onInterim = { [weak self] text in

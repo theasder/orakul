@@ -197,10 +197,10 @@ struct PromptBudgetBarViewTests {
         } else {
             // Direct-key/dev: the token estimate is the only honest number.
             let estimate = try inspected.find(textWhere: { string, _ in
-                string.contains("input") && string.contains("~")
+                string.contains("на входе") && string.contains("~")
             })
             #expect(try estimate.string().contains("~"))
-            #expect(try estimate.string().contains("Current partial"))
+            #expect(try estimate.string().contains("Сейчас на входе"))
         }
 
         // The disclosure control is mode-independent.

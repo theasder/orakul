@@ -402,7 +402,7 @@ struct ContextFolderTests {
         await state.rescanContextFolder(id: id)
 
         #expect(state.contextFolders.count == 1)
-        #expect(state.lastError?.contains("Could not refresh") == true)
+        #expect(state.lastError?.contains("Не удалось обновить") == true)
         #expect(state.lastError?.contains(root.path) == false)
         #expect(!state.contextImporting)
     }

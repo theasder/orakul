@@ -74,7 +74,7 @@ struct AccountSessionTests {
         await Self.waitUntil { !state.wheesprConnected }
 
         #expect(!state.wheesprConnected)
-        #expect(state.lastError == "Session expired — sign in again")
+        #expect(state.lastError == "Сессия истекла — войдите снова")
     }
 
     /// Poll `condition` on the main actor until true or a 5 s deadline — the

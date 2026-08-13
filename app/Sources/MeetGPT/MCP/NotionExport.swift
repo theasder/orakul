@@ -32,10 +32,10 @@ enum NotionExport {
                          answer: String, blindSpots: [String],
                          earlierExchanges: [AIExchange] = []) -> String {
         let df = DateFormatter()
-        df.locale = Locale(identifier: "en_US_POSIX")
+        df.locale = DisplayFormatting.locale
         df.dateFormat = "d MMMM yyyy"
 
-        var md = "# \(title)\n\n_Cruxwing assistant export · \(df.string(from: date))_\n\n"
+        var md = "# \(title)\n\n_orakul · \(df.string(from: date))_\n\n"
         for exchange in earlierExchanges {
             let earlierPrompt = exchange.prompt.trimmingCharacters(in: .whitespacesAndNewlines)
             if !earlierPrompt.isEmpty {

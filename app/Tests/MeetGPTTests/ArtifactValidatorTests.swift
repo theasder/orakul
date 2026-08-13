@@ -111,12 +111,12 @@ struct ArtifactValidatorTests {
                           dependency: nil, sourceRef: "10:02:10", tracked: true)],
             slackSummary: "Pricing decided; Sam drafts.")
         let markdown = tasks.markdown
-        #expect(markdown.contains("## Decisions (DACI)"))
+        #expect(markdown.contains("## Решения (DACI)"))
         #expect(markdown.contains("[OWNER?]"))
         #expect(markdown.contains("TRACKED"))
-        #expect(markdown.contains("Slack-ready"))
+        #expect(markdown.contains("сводка для чата"))
         let csv = tasks.csv
-        #expect(csv.hasPrefix("Task,Owner,Due"))
+        #expect(csv.hasPrefix("Задача,Владелец,Срок"))
         #expect(csv.contains("\"Draft, the page\""))   // comma-escaped
 
         let summary = SummaryArtifact(

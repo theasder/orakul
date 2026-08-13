@@ -135,7 +135,7 @@ final class LLMRouter: LLMGateway {
             return try await anthropic.streamChat(system: system, user: user, images: images, model: model.id, maxOutputTokens: maxOutputTokens, onDelta: onDelta)
         case .google:
             return try await gemini.streamChat(system: system, user: user, images: images, model: model.id, maxOutputTokens: maxOutputTokens, onDelta: onDelta)
-        case .deepSeek, .qwen, .zhipu, .moonshot:
+        case .deepSeek, .qwen, .zhipu, .moonshot, .yandexGPT:
             return try await dialectClient(for: model.provider)
                 .streamChat(system: system, user: user, images: images, model: model.id, maxOutputTokens: maxOutputTokens, onDelta: onDelta)
         }
@@ -173,7 +173,9 @@ final class LLMRouter: LLMGateway {
         }
         let client = OpenAIClient(providerName: provider.label,
                                   endpoint: dialect.endpoint,
-                                  keyProvider: dialect.key)
+                                  keyProvider: dialect.key,
+                                  modelIDTransform: dialect.modelID,
+                                  extraHeaders: dialect.headers)
         dialectClients[provider] = client
         return client
     }
@@ -204,7 +206,13 @@ enum LLMError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .missingKey(let provider):
-            return "\(provider) isn't available in this build — sign in to use managed models, or pick an on-device option."
+            // Единственная ошибка, которую человек видит при первом же вопросе
+            // в свежепоставленном приложении: ключей в установщике нет
+            // намеренно. Прежний текст отправлял «войти в аккаунт, чтобы
+            // пользоваться моделями» — совет для продукта с сервером, которого
+            // у orakul нет. Здесь нужно назвать экран, а не диагноз.
+            return "Нет ключа \(provider). Вставьте свой: «Настройки → ИИ → Ключи провайдеров» — "
+                 + "там же написано, где его взять. Запись и поиск по звонкам работают и без ключа."
         case .http(let provider, let code, let body):
             // A gateway outage (the backend down or restarting) returns an nginx
             // ERROR PAGE, not a message — pasting "<html>…502 Bad Gateway…nginx"

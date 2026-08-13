@@ -64,13 +64,13 @@ struct NumbersGuardTests {
             discussion: nil, actionItems: nil, nextSteps: nil)
         let audited = minutes.auditingNumbers(
             against: "we agreed the enterprise plan moves to $499")
-        #expect(audited.markdown.contains("Verify these figures"))
-        let warning = String(audited.markdown[audited.markdown.range(of: "Verify these figures")!.upperBound...])
+        #expect(audited.markdown.contains("Проверьте эти цифры"))
+        let warning = String(audited.markdown[audited.markdown.range(of: "Проверьте эти цифры")!.upperBound...])
         #expect(warning.contains("45"))
         #expect(!warning.contains("$499"), "verified figures stay out of the warning")
 
         let clean = minutes.auditingNumbers(
             against: "enterprise plan $499, headcount forty five, i.e. 45 people")
-        #expect(!clean.markdown.contains("Verify these figures"))
+        #expect(!clean.markdown.contains("Проверьте эти цифры"))
     }
 }

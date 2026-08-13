@@ -36,11 +36,11 @@ struct OnboardingTests {
         let view = OnboardingView(startingAt: .capture)
             .environmentObject(AppState(llm: MockLLMGateway(response: "")))
         let sut = try view.inspect()
-        #expect(throws: Never.self) { try sut.find(text: "Microphone") }
-        #expect(throws: Never.self) { try sut.find(text: "Screen Recording") }
+        #expect(throws: Never.self) { try sut.find(text: "Микрофон") }
+        #expect(throws: Never.self) { try sut.find(text: "Запись экрана") }
         // The check is the point of this screen: a granted permission and a
         // working capture are different things.
-        #expect(throws: Never.self) { try sut.find(text: "Capture check") }
+        #expect(throws: Never.self) { try sut.find(text: "Проверка захвата") }
         #expect(throws: Never.self) { try sut.find(button: "Продолжить") }
         // Sign-in has MOVED to the sidebar's setup card, so the account
         // decision lands after the user has seen what the co-pilot produces.
@@ -50,12 +50,14 @@ struct OnboardingTests {
     @Test("the relaunch fix is offered as a button, not described in prose")
     func relaunchIsAnAction() throws {
         // The old screen told the user to quit and reopen. The row now appears
-        // only when the probe proves the quirk — granted, and silent anyway —
-        // and it carries the action itself.
-        #expect(CaptureProbe.needsRelaunch(verdict: .micOnly,
-                                           screenRecordingGranted: true))
-        #expect(!CaptureProbe.needsRelaunch(verdict: .pass,
-                                            screenRecordingGranted: true))
+        // only when the probe proves the quirk — granted, and the stream refused
+        // to start — and it carries the action itself.
+        #expect(CaptureProbe.advice(verdict: .micOnly, systemAudioStarted: false,
+                                    screenRecordingGranted: true,
+                                    relaunchAlreadyTried: false) == .relaunch)
+        #expect(CaptureProbe.advice(verdict: .pass, systemAudioStarted: true,
+                                    screenRecordingGranted: true,
+                                    relaunchAlreadyTried: false) == .none)
     }
 
     @Test("asked for no particular step, the flow starts at the beginning")
@@ -71,7 +73,7 @@ struct OnboardingTests {
         let sut = try OnboardingView(startingAt: nil)
             .environmentObject(AppState(llm: MockLLMGateway(response: "")))
             .inspect()
-        #expect(throws: Never.self) { try sut.find(text: "Capture check") }
+        #expect(throws: Never.self) { try sut.find(text: "Проверка захвата") }
     }
 
     @Test("the sample step names itself fiction and offers a way out")
@@ -106,18 +108,38 @@ struct OnboardingTests {
         }
     }
 
-    @Test("the sign-in step can be put off from its own row")
-    func setupCardSignInRowHasItsOwnDismiss() throws {
+    @Test("строка про ключ показывается, пока ключа нет, и у неё свой крестик")
+    func setupCardProviderKeyRowHasItsOwnDismiss() throws {
+        // Строка держалась на признаке входа, хотя текст в ней был про ключ.
+        // Пока адрес сервера подставлялся сам, признак был ложным и строка
+        // показывалась — по случайности. Как только адрес перестал
+        // подставляться, `wheesprAvailable` стал false, «вошёл» — true, и
+        // единственная строка про ключ исчезла из установщика. Прошлый тест на
+        // этом упал, но искал он крестик, а не причину.
         let state = AppState(llm: MockLLMGateway(response: ""))
-        let view = SetupCard()
-            .environmentObject(state)
-            .environmentObject(MCPConnectionManager(tokenStore: InMemoryKeychain()))
-        let sut = try view.inspect()
+        let card = {
+            SetupCard()
+                .environmentObject(state)
+                .environmentObject(MCPConnectionManager(tokenStore: InMemoryKeychain()))
+        }
+        let label = "Скрыть: Вставить ключ провайдера — иначе не будет ответов"
 
-        // The row itself, and a dismiss that belongs to it rather than to the
-        // whole card — signing in is optional and stays available in the footer.
-        #expect(throws: Never.self) {
-            try sut.find(viewWithAccessibilityLabel: "Dismiss: Sign in — managed AI & sync")
+        // Ключа нет — строка на месте, и крестик принадлежит ей, а не карточке:
+        // шаг необязательный, но уносить с ним подключения нельзя.
+        ProviderKeyStore.$overrideForTesting.withValue(ProviderKeyStore(store: InMemoryKeychain())) {
+            #expect(throws: Never.self) {
+                try card().inspect().find(viewWithAccessibilityLabel: label)
+            }
+        }
+
+        // Ключ вставили — просить больше не о чем. Второе связывание, а не
+        // присваивание поверх первого: подмена живёт ровно в своей области.
+        let filled = ProviderKeyStore(store: InMemoryKeychain())
+        filled.setKey("sk-synthetic", for: .openAI)
+        ProviderKeyStore.$overrideForTesting.withValue(filled) {
+            #expect(throws: (any Error).self) {
+                try card().inspect().find(viewWithAccessibilityLabel: label)
+            }
         }
     }
 
@@ -154,8 +176,8 @@ struct OnboardingTests {
         let sut = try OnboardingView(startingAt: .capture)
             .environmentObject(state).inspect()
         // Mic granted → its accessibility label reflects that.
-        #expect(throws: Never.self) { try sut.find(viewWithAccessibilityLabel: "Microphone granted") }
+        #expect(throws: Never.self) { try sut.find(viewWithAccessibilityLabel: "Разрешено: Микрофон") }
         // Screen not granted → an Enable affordance is present.
-        #expect(throws: Never.self) { try sut.find(viewWithAccessibilityLabel: "Enable Screen Recording") }
+        #expect(throws: Never.self) { try sut.find(viewWithAccessibilityLabel: "Разрешить: Запись экрана") }
     }
 }

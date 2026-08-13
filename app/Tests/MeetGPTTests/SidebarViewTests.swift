@@ -22,7 +22,7 @@ struct SidebarViewTests {
         let view = SidebarFooter(accountAvailable: true).environmentObject(state(connected: false))
         #expect(throws: Never.self) { try view.inspect().find(viewWithAccessibilityLabel: "Войти") }
         #expect(throws: (any Error).self) {
-            try view.inspect().find(viewWithAccessibilityLabel: "Account: nobody@example.com")
+            try view.inspect().find(viewWithAccessibilityLabel: "Аккаунт: nobody@example.com")
         }
     }
 
@@ -31,7 +31,7 @@ struct SidebarViewTests {
         let view = SidebarFooter(accountAvailable: true)
             .environmentObject(state(connected: true, email: "artem@example.com"))
         #expect(throws: Never.self) {
-            try view.inspect().find(viewWithAccessibilityLabel: "Account: artem@example.com")
+            try view.inspect().find(viewWithAccessibilityLabel: "Аккаунт: artem@example.com")
         }
         // The sign-in control is gone once connected.
         #expect(throws: (any Error).self) { try view.inspect().find(viewWithAccessibilityLabel: "Войти") }
@@ -42,7 +42,7 @@ struct SidebarViewTests {
         let view = SidebarFooter(accountAvailable: false)
             .environmentObject(state(connected: true, email: "artem@example.com"))
         #expect(throws: (any Error).self) {
-            try view.inspect().find(viewWithAccessibilityLabel: "Account: artem@example.com")
+            try view.inspect().find(viewWithAccessibilityLabel: "Аккаунт: artem@example.com")
         }
         #expect(throws: (any Error).self) {
             try view.inspect().find(viewWithAccessibilityLabel: "Войти")

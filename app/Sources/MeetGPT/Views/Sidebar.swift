@@ -29,6 +29,20 @@ struct Sidebar: View {
 
             Hairline().padding(.horizontal, Space.l)
 
+            // Ширина содержимого берётся у самой панели, через GeometryReader.
+            //
+            // Вертикальный ScrollView не навязывает детям свою ширину: Text
+            // получает «идеальную» — всю строку без переносов. Столбец
+            // становился шире панели, и текст обрезался. Сначала слева
+            // («АСТРОЙКА» вместо «НАСТРОЙКА»), а после выравнивания по левому
+            // краю — справа («оставь» вместо «оставьте», «Набор» вместо
+            // «Наборы»): менялась только сторона обрезки, потому что причина —
+            // лишняя ширина — оставалась. `.frame(maxWidth: .infinity)` не
+            // помогает, «бесконечность» здесь и означает «сколько хочешь».
+            //
+            // Отсюда GeometryReader, а не число: панель умеет сужаться до 216,
+            // и зашитая ширина разъехалась бы с ней при первом же узком окне.
+            GeometryReader { geometry in
             ScrollView {
                 VStack(alignment: .leading, spacing: Space.xl) {
                     NewCallButton()
@@ -42,10 +56,24 @@ struct Sidebar: View {
                     HistorySection()
                     LedgerSection()
                 }
+                // Ширина берётся у панели, а не у содержимого.
+                //
+                // Без этого вертикальный ScrollView отдаёт детям их
+                // «идеальную» ширину — для Text это вся строка без переносов.
+                // Столбец становился шире панели, и текст обрезался: сперва
+                // слева («АСТРОЙКА» вместо «НАСТРОЙКА»), а после выравнивания
+                // по левому краю — справа («оставь» вместо «оставьте»,
+                // «Набор» вместо «Наборы»). Менялась только сторона обрезки:
+                // настоящая причина — лишняя ширина — оставалась.
+                //
+                // `maxWidth: .infinity` заставляет столбец принять
+                // предложенную ширину, и тогда Text переносится, как и должен.
+                .frame(width: max(0, geometry.size.width - 2 * Space.l), alignment: .leading)
                 .padding(.horizontal, Space.l)
                 .padding(.top, Space.l)
             }
             .scrollContentBackground(.hidden)
+            }
 
             Hairline().padding(.horizontal, Space.l)
 
@@ -152,9 +180,9 @@ struct NewCallButton: View {
             }
             .buttonStyle(QuietButtonStyle(prominent: true))
             .frame(maxWidth: .infinity, alignment: .leading)
-            .help("Leave this saved call — it stays in History, and the workspace goes blank")
+            .help("Выйти из звонка — он останется в истории, рабочая область очистится")
             .accessibilityLabel("Новый звонок")
-            .accessibilityHint("Closes the meeting opened from History and clears the workspace")
+            .accessibilityHint("Закрывает звонок, открытый из истории, и очищает рабочую область")
             .transition(.opacity)
         }
     }
@@ -191,7 +219,7 @@ private struct HistorySection: View {
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(state.canStartNewCall ? Theme.accentText : Theme.inkTertiary)
-                    .help("Start a new empty call — the current one is saved to History first")
+                    .help("Начать новый звонок — текущий сперва уйдёт в историю")
                     .disabled(!state.canStartNewCall)
                     .accessibilityLabel("Новый звонок")
                     // Next to New call: both answer "give me a different
@@ -207,10 +235,10 @@ private struct HistorySection: View {
                         }
                         .buttonStyle(.plain)
                         .foregroundStyle(Theme.accentText)
-                        .help("Import a past call from Fireflies — its transcript opens here, "
-                              + "ready for Blind Spots and questions")
+                        .help("Импортировать звонок из Fireflies — транскрипт откроется здесь, "
+                              + "готов для поиска слепых зон и вопросов")
                         .accessibilityLabel("Импорт из Fireflies")
-                        .accessibilityHint("Choose a past Fireflies meeting to open as a saved call")
+                        .accessibilityHint("Выберите звонок из Fireflies — он откроется как сохранённый")
                     }
                     Button { confirmClear = true } label: {
                         Image(systemName: "trash")
@@ -218,12 +246,12 @@ private struct HistorySection: View {
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(Theme.inkTertiary)
-                    .help("Remove all saved meetings")
+                    .help("Удалить все сохранённые звонки")
                     .disabled(state.isRecording)
                     .accessibilityLabel("Очистить историю")
                 }
                 if state.savedSessions.isEmpty {
-                    Text("No saved calls yet. Import one from Fireflies to look for blind spots in it.")
+                    Text("Сохранённых звонков пока нет. Импортируйте звонок из Fireflies, чтобы поискать в нём слепые зоны.")
                         .font(.system(size: 11))
                         .foregroundStyle(Theme.inkTertiary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -239,12 +267,12 @@ private struct HistorySection: View {
                 FirefliesImportPicker(isPresented: $showFirefliesPicker)
                     .environmentObject(state)
             }
-            .confirmationDialog("Remove all history?", isPresented: $confirmClear) {
+            .confirmationDialog("Удалить всю историю?", isPresented: $confirmClear) {
                 Button("Remove all \(state.savedSessions.count) meeting\(state.savedSessions.count == 1 ? "" : "s")",
                        role: .destructive) { state.clearAllHistory() }
                 Button("Отмена", role: .cancel) {}
             } message: {
-                Text("This permanently deletes every saved meeting on this Mac. It can't be undone.")
+                Text("Все сохранённые звонки на этом компьютере будут удалены навсегда. Отменить это нельзя.")
             }
         }
     }
@@ -285,8 +313,8 @@ private struct HistoryRow: View {
             }
             .buttonStyle(IconButtonStyle(size: 18))
             .opacity(hovering ? 1 : 0.35)
-            .help("Delete this saved meeting")
-            .accessibilityLabel("Delete \(session.displayTitle)")
+            .help("Удалить сохранённый звонок")
+            .accessibilityLabel("Удалить \(session.displayTitle)")
         }
         .padding(.horizontal, Space.s)
         .padding(.vertical, Space.xs)
@@ -296,7 +324,7 @@ private struct HistoryRow: View {
         .onTapGesture { if !disabled { onOpen() } }
         .onHover { hovering = $0 }
         .opacity(disabled ? 0.5 : 1)
-        .help(disabled ? "Stop recording to open a saved meeting" : "Open this meeting")
+        .help(disabled ? "Остановите запись, чтобы открыть сохранённый звонок" : "Открыть звонок")
         .animation(Motion.quick, value: hovering)
     }
 }
@@ -324,7 +352,7 @@ private struct LedgerSection: View {
                             Image(systemName: "arrow.clockwise").font(.system(size: 9, weight: .semibold))
                         }
                         .buttonStyle(IconButtonStyle(size: 18))
-                        .help("Refresh logged decisions")
+                        .help("Обновить журнал решений")
                     }
                 }
                 if state.ledgerDecisions.isEmpty {
@@ -392,7 +420,6 @@ struct SidebarFooter: View {
             if state.wheesprConnected {
                 Menu {
                     Text(state.wheesprEmail ?? "Signed in").font(Typo.caption)
-                    Text("Plan: \(state.currentTier.label)").font(Typo.caption)
                     Divider()
                     Button("Выйти") { state.signOutWheespr() }
                 } label: {
@@ -401,7 +428,7 @@ struct SidebarFooter: View {
                 .menuStyle(.borderlessButton)
                 .menuIndicator(.hidden)
                 .fixedSize()
-                .accessibilityLabel("Account: \(state.wheesprEmail ?? "signed in")")
+                .accessibilityLabel("Аккаунт: \(state.wheesprEmail ?? "вход выполнен")")
                 .help(state.wheesprEmail ?? "Account")
             } else {
                 Button {
@@ -411,7 +438,7 @@ struct SidebarFooter: View {
                 }
                 .buttonStyle(IconButtonStyle())
                 .accessibilityLabel("Войти")
-                .help("Sign in to your account")
+                .help("Войти в аккаунт")
             }
         }
     }
@@ -469,10 +496,10 @@ struct SidebarFooter: View {
         switch state.status {
         case .idle: return "Готово"
         case .starting: return "Запускаю…"
-        case .recording: return "Recording"
-        case .paused: return "Paused"
-        case .stopping: return "Stopping…"
-        case .error: return "Needs attention"
+        case .recording: return "Идёт запись"
+        case .paused: return "Пауза"
+        case .stopping: return "Останавливаю…"
+        case .error: return "Нужно вмешаться"
         }
     }
 }

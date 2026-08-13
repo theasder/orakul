@@ -105,7 +105,7 @@ struct ComposerImmediateFeedbackTests {
         #expect(state.clarifying)
         let inspected = try ResponseView().environmentObject(state).inspect()
         #expect(throws: Never.self) {
-            try inspected.find(viewWithAccessibilityLabel: "You asked: \(prompt)")
+            try inspected.find(viewWithAccessibilityLabel: "Вы спросили: \(prompt)")
         }
         #expect(throws: Never.self) {
             try inspected.find(text: "The prior answer remains readable.")
@@ -162,7 +162,7 @@ struct ComposerImmediateFeedbackTests {
         #expect(state.submittedPromptPreview == replacement)
         let inspected = try ResponseView().environmentObject(state).inspect()
         #expect(throws: Never.self) {
-            try inspected.find(viewWithAccessibilityLabel: "You asked: \(replacement)")
+            try inspected.find(viewWithAccessibilityLabel: "Вы спросили: \(replacement)")
         }
 
         for _ in 0..<2_000 {
@@ -217,7 +217,7 @@ struct ComposerImmediateFeedbackTests {
             try importingChip.inspect().find(text: "customer-roadmap.pdf")
         }
         #expect(throws: Never.self) {
-            try importingChip.inspect().find(text: "Importing…")
+            try importingChip.inspect().find(text: "Загружаю…")
         }
 
         let context = ImportedContextFile(
@@ -246,9 +246,9 @@ struct ComposerImmediateFeedbackTests {
         #expect(feedback.items[0].phase == .importing)
         let indexing = ComposerAttachmentStatusChip(
             item: feedback.items[0], onRemove: {})
-        #expect(throws: Never.self) { try indexing.inspect().find(text: "Indexing…") }
+        #expect(throws: Never.self) { try indexing.inspect().find(text: "Строю индекс…") }
         #expect(throws: Never.self) {
-            try indexing.inspect().find(viewWithAccessibilityLabel: "Cancel customer-project")
+            try indexing.inspect().find(viewWithAccessibilityLabel: "Отменить customer-project")
         }
 
         let folder = ContextFolder(
@@ -265,7 +265,7 @@ struct ComposerImmediateFeedbackTests {
         #expect(throws: Never.self) { try persistent.inspect().find(text: "customer-project") }
         #expect(throws: Never.self) { try persistent.inspect().find(text: "1 indexed") }
         #expect(throws: Never.self) {
-            try persistent.inspect().find(viewWithAccessibilityLabel: "Remove folder customer-project")
+            try persistent.inspect().find(viewWithAccessibilityLabel: "Убрать папку customer-project")
         }
     }
 
@@ -281,9 +281,9 @@ struct ComposerImmediateFeedbackTests {
         #expect(feedback.items.count == 1)
         #expect(feedback.items[0].phase == .failed)
         let chip = ComposerAttachmentStatusChip(item: feedback.items[0], onRemove: {})
-        #expect(throws: Never.self) { try chip.inspect().find(text: "Import failed") }
+        #expect(throws: Never.self) { try chip.inspect().find(text: "Импорт не удался") }
         #expect(throws: Never.self) {
-            try chip.inspect().find(viewWithAccessibilityLabel: "Remove unreadable")
+            try chip.inspect().find(viewWithAccessibilityLabel: "Убрать unreadable")
         }
     }
 

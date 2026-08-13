@@ -172,10 +172,10 @@ struct LocalWhisperModelTests {
     }
 
     @Test("Config.localWhisperModel honors a saved known choice and rejects garbage")
-    func configPersistence() {
+    func configPersistence() async {
         // Held across the whole test: `SettingsDuringCallTests` writes this same
         // key, and without the lock this read back its "small".
-        SharedDefaults.withExclusiveAccess { configPersistenceBody() }
+        await SharedDefaults.withExclusiveAccess { configPersistenceBody() }
     }
 
     private func configPersistenceBody() {

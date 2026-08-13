@@ -118,4 +118,54 @@ struct RussianLexiconTests {
         #expect(found.contains("API"))
         #expect(found.contains("прод"))
     }
+
+    @Test("английская расшифровка не кириллизуется")
+    func englishTranscriptIsUntouched() {
+        // Самый опасный случай таблицы вариантов: в английском созвоне «prod»
+        // и «bug» — обычные слова, и переписать их кириллицей значит испортить
+        // расшифровку, которую пользователь не просил переводить.
+        let english = "We shipped to prod and closed the bug after review."
+        #expect(RussianLexicon.restoreIfRussian(english) == english)
+    }
+
+    @Test("русская фраза с английскими терминами всё-таки чинится")
+    func mixedRussianIsRepaired() {
+        // Речь разработчика наполовину латиница — определитель языка на таком
+        // тексте регулярно отвечает «английский», поэтому порог по доле букв.
+        let mixed = "Выкатили в prod, поправили промпт и дёрнули api."
+        let repaired = RussianLexicon.restoreIfRussian(mixed)
+        #expect(repaired.contains("прод"))
+        #expect(repaired.contains("API"))
+        #expect(!repaired.contains("prod"))
+    }
+
+    @Test("порог определения языка выдерживает жаргон")
+    func languageDetectionHandlesJargon() {
+        #expect(RussianLexicon.looksRussian("поднимем LLM-фильтр в prod"))
+        #expect(!RussianLexicon.looksRussian("deploy the LLM filter to prod"))
+        // Пустой и технический текст не должен считаться русским: чинить там
+        // нечего, а испортить есть что.
+        #expect(!RussianLexicon.looksRussian(""))
+        #expect(!RussianLexicon.looksRussian("git commit -m fix"))
+    }
+
+
+    @Test("канонический токен: термин, падеж или ничего",
+          arguments: [("промпт", "промпт"), ("prompt", "промпт"), ("prompts", "промпт"),
+                      ("деплою", "деплой"), ("коммита", "коммит"), ("фичи", "фича"),
+                      ("апи", "api"), ("API", "api")])
+    func canonicalTokenResolves(pair: (String, String)) {
+        #expect(RussianLexicon.canonicalToken(for: pair.0) == pair.1)
+    }
+
+    @Test("слово не из словаря даёт nil, а не выдумку",
+          arguments: ["продукт", "багаж", "cat", "совещание"])
+    func unknownWordsHaveNoCanonicalToken(word: String) {
+        // nil — это «решай сам»: командная строка обрежет окончание, приложение
+        // оставит слово как есть. Вернуть здесь что-нибудь значит заставить оба
+        // поиска находить то, чего не говорили.
+        #expect(RussianLexicon.canonicalToken(for: word) == nil,
+                "«\(word)» не термин, а словарь его присвоил")
+    }
+
 }

@@ -407,7 +407,7 @@ final class TranscriptTextView: NSTextView {
         }
         if let speaker = coordinator.speakerForSelection() {
             menu.addItem(.separator())
-            let rename = NSMenuItem(title: "Rename \"\(speaker)\"…",
+            let rename = NSMenuItem(title: "Переименовать «\(speaker)»…",
                                     action: #selector(renameSpeaker), keyEquivalent: "")
             rename.target = self
             rename.representedObject = speaker

@@ -36,11 +36,11 @@ struct BlindSpotPanelPresentation: Equatable {
 
         let heading: String
         if !enabled {
-            heading = "Suggestions off"
+            heading = "Подсказки выключены"
         } else if isPaused {
-            heading = "Suggestions paused"
+            heading = "Подсказки приостановлены"
         } else {
-            heading = isRecording ? "Live suggestions" : "Blind spots"
+            heading = isRecording ? "Подсказки по ходу" : "Слепые зоны"
         }
 
         let status: (String?, StatusKind?)
@@ -49,15 +49,15 @@ struct BlindSpotPanelPresentation: Equatable {
             // stale provider-failure copy promising an automatic retry.
             status = (quota, .quota)
         } else if !enabled {
-            status = ("Turn on Blind Spot in Settings to resume.", .informational)
+            status = ("Включите поиск слепых зон в настройках, чтобы продолжить.", .informational)
         } else if snoozed {
-            status = ("Paused for this call.", .informational)
+            status = ("Приостановлены на этот звонок.", .informational)
         } else if let failure, !failure.isEmpty {
             status = (failure, .providerFailure)
         } else if !hasSuggestions, secondsRemaining <= 0 {
-            status = ("Out of co-pilot hours this month", .informational)
+            status = ("Часы ко-пилота на этот месяц кончились", .informational)
         } else if !hasSuggestions, isRecording, goalSet {
-            status = ("Listening for suggestions…", .informational)
+            status = ("Слушаю, чтобы подсказать…", .informational)
         } else {
             status = (nil, nil)
         }
@@ -109,7 +109,7 @@ struct BrainstormSection: View {
                         .lineLimit(1)
                     Button("очистить") { state.clearProposedGoal() }
                         .buttonStyle(QuietButtonStyle(prominent: true))
-                        .help("Clear the proposed goal and let Cruxwing suggest another")
+                        .help("Убрать предложенную цель — orakul предложит другую")
                     Spacer(minLength: 0)
                 }
             }
@@ -139,7 +139,7 @@ struct BrainstormSection: View {
                     Image(systemName: "clock.arrow.circlepath")
                         .font(.system(size: 10))
                         .foregroundStyle(Theme.amber)
-                    Text("Switching this call to \(pending.advantageTitle)")
+                    Text("Переключаю звонок: \(pending.advantageTitle)")
                         .font(Typo.caption)
                         .foregroundStyle(Theme.inkTertiary)
                         .lineLimit(2)
@@ -180,7 +180,7 @@ struct BrainstormSection: View {
                     }
                     .buttonStyle(QuietButtonStyle(prominent: true))
                     .disabled(researching)
-                    .help("Search your connected apps for material related to the goal")
+                    .help("Поискать в подключённых приложениях то, что относится к цели")
                     if researching {
                         ProgressView().controlSize(.small).scaleEffect(0.7)
                     } else {
@@ -193,7 +193,7 @@ struct BrainstormSection: View {
                 .padding(.leading, -Space.m) // align the quiet button's text
             }
 
-            // Live suggestions: output-first — no standing switch to think
+            // Подсказки по ходу: output-first — no standing switch to think
             // about. Saved cards remain visible while the watcher is off or
             // paused, but its heading/status must describe the watcher that can
             // actually run. The permanent switch remains in Settings.
@@ -222,7 +222,7 @@ struct BrainstormSection: View {
                                 Image(systemName: "pause.circle")
                             }
                             .buttonStyle(IconButtonStyle(size: 16))
-                            .help("Pause suggestions for this call — they return automatically next call")
+                            .help("Приостановить подсказки на этот звонок — на следующем они вернутся сами")
                         }
                     }
                     if let status = blindSpotPanel.statusMessage,
@@ -248,7 +248,7 @@ struct BrainstormSection: View {
                 }
                 .onHover { hoveringSuggestions = $0 }
             } else if !effectiveGoalSet {
-                Text("Set a goal and the co-pilot will surface questions and risks while you record.")
+                Text("Задайте цель — и ко-пилот будет подсказывать вопросы и риски прямо по ходу записи.")
                     .font(Typo.caption)
                     .foregroundStyle(Theme.inkTertiary)
             }
@@ -267,7 +267,7 @@ struct BrainstormSection: View {
                           systemImage: "checkmark.seal")
                 }
                 .buttonStyle(QuietButtonStyle(prominent: true))
-                .help("The background fact-check flagged claims worth a look — open the review")
+                .help("Фоновая проверка фактов отметила утверждения, на которые стоит взглянуть — откройте разбор")
             }
         }
     }
@@ -288,7 +288,7 @@ struct BrainstormSection: View {
         let goal = state.effectiveCallGoal
         guard !goal.isEmpty, !researching else { return }
         guard UsageTracker.consumeGroundedCycle(for: state.currentTier) else {
-            state.lastError = "You've used this month's grounded research runs — upgrade or add more to continue."
+            state.lastError = "Обращения к подключённым приложениям на этот месяц исчерпаны."
             return
         }
         researching = true
@@ -303,7 +303,7 @@ struct BrainstormSection: View {
                 name: "Research · \(snippet.serverName)", text: snippet.text))
         }
         if snippets.isEmpty {
-            state.lastError = "Research found nothing for this goal in your connected apps."
+            state.lastError = "По этой цели в подключённых приложениях ничего не нашлось."
         } else {
             state.lastError = nil
         }
@@ -331,7 +331,7 @@ private struct RecordingContextChip: View {
                 state.selectRecordingContext(.automatic)
             } label: {
                 Label(
-                    "Auto-detect · \(detected.label)",
+                    "Определить самому · \(detected.displayLabel)",
                     systemImage: selection.isAutomatic ? "checkmark" : "wand.and.stars")
             }
             Divider()
@@ -342,7 +342,7 @@ private struct RecordingContextChip: View {
                     state.selectRecordingContext(mode)
                 } label: {
                     Label(
-                        kind.label,
+                        kind.displayLabel,
                         systemImage: selection.mode.rawValue == kind.rawValue
                             ? "checkmark" : kind.symbol)
                 }
@@ -369,7 +369,7 @@ private struct RecordingContextChip: View {
                 Text(awaitingDetection
                      ? "Определять автоматически"
                      : selection.isAutomatic
-                     ? "Auto · \(state.effectiveRecordingContextLabel)"
+                     ? "Авто · \(state.effectiveRecordingContextLabel)"
                      : state.effectiveRecordingContextLabel)
                     .font(Typo.caption)
                     .foregroundStyle(Theme.inkSecondary)
@@ -388,9 +388,9 @@ private struct RecordingContextChip: View {
         .accessibilityIdentifier("recording.context.menu")
         .accessibilityLabel("Тип записи")
         .accessibilityValue(state.effectiveRecordingContextLabel)
-        .help("What this recording represents — override auto-detect without stopping capture")
+        .help("Что именно записывается — можно переключить, не останавливая запись")
         .alert("Тип записи", isPresented: $showingCustomType) {
-            TextField("For example: architecture review video", text: $customDraft)
+            TextField("Например: видео с разбором архитектуры", text: $customDraft)
                 .accessibilityIdentifier("recording.context.custom-field")
             Button("Тип использования") {
                 state.selectRecordingContext(.custom, customLabel: customDraft)
@@ -458,16 +458,16 @@ struct FullContextChip: View {
         if state.fullContextRequested {
             return "\(quote.credits) credits · full context"
         }
-        return state.fullContextQuote.truncated ? "Transcript is being clipped" : "Full context"
+        return state.fullContextQuote.truncated ? "Транскрипт обрезается" : "Весь контекст"
     }
 
     private var helpText: String {
         let quote = state.fullContextQuote
         if state.fullContextRequested {
-            return quote.summary + ". Applies to the next send only."
+            return quote.summary + ". Действует только на следующую отправку."
         }
-        return "Send the whole transcript and everything attached on the next request. "
-            + "Costs more credits; applies once."
+        return "Следующий запрос уйдёт со всем транскриптом и всем приложенным. "
+            + "Стоит дороже у провайдера; действует один раз."
     }
 }
 
@@ -507,18 +507,18 @@ struct SocraticChip: View {
     /// Names what happens next, not what the setting is called. "Socratic" alone
     /// does not tell someone whether THIS ask gets an answer.
     private var label: String {
-        if state.socraticBrokenOut { return "Socratic · answering plainly" }
-        guard state.socraticWillWithhold else { return "Socratic · bound spent" }
+        if state.socraticBrokenOut { return "Сократ · отвечаю прямо" }
+        guard state.socraticWillWithhold else { return "Сократ · лимит вопросов исчерпан" }
         let remaining = state.socraticRemainingExchanges
-        return remaining == 1 ? "Socratic · 1 question left"
+        return remaining == 1 ? "Сократ · остался 1 вопрос"
                               : "Socratic · \(remaining) questions left"
     }
 
     private var helpText: String {
         state.status == .recording
             ? "Answers with questions. Limited to \(SocraticMode.maxExchangesRecording) "
-              + "during a live call — press ⌘⇧A for a direct answer."
-            : "Answers with questions. Press ⌘⇧A for a direct answer."
+              + "по ходу звонка — ⌘⇧A даёт прямой ответ."
+            : "Отвечает вопросами. ⌘⇧A — прямой ответ."
     }
 }
 
@@ -532,7 +532,7 @@ private struct ThemeChip: View {
         Menu {
             // Style sits beside the theme rather than in Settings: it is a
             // per-session choice made while composing, like the theme is.
-            Picker("Answer style", selection: $state.answerStyle) {
+            Picker("Как отвечать", selection: $state.answerStyle) {
                 ForEach(AnswerStyle.allCases) { style in
                     Text(style.label).tag(style)
                 }
@@ -553,7 +553,7 @@ private struct ThemeChip: View {
                     .accessibilityIdentifier("composer.socraticBreakout")
             }
             Divider()
-            Picker("Call theme", selection: $state.callThemeOverride) {
+            Picker("Тема звонка", selection: $state.callThemeOverride) {
                 Label("Определять автоматически", systemImage: "wand.and.stars")
                     .tag(CallTheme?.none)
                 Divider()
@@ -568,7 +568,7 @@ private struct ThemeChip: View {
                 Image(systemName: active.symbol)
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(Theme.accent)
-                Text(isAuto ? "Auto · \(active.label)" : active.label)
+                Text(isAuto ? "Авто · \(active.label)" : active.label)
                     .font(Typo.caption)
                     .foregroundStyle(Theme.inkSecondary)
                     // No truncation: at its narrowest the label wraps to a
@@ -585,7 +585,7 @@ private struct ThemeChip: View {
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
-        .help("Skill pack applied to this call's AI actions — tap to change or auto-detect")
+        .help("Набор навыков для действий ИИ на этом звонке — нажмите, чтобы сменить или определить автоматически")
     }
 }
 
@@ -630,7 +630,7 @@ private struct RoleChip: View {
                                                : (active?.symbol ?? "person.crop.circle.dashed"))
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(active == nil && !isCustom ? Theme.inkTertiary : Theme.accent)
-                    Text(isCustom ? (customLabel ?? "Role") : (active?.label ?? "Role"))
+                    Text(isCustom ? (customLabel ?? "Роль") : (active?.label ?? "Роль"))
                         .font(Typo.caption)
                         .foregroundStyle(Theme.inkSecondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -645,7 +645,7 @@ private struct RoleChip: View {
             }
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
-            .help("Your job position — tailors every AI action's method to your role")
+            .help("Ваша должность — под неё подстраивается способ, которым ИИ разбирает звонок")
         }
     }
 }
@@ -717,7 +717,7 @@ private struct RhetoricNoteCard: View {
             .strokeBorder(Theme.amber.opacity(0.3), lineWidth: 1))
         .onHover { hovering = $0 }
         .animation(Motion.quick, value: hovering)
-        .accessibilityLabel("Rhetoric watch: \(note)")
+        .accessibilityLabel("Как это звучит: \(note)")
     }
 }
 
@@ -757,7 +757,7 @@ private struct FacilitationNoteCard: View {
             .strokeBorder(Theme.speakerThem.opacity(0.35), lineWidth: 1))
         .onHover { hovering = $0 }
         .animation(Motion.quick, value: hovering)
-        .accessibilityLabel("Facilitation: \(note)")
+        .accessibilityLabel("Ведение разговора: \(note)")
     }
 }
 
@@ -832,7 +832,7 @@ struct SuggestionCard: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .fixedSize(horizontal: false, vertical: true)
-                .accessibilityLabel("Quoted from the call: \(evidence)")
+                .accessibilityLabel("Цитата со звонка: \(evidence)")
             }
             if !suggestion.detail.isEmpty {
                 Text(suggestion.detail)
@@ -864,10 +864,10 @@ struct SuggestionCard: View {
                                 .foregroundStyle(Theme.ink)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
-                        .accessibilityLabel("Say this to test it: \(cheapTest)")
+                        .accessibilityLabel("Скажите это, чтобы проверить: \(cheapTest)")
                     }
                     if let cost = suggestion.costOfMissing, !cost.isEmpty {
-                        Text("If wrong: \(cost)")
+                        Text("Если ошибаемся: \(cost)")
                             .font(Typo.caption)  // deliberately smaller: consequence, not action
                             .foregroundStyle(Theme.inkTertiary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -888,17 +888,17 @@ struct SuggestionCard: View {
                         NSPasteboard.general.setString(cheapTest, forType: .string)
                         copied = true
                     } label: {
-                        Label(copied ? "Copied" : "Copy the test",
+                        Label(copied ? "Copied" : "Скопировать проверку",
                               systemImage: copied ? "checkmark" : "doc.on.doc")
                     }
                     .buttonStyle(QuietButtonStyle())
-                    .help("Copy the sentence that settles this")
+                    .help("Скопировать фразу, которая это закрывает")
                 }
                 Button { onAsk() } label: {
                     Label("Спросить", systemImage: "arrow.up.circle")
                 }
                 .buttonStyle(QuietButtonStyle(prominent: true))
-                .help("Send to the assistant")
+                .help("Отправить ассистенту")
             }
         }
         .padding(Space.s)

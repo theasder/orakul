@@ -217,7 +217,7 @@ struct ConnectedWriteCommitDispatchTests {
         #expect(fake.requests.count == 1)
         #expect(state.answerActionResult == nil)
         #expect(state.lastError ==
-            "Create in HubSpot failed — Fake connector rejected the edited payload.")
+            "Create in HubSpot: не удалось — Fake connector rejected the edited payload.")
         #expect(state.runningAnswerAction == nil)
     }
 

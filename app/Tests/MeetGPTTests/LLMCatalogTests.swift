@@ -246,23 +246,33 @@ struct LLMCatalogTests {
 
     @Test("configuredProviders is a catalog-ordered subsequence, deduped, and tier-monotonic")
     func configuredProvidersOrdering() {
-        // Full first-appearance provider order across the catalog.
-        var catalogOrder: [LLMProvider] = []
-        for model in LLMCatalog.all where !catalogOrder.contains(model.provider) {
-            catalogOrder.append(model.provider)
+        // `configuredProviders` и `isConfigured` оба смотрят в
+        // `ProviderKeyStore.current`. Тест читает его дважды, и пока подмена
+        // была глобальной на процесс, между чтениями другой набор успевал
+        // подставить своё хранилище: список приходил про одно состояние, а
+        // `isConfigured` отвечал уже про другое. Падало примерно в половине
+        // полных прогонов и только под нагрузкой, а в одиночку проходило.
+        //
+        // Теперь подмена — task-local, и связывание видно только этой задаче.
+        withSeededProviderKeys {
+            // Full first-appearance provider order across the catalog.
+            var catalogOrder: [LLMProvider] = []
+            for model in LLMCatalog.all where !catalogOrder.contains(model.provider) {
+                catalogOrder.append(model.provider)
+            }
+
+            let premium = LLMCatalog.configuredProviders(for: .premium)
+            // No duplicates.
+            #expect(Set(premium).count == premium.count)
+            // Relative order matches the catalog's first-appearance order.
+            #expect(premium == catalogOrder.filter(premium.contains))
+            // Every configured provider actually reports itself configured.
+            for provider in premium { #expect(provider.isConfigured) }
+
+            // Weaker tiers configure a subset of a stronger tier's providers.
+            let free = LLMCatalog.configuredProviders(for: .free)
+            #expect(Set(free).isSubset(of: Set(premium)))
         }
-
-        let premium = LLMCatalog.configuredProviders(for: .premium)
-        // No duplicates.
-        #expect(Set(premium).count == premium.count)
-        // Relative order matches the catalog's first-appearance order.
-        #expect(premium == catalogOrder.filter(premium.contains))
-        // Every configured provider actually reports itself configured.
-        for provider in premium { #expect(provider.isConfigured) }
-
-        // Weaker tiers configure a subset of a stronger tier's providers.
-        let free = LLMCatalog.configuredProviders(for: .free)
-        #expect(Set(free).isSubset(of: Set(premium)))
     }
 
     // MARK: LLMProvider jurisdiction + label
@@ -310,15 +320,20 @@ struct LLMCatalogTests {
 
     @Test("council panels only include same-jurisdiction providers at their autoVersion")
     func councilPanelMembers() {
-        for tier in Tier.allCases {
-            for member in LLMCatalog.councilPanel(.us, for: tier) {
-                #expect(member.provider.jurisdiction == .us)
-                #expect(member.provider.hasDirectKey)
-                // Each member runs the provider's strongest tier-allowed version.
-                #expect(member.modelID == LLMCatalog.autoVersion(of: member.provider, for: tier)?.id)
-            }
-            for member in LLMCatalog.councilPanel(.china, for: tier) {
-                #expect(member.provider.jurisdiction == .china)
+        // Ключи нужны по той же причине, что и в проверке выше: `hasDirectKey`
+        // смотрит в `ProviderKeyStore.current`. Связывание — task-local, так
+        // что соседние наборы его не видят и подменить не могут.
+        withSeededProviderKeys {
+            for tier in Tier.allCases {
+                for member in LLMCatalog.councilPanel(.us, for: tier) {
+                    #expect(member.provider.jurisdiction == .us)
+                    #expect(member.provider.hasDirectKey)
+                    // Each member runs the provider's strongest tier-allowed version.
+                    #expect(member.modelID == LLMCatalog.autoVersion(of: member.provider, for: tier)?.id)
+                }
+                for member in LLMCatalog.councilPanel(.china, for: tier) {
+                    #expect(member.provider.jurisdiction == .china)
+                }
             }
         }
     }

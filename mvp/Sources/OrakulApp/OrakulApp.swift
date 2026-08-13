@@ -33,9 +33,18 @@ final class ArchiveModel: ObservableObject {
         reload()
     }
 
+    /// Разобранный архив. Строится один раз на загрузку, а не на каждый вопрос.
+    ///
+    /// `RecallIndex` разбирает слова всех встреч при создании. Пока индекс
+    /// создавался прямо в `search()`, месяц часовых звонков разбирался заново
+    /// на каждое нажатие «Найти» — секунды ожидания каждый раз, а не только
+    /// первый.
+    private var index: RecallIndex?
+
     func reload() {
         let archive = store.load()
         sessions = archive.sessions
+        index = nil            // архив изменился — старый разбор недействителен
         // Пропущенные файлы показываются, а не проглатываются: тихо потерянная
         // встреча — худший исход для архива.
         status = archive.skipped.isEmpty
@@ -48,8 +57,9 @@ final class ArchiveModel: ObservableObject {
         guard !trimmed.isEmpty else { return }
         // Тот же составитель ответа, что и в командной строке: двух форматов
         // «ответа» у продукта быть не должно.
-        answer = RecallAnswer.compose(query: trimmed,
-                                      hits: RecallIndex(sessions: sessions).search(trimmed))
+        let index = self.index ?? RecallIndex(sessions: sessions)
+        self.index = index
+        answer = RecallAnswer.compose(query: trimmed, hits: index.search(trimmed))
     }
 }
 

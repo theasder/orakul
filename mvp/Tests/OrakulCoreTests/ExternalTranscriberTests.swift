@@ -235,3 +235,63 @@ private final class Box: @unchecked Sendable {
         set { lock.lock(); stored = newValue; lock.unlock() }
     }
 }
+
+/// Что человек читает, когда расшифровка не удалась.
+///
+/// Печаталось `Не смог расшифровать: engineFailed("движок упал\n")` — имя
+/// случая перечисления в строке для человека. Соседние сообщения той же
+/// команды написаны нормально: «Запись на 44100 Гц, а движку нужно 16000».
+/// Разница проявляется ровно в момент отказа — там, где помощь и нужна.
+@Suite("Сообщения об отказе расшифровки")
+struct TranscriberErrorTextTests {
+
+    private static let engineErrors: [ExternalTranscriber.TranscriberError] = [
+        .commandIsEmpty, .commandHasNoFilePlaceholder,
+        .engineFailed("движок упал"), .engineSaidNothing,
+    ]
+    private static let decodeErrors: [WAVFile.DecodeError] = [
+        .notRIFF, .notPCM16, .unsupportedSampleRate(44_100),
+    ]
+
+    @Test("ни одно сообщение не показывает имя случая перечисления",
+          arguments: engineErrors.map(String.init(describing:))
+                   + decodeErrors.map(String.init(describing:)))
+    func noEnumCaseLeaksIntoText(text: String) {
+        for leak in ["engineFailed", "engineSaidNothing", "commandIsEmpty",
+                     "commandHasNoFilePlaceholder", "notRIFF", "notPCM16",
+                     "unsupportedSampleRate", "(", ")"] {
+            #expect(!text.contains(leak),
+                    "во внутренностях наружу: «\(text)»")
+        }
+    }
+
+    @Test("каждое сообщение — по-русски и не пустое",
+          arguments: engineErrors.map(String.init(describing:))
+                   + decodeErrors.map(String.init(describing:)))
+    func everyMessageIsRussian(text: String) {
+        #expect(text.count > 20, "слишком коротко, чтобы что-то объяснить: «\(text)»")
+        #expect(text.contains(where: { ("а"..."я").contains($0) || ("А"..."Я").contains($0) }),
+                "сообщение не по-русски: «\(text)»")
+    }
+
+    @Test("сообщение о частоте называет её и даёт команду")
+    func sampleRateMessageIsActionable() {
+        let text = String(describing: WAVFile.DecodeError.unsupportedSampleRate(44_100))
+        #expect(text.contains("44100"), "не сказано, какая частота у файла")
+        #expect(text.contains("16000"), "не сказано, какая нужна")
+        #expect(text.contains("ffmpeg"), "нет команды, которой это чинится")
+    }
+
+    @Test("ответ движка доходит до человека, а не теряется")
+    func engineOutputSurvives() {
+        // Единственная подсказка о причине — то, что сказал сам движок.
+        let text = String(describing: ExternalTranscriber.TranscriberError.engineFailed("нет модели"))
+        #expect(text.contains("нет модели"))
+    }
+
+    @Test("молчаливый движок объясняется без его слов")
+    func silentEngineStillExplains() {
+        let text = String(describing: ExternalTranscriber.TranscriberError.engineFailed("   "))
+        #expect(text.contains("ничего не сказал"), "пустой вывод оставил пустое сообщение: «\(text)»")
+    }
+}

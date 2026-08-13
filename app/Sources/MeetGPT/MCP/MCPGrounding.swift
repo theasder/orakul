@@ -1,5 +1,6 @@
 import Foundation
 import MCP
+import OrakulCore
 
 /// One piece of background pulled from a connected work app during research.
 struct GroundingSnippet: Identifiable, Sendable {
@@ -111,6 +112,68 @@ extension MCPConnectionManager {
                     .joined(separator: " "),
                 strongFor: probe?.strongFor ?? [])
         }
+        // Российские трекеры — такие же токенные коннекторы, как Slack: не MCP,
+        // но отвечают на тот же вопрос, что Linear и Jira. Проходят через тот
+        // же подбор источников, иначе подключённый Яндекс Трекер молчал бы,
+        // а Linear отвечал.
+        let allTrackers = includeTeam ? trackerStore.configured : []
+        let trackerCandidates = allTrackers.map { service -> GroundingContextPolicy.SourceCandidate in
+            GroundingContextPolicy.SourceCandidate(
+                id: "tracker:\(service.rawValue)",
+                searchableText: [service.rawValue, service.title,
+                                 ConnectorProbeStrategy.trackerProbe.queryHint]
+                    .joined(separator: " "),
+                strongFor: ConnectorProbeStrategy.trackerProbe.strongFor)
+        }
+        // GitHub — источник того же рода: задачи команды, только не через MCP
+        // (у GitHub нет динамической регистрации клиента, см. GitHubConnector).
+        let githubReady = includeTeam && trackerStore.isGitHubReady
+        let githubCandidates: [GroundingContextPolicy.SourceCandidate] = githubReady
+            ? [GroundingContextPolicy.SourceCandidate(
+                id: "github",
+                searchableText: "github issues pull requests задачи пулл-реквесты "
+                    + ConnectorProbeStrategy.trackerProbe.queryHint,
+                strongFor: ConnectorProbeStrategy.trackerProbe.strongFor)]
+            : []
+
+        // Рабочие мессенджеры — тот же род источника, но отвечают на другой
+        // вопрос: не «заводили ли задачу», а «обсуждали ли это». Ответ на
+        // второй чаще лежит в переписке, чем в трекере.
+        let allMessengers = includeTeam ? trackerStore.configuredMessengers : []
+        let messengerCandidates = allMessengers.map { service -> GroundingContextPolicy.SourceCandidate in
+            GroundingContextPolicy.SourceCandidate(
+                id: "messenger:\(service.rawValue)",
+                searchableText: [service.rawValue, service.title,
+                                 "переписка чат сообщения обсуждали писали"]
+                    .joined(separator: " "),
+                strongFor: ConnectorProbeStrategy.trackerProbe.strongFor)
+        }
+
+        // Открытые трекеры на своём сервере — тот же вопрос, что у GitHub,
+        // только адрес свой.
+        let allSelfHosted = includeTeam ? trackerStore.configuredSelfHosted : []
+        let selfHostedCandidates = allSelfHosted.map { service -> GroundingContextPolicy.SourceCandidate in
+            GroundingContextPolicy.SourceCandidate(
+                id: "selfhosted:\(service.rawValue)",
+                searchableText: [service.rawValue, service.title,
+                                 ConnectorProbeStrategy.trackerProbe.queryHint]
+                    .joined(separator: " "),
+                strongFor: ConnectorProbeStrategy.trackerProbe.strongFor)
+        }
+
+        // База знаний — третий вопрос: не «заводили» и не «обсуждали», а
+        // «описывали». Решение, записанное в вики полгода назад, не найдётся
+        // ни в задачах, ни в переписке.
+        let allNotes = includeTeam ? trackerStore.configuredNotes : []
+        let notesCandidates = allNotes.map { service -> GroundingContextPolicy.SourceCandidate in
+            GroundingContextPolicy.SourceCandidate(
+                id: "notes:\(service.rawValue)",
+                searchableText: [service.rawValue, service.title,
+                                 "вики база знаний документация описывали заметки"]
+                    .joined(separator: " "),
+                strongFor: ConnectorProbeStrategy.trackerProbe.strongFor)
+        }
+
         let teamCandidates = allTeamServices.map { service -> GroundingContextPolicy.SourceCandidate in
             let probe = ConnectorProbeStrategy.probe(forTeamService: service.rawValue)
             return GroundingContextPolicy.SourceCandidate(
@@ -121,7 +184,8 @@ extension MCPConnectionManager {
                 strongFor: probe?.strongFor ?? [])
         }
         let selected = GroundingContextPolicy.selectSources(
-            mcpCandidates + teamCandidates,
+            trackerCandidates + githubCandidates + messengerCandidates
+                + selfHostedCandidates + notesCandidates + mcpCandidates + teamCandidates,
             query: goal,
             tier: Config.currentTier,
             requestedLimit: maxSources)
@@ -131,6 +195,9 @@ extension MCPConnectionManager {
         let targets: [MCPServerDescriptor] = selected.compactMap {
             candidate -> MCPServerDescriptor? in
             guard candidate.id.hasPrefix("mcp:") else { return nil }
+            // Тип проставлен явно: у `+` десятки перегрузок, и цепочка из шести
+            // слагаемых с тернарником перебиралась почти секунду на каждое место
+            // вызова — пока сборка не начала падать с «unable to type-check».
             let id = String(candidate.id.dropFirst("mcp:".count))
             return allTargets.first { $0.id == id }
         }
@@ -140,8 +207,40 @@ extension MCPConnectionManager {
             let id = String(candidate.id.dropFirst("team:".count))
             return allTeamServices.first { $0.rawValue == id }
         }
-        guard !targets.isEmpty || !teamServices.isEmpty else { return [] }
-        return await withTaskGroup(of: (Int, GroundingSnippet?).self) { group in
+        let trackerServices: [RussianTrackers.Service] = selected.compactMap {
+            candidate -> RussianTrackers.Service? in
+            guard candidate.id.hasPrefix("tracker:") else { return nil }
+            let id = String(candidate.id.dropFirst("tracker:".count))
+            return allTrackers.first { $0.rawValue == id }
+        }
+        let messengerServices: [WorkMessengers.Service] = selected.compactMap {
+            candidate -> WorkMessengers.Service? in
+            guard candidate.id.hasPrefix("messenger:") else { return nil }
+            let id = String(candidate.id.dropFirst("messenger:".count))
+            return allMessengers.first { $0.rawValue == id }
+        }
+        let selfHostedServices: [SelfHostedTrackers.Service] = selected.compactMap {
+            candidate -> SelfHostedTrackers.Service? in
+            guard candidate.id.hasPrefix("selfhosted:") else { return nil }
+            let id = String(candidate.id.dropFirst("selfhosted:".count))
+            return allSelfHosted.first { $0.rawValue == id }
+        }
+        let notesServices: [TeamNotes.Service] = selected.compactMap {
+            candidate -> TeamNotes.Service? in
+            guard candidate.id.hasPrefix("notes:") else { return nil }
+            let id = String(candidate.id.dropFirst("notes:".count))
+            return allNotes.first { $0.rawValue == id }
+        }
+        let githubSelected = selected.contains { $0.id == "github" }
+        guard !targets.isEmpty || !teamServices.isEmpty || !trackerServices.isEmpty
+                || githubSelected || !messengerServices.isEmpty
+                || !selfHostedServices.isEmpty || !notesServices.isEmpty
+        else { return [] }
+        // Тип результата закрытия проставлен явно. Без него компилятор
+        // выводит его из семи веток `group.addTask` разом и перестаёт
+        // укладываться в отведённое время — сборка падает не ошибкой в
+        // коде, а «unable to type-check in reasonable time».
+        return await withTaskGroup(of: (Int, GroundingSnippet?).self) { group -> [GroundingSnippet] in
             for (index, server) in targets.enumerated() {
                 group.addTask { @MainActor in
                     (index, await self.researchOne(
@@ -149,7 +248,7 @@ extension MCPConnectionManager {
                 }
             }
             for (offset, service) in teamServices.enumerated() {
-                let index = targets.count + offset
+                let index: Int = targets.count + offset
                 group.addTask {
                     let query = ConnectorProbeStrategy.query(goal: goal, serverID: service.rawValue)
                     guard let text = await TeamConnectors.search(service, query: query, cap: maxCharsPerSource),
@@ -161,6 +260,165 @@ extension MCPConnectionManager {
                             forTeamService: service.rawValue)?.readFor))
                 }
             }
+            let store = trackerStore
+            let http = trackerHTTP
+            for (offset, service) in trackerServices.enumerated() {
+                let index: Int = targets.count + teamServices.count + offset
+                group.addTask {
+                    let query = ConnectorProbeStrategy.query(
+                        goal: goal, serverID: service.rawValue)
+                    guard let text = await store.searchText(
+                        service, query: query, cap: maxCharsPerSource, http: http),
+                          !text.isEmpty else { return (index, nil) }
+                    return (index, GroundingSnippet(
+                        serverName: service.title, toolName: "search",
+                        text: text, sourceID: "tracker:\(service.rawValue)",
+                        readFor: ConnectorProbeStrategy.trackerProbe.readFor))
+                }
+            }
+            let githubCount: Int = githubSelected ? 1 : 0
+            // База знаний идёт после открытых трекеров.
+            // Сложение разбито по шагам не ради читаемости: одной цепочкой из
+            // шести слагаемых с тернарником оно проверялось 8,8 с, и после
+            // подключения второго модуля сборка стала падать не ошибкой в коде,
+            // а «unable to type-check this expression in reasonable time».
+            // Замер: -Xfrontend -warn-long-expression-type-checking.
+            var notesBase: Int = targets.count
+            notesBase += teamServices.count
+            notesBase += trackerServices.count
+            notesBase += githubCount
+            notesBase += messengerServices.count
+            notesBase += selfHostedServices.count
+            for (offset, service) in notesServices.enumerated() {
+                let index = notesBase + offset
+                let store = trackerStore
+                let http = notesHTTP
+                group.addTask {
+                    let query = ConnectorProbeStrategy.query(
+                        goal: goal, serverID: service.rawValue)
+                    guard let client = store.notesClient(for: service, http: http) else { return (index, nil) }
+                    // Срок тот же, что у MCP-инструмента: зависший сервис должен
+                    // стоить одного источника, а не всего ответа на звонке.
+                    // `timeoutInterval` у запроса этого не даёт — он сбрасывается
+                    // на каждом принятом байте, и сервер, отдающий по байту,
+                    // держит соединение сколько угодно.
+                    let hits = await withMCPDeadline(seconds: Self.groundingDeadline) {
+                        try await client.search(query)
+                    }
+                    guard let hits, !hits.isEmpty else { return (index, nil) }
+                    let text = hits.prefix(10)
+                        .map { "[\($0.title)] \($0.context)" }
+                        .joined(separator: "\n")
+                        .prefix(maxCharsPerSource).description
+                    return (index, GroundingSnippet(
+                        serverName: service.title, toolName: "search",
+                        text: text, sourceID: "notes:\(service.rawValue)",
+                        readFor: ConnectorProbeStrategy.trackerProbe.readFor))
+                }
+            }
+            // Открытые трекеры идут последними, после мессенджеров.
+            var selfHostedBase: Int = targets.count
+            selfHostedBase += teamServices.count
+            selfHostedBase += trackerServices.count
+            selfHostedBase += githubCount
+            selfHostedBase += messengerServices.count
+            for (offset, service) in selfHostedServices.enumerated() {
+                let index = selfHostedBase + offset
+                let store = trackerStore
+                let http = selfHostedHTTP
+                group.addTask {
+                    let query = ConnectorProbeStrategy.query(
+                        goal: goal, serverID: service.rawValue)
+                    guard let client = store.selfHostedClient(for: service, http: http) else { return (index, nil) }
+                    // Срок тот же, что у MCP-инструмента: зависший сервис должен
+                    // стоить одного источника, а не всего ответа на звонке.
+                    // `timeoutInterval` у запроса этого не даёт — он сбрасывается
+                    // на каждом принятом байте, и сервер, отдающий по байту,
+                    // держит соединение сколько угодно.
+                    let items = await withMCPDeadline(seconds: Self.groundingDeadline) {
+                        try await client.search(query)
+                    }
+                    guard let items, !items.isEmpty else { return (index, nil) }
+                    // Состояние задачи в тексте: «уже закрыто» меняет смысл
+                    // находки на противоположный.
+                    let text = items.prefix(10)
+                        .map { "[\($0.key), \($0.state)] \($0.title)" }
+                        .joined(separator: "\n")
+                        .prefix(maxCharsPerSource).description
+                    return (index, GroundingSnippet(
+                        serverName: service.title, toolName: "search",
+                        text: text, sourceID: "selfhosted:\(service.rawValue)",
+                        readFor: ConnectorProbeStrategy.trackerProbe.readFor))
+                }
+            }
+            // Мессенджеры идут после GitHub, поэтому и смещение считается от
+            // него. Индексы здесь ручные: результаты собираются по позиции, и
+            // сдвиг на единицу подменил бы источник у сниппета.
+            var messengerBase: Int = targets.count
+            messengerBase += teamServices.count
+            messengerBase += trackerServices.count
+            messengerBase += githubCount
+            for (offset, service) in messengerServices.enumerated() {
+                let index = messengerBase + offset
+                let store = trackerStore
+                let http = messengerHTTP
+                group.addTask {
+                    let query = ConnectorProbeStrategy.query(
+                        goal: goal, serverID: service.rawValue)
+                    guard let client = store.messengerClient(for: service, http: http) else { return (index, nil) }
+                    // Срок тот же, что у MCP-инструмента: зависший сервис должен
+                    // стоить одного источника, а не всего ответа на звонке.
+                    // `timeoutInterval` у запроса этого не даёт — он сбрасывается
+                    // на каждом принятом байте, и сервер, отдающий по байту,
+                    // держит соединение сколько угодно.
+                    let hits = await withMCPDeadline(seconds: Self.groundingDeadline) {
+                        try await client.search(query)
+                    }
+                    guard let hits, !hits.isEmpty else { return (index, nil) }
+                    // Автор попадает в текст: «это писала Полина» меняет вес
+                    // находки, а по одному тексту сообщения этого не видно.
+                    let text = hits.prefix(10)
+                        .map { hit in
+                            hit.author.map { "[\($0)] \(hit.text)" } ?? hit.text
+                        }
+                        .joined(separator: "\n")
+                        .prefix(maxCharsPerSource).description
+                    return (index, GroundingSnippet(
+                        serverName: service.title, toolName: "search",
+                        text: text, sourceID: "messenger:\(service.rawValue)",
+                        readFor: ConnectorProbeStrategy.trackerProbe.readFor))
+                }
+            }
+            if githubSelected {
+                let index: Int = targets.count + teamServices.count + trackerServices.count
+                let store = trackerStore
+                let http = trackerHTTP
+                group.addTask {
+                    let query = ConnectorProbeStrategy.query(goal: goal, serverID: "github")
+                    guard let client = store.githubClient(http: http) else { return (index, nil) }
+                    // Срок тот же, что у MCP-инструмента: зависший сервис должен
+                    // стоить одного источника, а не всего ответа на звонке.
+                    // `timeoutInterval` у запроса этого не даёт — он сбрасывается
+                    // на каждом принятом байте, и сервер, отдающий по байту,
+                    // держит соединение сколько угодно.
+                    let items = await withMCPDeadline(seconds: Self.groundingDeadline) {
+                        try await client.search(query)
+                    }
+                    guard let items, !items.isEmpty else { return (index, nil) }
+                    // Состояние задачи попадает в текст: «уже закрыто» меняет
+                    // смысл находки на противоположный, а по одному заголовку
+                    // этого не видно.
+                    let text = items.prefix(10)
+                        .map { "[\($0.key), \($0.state)] \($0.title)" }
+                        .joined(separator: "\n")
+                        .prefix(maxCharsPerSource).description
+                    return (index, GroundingSnippet(
+                        serverName: "GitHub", toolName: "search",
+                        text: text, sourceID: "github",
+                        readFor: ConnectorProbeStrategy.trackerProbe.readFor))
+                }
+            }
+
             var snippets: [(Int, GroundingSnippet)] = []
             for await (index, snippet) in group {
                 if let snippet { snippets.append((index, snippet)) }

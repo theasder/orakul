@@ -146,12 +146,12 @@ private struct NewPromptChip: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
-        .help("Create a custom prompt")
+        .help("Создать свою подсказку")
         .animation(Motion.quick, value: hovering)
     }
 }
 
-/// Quiet capsule that folds/unfolds the prompt tail ("+3 more" / "Show less").
+/// Quiet capsule that folds/unfolds the prompt tail ("+3 more" / "Свернуть").
 private struct FoldToggleChip: View {
     let expanded: Bool
     let hiddenCount: Int
@@ -163,7 +163,7 @@ private struct FoldToggleChip: View {
             HStack(spacing: 4) {
                 Image(systemName: expanded ? "chevron.up" : "chevron.down")
                     .font(.system(size: 9, weight: .semibold))
-                Text(expanded ? "Show less" : "+\(hiddenCount) more")
+                Text(expanded ? "Свернуть" : "+\(hiddenCount) more")
                     .font(Typo.callout.weight(.medium))
             }
             .foregroundStyle(hovering ? Theme.ink : Theme.inkSecondary)
@@ -177,8 +177,8 @@ private struct FoldToggleChip: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
-        .help(expanded ? "Show fewer prompts" : "Show all prompts")
-        .accessibilityLabel(expanded ? "Show fewer prompts" : "Show \(hiddenCount) more prompts")
+        .help(expanded ? "Показать меньше подсказок" : "Показать все подсказки")
+        .accessibilityLabel(expanded ? "Показать меньше подсказок" : "Show \(hiddenCount) more prompts")
         .animation(Motion.quick, value: hovering)
     }
 }
@@ -213,7 +213,7 @@ struct PromptEditorView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.l) {
-            Text(draft.isNew ? "New prompt" : "Edit prompt")
+            Text(draft.isNew ? "Новая подсказка" : "Изменить подсказку")
                 .font(Typo.title)
                 .foregroundStyle(Theme.ink)
 
@@ -226,7 +226,7 @@ struct PromptEditorView: View {
                     .frame(width: 44, height: 36)
                     .background(Theme.surface, in: RoundedRectangle(cornerRadius: Radius.s, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: Radius.s, style: .continuous).strokeBorder(Theme.hairline, lineWidth: 1))
-                TextField("Title (e.g. Draft follow-up email)", text: $draft.title)
+                TextField("Название, например «Написать письмо по итогам»", text: $draft.title)
                     .textFieldStyle(.plain)
                     .font(Typo.body)
                     .foregroundStyle(Theme.ink)
@@ -246,7 +246,7 @@ struct PromptEditorView: View {
                     .frame(minHeight: 150, maxHeight: 240)
                     .background(Theme.surfaceSunken, in: RoundedRectangle(cornerRadius: Radius.s, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: Radius.s, style: .continuous).strokeBorder(Theme.hairline, lineWidth: 1))
-                Text("Sent with the live transcript and your context. Refer to “the transcript”, “past notes”, attendees, etc.")
+                Text("Уходит вместе с транскриптом звонка и вашим контекстом. Можно ссылаться на «транскрипт», «прошлые заметки», участников.")
                     .font(Typo.caption)
                     .foregroundStyle(Theme.inkTertiary)
                 Label(state.workflowSummary(for: previewPrompt),

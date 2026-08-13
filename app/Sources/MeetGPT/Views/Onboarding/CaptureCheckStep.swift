@@ -20,10 +20,20 @@ struct CaptureCheckStep: View {
 
     private var usesLocalModel: Bool { Config.transcriptionEngineValue == .local }
 
-    private var relaunchNeeded: Bool {
-        guard let verdict = probe.verdict else { return false }
-        return CaptureProbe.needsRelaunch(
-            verdict: verdict, screenRecordingGranted: state.screenRecordingGranted)
+    /// Read once per launch, before any probe runs: the question is about the
+    /// previous run, so it must not be re-read after the advice is written.
+    private let memory = RelaunchMemory()
+    @State private var relaunchAlreadyTried = RelaunchMemory().relaunchAlreadyTried
+
+    private var advice: CaptureProbe.Advice {
+        guard let verdict = probe.verdict else { return .none }
+        return CaptureProbe.advice(
+            verdict: verdict,
+            systemAudioStarted: probe.systemAudioStarted,
+            screenRecordingGranted: state.screenRecordingGranted,
+            relaunchAlreadyTried: relaunchAlreadyTried,
+            installLocation: CaptureProbe.installLocation(
+                bundlePath: Bundle.main.bundleURL.path))
     }
 
     /// Ceiling on the scrolling area. Chosen so the pinned header, the footer
@@ -61,6 +71,15 @@ struct CaptureCheckStep: View {
             for: NSApplication.didBecomeActiveNotification)) { _ in
             Task { await state.refreshPermissionStatus() }
         }
+        // What lets the NEXT launch know a relaunch was already tried. Written
+        // when the advice is actually shown, so the memory never records advice
+        // nobody saw; cleared as soon as system audio is heard, because a stale
+        // flag would meet a user whose problem was fixed months ago with
+        // «relaunching did not help» the first time anything else went quiet.
+        .onChange(of: probe.verdict) { _ in
+            if advice == .relaunch { memory.noteAdvised() }
+            if probe.verdict == .pass || probe.verdict == .systemOnly { memory.clear() }
+        }
         // Continue is deliberately enabled during the test, so leaving mid-probe
         // is normal. Cancelling shortens the remaining sleep, which brings the
         // teardown forward — without this, two capture sources stay live (and
@@ -76,7 +95,7 @@ struct CaptureCheckStep: View {
             // Deliberately does NOT restate the duration. The capture-check row
             // says "Six seconds" right next to the button that spends them, and
             // saying it twice two lines apart reads as a mistake, not emphasis.
-            Text("Two permissions, then a quick check. No bot joins your calls — Cruxwing listens on this Mac.")
+            Text("Два разрешения и короткая проверка. Бот в звонок не заходит — orakul слушает на этом компьютере.")
                 .font(Typo.callout).foregroundStyle(Theme.inkSecondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -86,8 +105,8 @@ struct CaptureCheckStep: View {
         VStack(spacing: Space.s) {
             PermissionRow(
                 icon: "mic.fill",
-                title: "Microphone",
-                detail: "Your side of the conversation.",
+                title: "Микрофон",
+                detail: "Ваша половина разговора.",
                 granted: state.micGranted,
                 kind: .microphone,
                 alreadyAsked: askedMicrophone,
@@ -98,8 +117,8 @@ struct CaptureCheckStep: View {
 
             PermissionRow(
                 icon: "rectangle.on.rectangle",
-                title: "Screen Recording",
-                detail: "Everyone else's audio, via ScreenCaptureKit. Nothing is screenshotted.",
+                title: "Запись экрана",
+                detail: "Звук собеседников — через ScreenCaptureKit. Снимки экрана не делаются.",
                 granted: state.screenRecordingGranted,
                 kind: .screenRecording,
                 alreadyAsked: askedScreenRecording,
@@ -122,8 +141,8 @@ struct CaptureCheckStep: View {
             // Inside the scroll with the other rows: it appears only after a
             // failed probe, and when it does it is the FIFTH row — exactly the
             // case that used to overflow.
-            if relaunchNeeded {
-                RelaunchRow()
+            if advice != .none {
+                AdviceRow(advice: advice)
             }
         }
     }
@@ -132,7 +151,11 @@ struct CaptureCheckStep: View {
     /// user who cannot find it is stuck on the first screen of the product.
     private var footer: some View {
         HStack(spacing: Space.m) {
-            Text("Вы не вошли — расшифровка на устройстве всё равно без ограничений.")
+            // Было «Вы не вошли — расшифровка на устройстве всё равно без
+            // ограничений»: первая строка, которую видит новый человек, начиналась
+            // с упоминания входа, которого в orakul нет. Отвечала на вопрос,
+            // которого он не задавал, и подсказывала, что где-то есть аккаунт.
+            Text("Аккаунта нет и не нужно — расшифровка идёт на этом компьютере, без ограничений.")
                 .font(Typo.caption).foregroundStyle(Theme.inkTertiary)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: Space.s)
@@ -161,11 +184,11 @@ private struct PermissionRow: View {
                     .font(Typo.caption.weight(.medium))
                     .foregroundStyle(Theme.speakerYou)
                     .labelStyle(.titleAndIcon)
-                    .accessibilityLabel("\(title) granted")
+                    .accessibilityLabel("Разрешено: \(title)")
             case .request:
                 Button("Включить", action: action)
                     .buttonStyle(QuietButtonStyle())
-                    .accessibilityLabel("Enable \(title)")
+                    .accessibilityLabel("Разрешить: \(title)")
             case .openSettings:
                 // macOS will not prompt a second time, so pressing Enable again
                 // would do nothing at all. Send them where the toggle lives.
@@ -175,7 +198,7 @@ private struct PermissionRow: View {
                     }
                 }
                 .buttonStyle(QuietButtonStyle())
-                .accessibilityLabel("Open System Settings for \(title)")
+                .accessibilityLabel("Открыть системные настройки: \(title)")
             }
         }
     }
@@ -190,11 +213,11 @@ private struct CaptureCheckRow: View {
 
     private var status: (text: String, tint: Color) {
         switch probe.verdict {
-        case .pass:       return ("Both sources heard", Theme.speakerYou)
-        case .micOnly:    return ("No system audio", Theme.amber)
-        case .systemOnly: return ("No microphone", Theme.amber)
-        case .silent:     return ("Nothing heard", Theme.amber)
-        case nil:         return (probe.isRunning ? "Listening…" : "Not run yet",
+        case .pass:       return ("Слышно оба источника", Theme.speakerYou)
+        case .micOnly:    return ("Нет звука собеседников", Theme.amber)
+        case .systemOnly: return ("Нет микрофона", Theme.amber)
+        case .silent:     return ("Ничего не слышно", Theme.amber)
+        case nil:         return (probe.isRunning ? "Слушаю…" : "Проверка не запускалась",
                                   Theme.inkTertiary)
         }
     }
@@ -202,29 +225,29 @@ private struct CaptureCheckRow: View {
     var body: some View {
         OnboardingRow(
             icon: "waveform.badge.magnifyingglass",
-            title: "Capture check",
+            title: "Проверка захвата",
             detail: probe.isRunning
-                ? "Say something, and play any audio — a video, a song."
-                : "Six seconds. Proves both sources are audible before your first call.",
+                ? "Скажите что-нибудь и включите любой звук — видео, песню."
+                : "Шесть секунд. Покажет, что оба источника слышны, ещё до первого звонка.",
             trailing: {
                 if probe.isRunning {
                     ProgressView().controlSize(.small)
                 } else {
-                    Button(probe.verdict == nil ? "Run test" : "Run again", action: start)
+                    Button(probe.verdict == nil ? "Проверить" : "Ещё раз", action: start)
                         .buttonStyle(QuietButtonStyle())
                         .accessibilityLabel("Проверить захват звука")
                 }
             },
             footer: {
                 VStack(alignment: .leading, spacing: Space.xs) {
-                    ProbeMeter(label: "You", level: probe.micLevel,
+                    ProbeMeter(label: "Вы", level: probe.micLevel,
                                peak: probe.micPeak, tint: Theme.speakerYou)
-                    ProbeMeter(label: "System audio", level: probe.systemLevel,
+                    ProbeMeter(label: "Собеседники", level: probe.systemLevel,
                                peak: probe.systemPeak, tint: Theme.speakerThem)
                     Text(status.text)
                         .font(Typo.caption.weight(.medium))
                         .foregroundStyle(status.tint)
-                        .accessibilityLabel("Capture check: \(status.text)")
+                        .accessibilityLabel("Проверка захвата: \(status.text)")
                     if let failure = probe.startFailure {
                         Text(failure)
                             .font(Typo.caption).foregroundStyle(Theme.inkTertiary)
@@ -247,7 +270,14 @@ private struct ProbeMeter: View {
         HStack(spacing: Space.s) {
             Text(label)
                 .font(Typo.caption).foregroundStyle(Theme.inkTertiary)
-                .frame(width: 76, alignment: .leading)
+                // Колонка была 76 pt под английское «System audio». Русская
+                // подпись длиннее и переносилась посреди слова: «Звук /
+                // собеседнико / в». Ширины мало, поэтому подпись ещё и держится
+                // одной строкой — следующий перевод не должен снова ломать
+                // слово пополам.
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+                .frame(width: 104, alignment: .leading)
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     Capsule().fill(Theme.surfaceSunken)
@@ -269,18 +299,82 @@ private struct ProbeMeter: View {
     }
 }
 
-/// Offered only when the probe proves the quirk: granted, and silent anyway.
-private struct RelaunchRow: View {
+/// The one thing worth saying after a failed check — and only ever one.
+///
+/// Три разных случая раньше показывались как один: «перезапустите». Двум из них
+/// перезапуск не помогает ничем, и человек попадал в круг без выхода.
+/// Not `private`: a pure function returning `.regrant` proves nothing if the
+/// view still renders the relaunch button, and that gap is where this bug lived.
+struct AdviceRow: View {
+    let advice: CaptureProbe.Advice
+
     var body: some View {
-        OnboardingRow(
-            icon: "arrow.clockwise.circle",
-            iconTint: Theme.amber,
-            title: "macOS hasn't applied Screen Recording yet",
-            detail: "A macOS quirk, not a Cruxwing bug — the permission takes effect on the next launch. Nothing is lost."
-        ) {
-            Button("Выйти и открыть заново") { relaunch() }
+        switch advice {
+        case .none:
+            EmptyView()
+
+        case .relaunch:
+            OnboardingRow(
+                icon: "arrow.clockwise.circle",
+                iconTint: Theme.amber,
+                title: "macOS ещё не применила разрешение на запись экрана",
+                detail: "Особенность macOS, а не ошибка orakul: разрешение начинает действовать со следующего запуска. Ничего не потеряется."
+            ) {
+                Button("Выйти и открыть заново") { relaunch() }
+                    .buttonStyle(QuietButtonStyle(prominent: true))
+                    .accessibilityLabel("Выйти и открыть orakul заново")
+            }
+
+        case .regrant:
+            // Перезапуск уже был и не помог — значит дело не в нём. Дальше
+            // честнее не угадывать причину, а назвать действие, которое чинит
+            // все известные: разрешение записано за старую версию программы и
+            // к текущей не применяется. Снять галочку и поставить заново.
+            OnboardingRow(
+                icon: "exclamationmark.triangle",
+                iconTint: Theme.amber,
+                title: "Перезапуск не помог — разрешение придётся выдать заново",
+                detail: "Так бывает, когда разрешение записано за прежнюю версию orakul: после обновления или когда рядом лежит вторая копия программы. Откройте настройки, снимите галочку у orakul, поставьте её снова — и запустите orakul заново."
+            ) {
+                Button("Открыть системные настройки") {
+                    if let url = PermissionPrompt.settingsURL(for: .screenRecording) {
+                        NSWorkspace.shared.open(url)
+                    }
+                }
                 .buttonStyle(QuietButtonStyle(prominent: true))
-                .accessibilityLabel("Выйти и открыть orakul заново")
+                .accessibilityLabel("Открыть системные настройки: запись экрана")
+            }
+
+        case .moveToApplications:
+            // Самый частый настоящий ответ на «перезапустил, и всё равно
+            // просит перезапустить»: приложение запущено из образа или из
+            // «Загрузок». macOS в этом случае запускает его из временной копии
+            // со случайным адресом, и разрешение, выданное вчерашней копии, к
+            // сегодняшней не относится. Перезапуск тут не поможет никогда.
+            OnboardingRow(
+                icon: "folder.badge.gearshape",
+                iconTint: Theme.amber,
+                title: "Перенесите orakul в «Программы»",
+                detail: "Сейчас orakul запущен из образа или из «Загрузок». macOS запускает такие программы из временной копии со случайным адресом, а разрешение помнит по адресу — поэтому оно и не сохраняется между запусками. Перетащите orakul в «Программы», запустите оттуда и выдайте разрешение заново."
+            ) {
+                Button("Показать в Finder") {
+                    NSWorkspace.shared.activateFileViewerSelecting([Bundle.main.bundleURL])
+                }
+                .buttonStyle(QuietButtonStyle(prominent: true))
+                .accessibilityLabel("Показать orakul в Finder")
+            }
+
+        case .noSoundPlaying:
+            // Захват работает — просто звучать было нечему. Раньше этот случай
+            // предлагал перезапуск, хотя перезапускать нечего.
+            OnboardingRow(
+                icon: "speaker.slash",
+                iconTint: Theme.inkTertiary,
+                title: "Звука собеседников не было слышно",
+                detail: "Запись экрана работает — orakul подключился к системному звуку без ошибок. Похоже, в эти шесть секунд ничего не играло. Включите видео или песню погромче и нажмите «Ещё раз»."
+            ) {
+                EmptyView()
+            }
         }
     }
 
@@ -304,13 +398,13 @@ private struct ModelWarmupRow: View {
     var body: some View {
         OnboardingRow(
             icon: "cpu",
-            title: "On-device model",
+            title: "Модель на устройстве",
             // Size of the model THIS Mac will fetch, not a fixed number: the old
             // "~150 MB" was only true for `base`, while a 16 GB Apple Silicon
             // machine pulls ~480 MB and a Max/Ultra ~1.5 GB. Promising 150 MB and
             // downloading ten times that is how someone abandons onboarding on a
             // tethered connection.
-            detail: "A private speech model (\(LocalWhisperModel.approxDownloadForThisMac(selected: Config.localWhisperModel))) downloads once, then runs offline."
+            detail: "Модель распознавания речи (\(LocalWhisperModel.approxDownloadForThisMac(selected: Config.localWhisperModel))) скачается один раз и дальше работает без сети."
         ) {
             switch stateValue {
             case .preparing:

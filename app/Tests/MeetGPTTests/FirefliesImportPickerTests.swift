@@ -34,7 +34,7 @@ struct FirefliesImportPickerTests {
         let state = state()
         state.firefliesImportBusy = true
         let text = try inspect(state).findAll(ViewType.Text.self).compactMap { try? $0.string() }
-        #expect(text.contains { $0.contains("Загружаю встречи из Fireflies") })
+        #expect(text.contains { $0.contains("Загружаю звонки из Fireflies") })
     }
 
     @Test("a failure with no list shows the error and a retry")

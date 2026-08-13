@@ -1,4 +1,5 @@
 import SwiftUI
+import OrakulCore
 
 enum SettingsTab: String, Hashable, CaseIterable {
     case general
@@ -31,7 +32,7 @@ struct SettingsView: View {
                 .tabItem { Label("Расшифровка", systemImage: "waveform") }
                 .tag(SettingsTab.transcription)
             AISettingsTab()
-                .tabItem { Label("AI", systemImage: "sparkles") }
+                .tabItem { Label("ИИ", systemImage: "sparkles") }
                 .tag(SettingsTab.ai)
             ConnectedAppsTab()
                 .tabItem { Label("Рабочие приложения", systemImage: "app.connected.to.app.below.fill") }
@@ -59,8 +60,8 @@ private struct GeneralSettingsTab: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.xl) {
-            SettingsSection(title: "Appearance",
-                            caption: "Auto follows your Mac's appearance; Light and Dark override it.") {
+            SettingsSection(title: "Оформление",
+                            caption: "«Авто» следует за системой; «Светлое» и «Тёмное» переопределяют её.") {
                 SettingsRow {
                     Label("Оформление", systemImage: "circle.lefthalf.filled")
                         .labelStyle(SettingLabelStyle())
@@ -99,8 +100,8 @@ private struct GeneralSettingsTab: View {
             // six-second test that proves both audio sources are audible, which
             // is the check that answers "why is the other side silent?" before a
             // real call does.
-            SettingsSection(title: "Setup guide",
-                            caption: "Re-runs the permission pre-flight, the capture check, and the sample call. Nothing is reset except the guide itself.") {
+            SettingsSection(title: "Первая настройка",
+                            caption: "Заново пройдёт проверку разрешений, проверку захвата звука и показ на примере. Ничего, кроме самой настройки, не сбрасывается.") {
                 SettingsRow {
                     Label("Показать настройку заново", systemImage: "arrow.counterclockwise")
                         .labelStyle(SettingLabelStyle())
@@ -110,8 +111,8 @@ private struct GeneralSettingsTab: View {
                 }
             }
 
-            SettingsSection(title: "Profile",
-                            caption: "Your role tailors every AI action's method — a PM's summary differs from a founder's. Pick one, or write your own. Also switchable from the sidebar chip.") {
+            SettingsSection(title: "Профиль",
+                            caption: "Роль меняет способ, которым ИИ разбирает звонок: у менеджера продукта и у основателя итог получается разный. Выберите из списка или напишите свою. Роль переключается и в боковой панели.") {
                 SettingsRow {
                     Label("Ваша роль", systemImage: "person.text.rectangle")
                         .labelStyle(SettingLabelStyle())
@@ -132,7 +133,7 @@ private struct GeneralSettingsTab: View {
                 }
                 if state.userRoleID == RoleSkillMatrix.customRoleID {
                     SettingsRow {
-                        TextField("e.g. Head of Growth at a B2B fintech startup",
+                        TextField("например, руководитель роста в финтех-стартапе",
                                   text: $customRole)
                             .textFieldStyle(.plain)
                             .font(Typo.callout)
@@ -149,8 +150,8 @@ private struct GeneralSettingsTab: View {
                 }
             }
 
-            SettingsSection(title: "During calls",
-                            caption: "Cruxwing can notice when a meeting app becomes active and offer to start recording.") {
+            SettingsSection(title: "Во время звонка",
+                            caption: "orakul замечает, что открылось приложение для звонков, и предлагает начать запись.") {
                 SettingsRow {
                     Label("Сообщать о звонках", systemImage: "bell.badge")
                         .labelStyle(SettingLabelStyle())
@@ -174,8 +175,8 @@ private struct GeneralSettingsTab: View {
                 }
             }
 
-            SettingsSection(title: "During calls",
-                            caption: "A silent banner when a new blind spot lands and Cruxwing is in the background — text, never a sound.") {
+            SettingsSection(title: "Во время звонка",
+                            caption: "Тихий баннер, когда найдена новая слепая зона, а orakul свёрнут — только текст, без звука.") {
                 SettingsRow {
                     Label("Плашки слепых зон", systemImage: "bell.badge")
                         .labelStyle(SettingLabelStyle())
@@ -188,10 +189,10 @@ private struct GeneralSettingsTab: View {
                 }
             }
 
-            SettingsSection(title: "Before meetings",
+            SettingsSection(title: "Перед встречей",
                             caption: state.googleConnected
-                                ? "Reminders fire ahead of calendar meetings."
-                                : "Reminders need Google Calendar — connect it in the Connected Apps tab.") {
+                                ? "Напоминания приходят заранее — перед встречей в календаре."
+                                : "Напоминаниям нужен Google Календарь — подключите его во вкладке «Подключённые приложения».") {
                 SettingsRow {
                     Label("Напоминать перед встречами", systemImage: "bell.and.waves.left.and.right")
                         .labelStyle(SettingLabelStyle())
@@ -207,11 +208,11 @@ private struct GeneralSettingsTab: View {
                         .labelStyle(SettingLabelStyle())
                     Spacer()
                     Picker("", selection: $reminderMinutes) {
-                        Text("1 min before").tag(1)
-                        Text("5 min before").tag(5)
-                        Text("10 min before").tag(10)
-                        Text("15 min before").tag(15)
-                        Text("30 min before").tag(30)
+                        Text("за 1 минуту").tag(1)
+                        Text("за 5 минут").tag(5)
+                        Text("за 10 минут").tag(10)
+                        Text("1за 5 минут").tag(15)
+                        Text("за 30 минут").tag(30)
                     }
                     .labelsHidden().pickerStyle(.menu).fixedSize()
                     .disabled(!reminders)
@@ -250,8 +251,8 @@ private struct TranscriptionSettingsTab: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Space.xl) {
-                SettingsSection(title: "Engine",
-                                caption: "Local keeps meeting audio on this Mac. Choosing Deepgram or Whisper sends audio to that cloud provider. During a call, engine changes take effect immediately.") {
+                SettingsSection(title: "Движок",
+                                caption: "«Локально» оставляет звук звонка на этом компьютере. Deepgram или Whisper — значит, звук уходит к этому облачному провайдеру. Смена движка по ходу звонка действует сразу.") {
                     ForEach(TranscriptionEngine.selectableCases) { option in
                         EngineChoiceRow(engine: option,
                                         selected: state.selectedTranscriptionEngine == option,
@@ -265,7 +266,7 @@ private struct TranscriptionSettingsTab: View {
                 }
 
                 SettingsSection(title: "Язык",
-                                caption: "Auto re-detects supported languages as the conversation changes. For Russian-only meetings, choose Russian: Auto can misdetect short or noisy local Whisper chunks. Use Auto for genuinely mixed-language calls. Applied on your next recording.") {
+                                caption: "«Авто» переопределяет язык по ходу разговора. Если звонок целиком по-русски, выберите русский: на коротких и шумных кусках «Авто» ошибается. «Авто» нужен там, где в разговоре и правда два языка. Действует со следующей записи.") {
                     SettingsRow {
                         Label("Язык", systemImage: "globe")
                             .labelStyle(SettingLabelStyle())
@@ -283,8 +284,8 @@ private struct TranscriptionSettingsTab: View {
                     }
                 }
 
-                SettingsSection(title: "Microphone",
-                                caption: "Optional Apple voice processing reduces echo and background noise, but can lower speaker playback while recording. Leave it off for unchanged volume; headphones avoid that trade-off. Applies on your next recording.") {
+                SettingsSection(title: "Микрофон",
+                                caption: "Необязательная обработка Apple убирает эхо и фоновый шум, но при записи может приглушить звук из колонок. Оставьте выключенной, чтобы громкость не менялась; в наушниках этой платы нет. Действует со следующей записи.") {
                     SettingsRow {
                         Label("Шумоподавление Apple", systemImage: "waveform.badge.mic")
                             .labelStyle(SettingLabelStyle())
@@ -297,8 +298,8 @@ private struct TranscriptionSettingsTab: View {
                     }
                 }
 
-                SettingsSection(title: "Fireflies enhance",
-                                caption: "When Fireflies is connected, merge its cloud transcript with on-device Whisper after the call (and when you import Fireflies). The LLM also uses connected apps (Notion, CRM, trackers) to correct names and project terms — Whisper timing, Fireflies speakers, connector spellings.") {
+                SettingsSection(title: "Дополнить из Fireflies",
+                                caption: "Если Fireflies подключён, его расшифровка сводится с локальной после звонка (и при импорте из Fireflies). Имена и термины проекта модель уточняет по подключённым приложениям — Notion, CRM, трекерам: тайминг от Whisper, говорящие от Fireflies, написание из коннекторов.") {
                     SettingsRow {
                         Label("Дополнять транскрипт из Fireflies", systemImage: "flame")
                             .labelStyle(SettingLabelStyle())
@@ -312,8 +313,8 @@ private struct TranscriptionSettingsTab: View {
                 }
 
                 if state.selectedTranscriptionEngine == .local {
-                    SettingsSection(title: "On-device model",
-                                    caption: "Larger models can be more accurate but download and run heavier. Model changes apply on your next recording.") {
+                    SettingsSection(title: "Модель на устройстве",
+                                    caption: "Модель побольше обычно точнее, но дольше качается и тяжелее работает. Смена действует со следующей записи.") {
                     Picker("", selection: $localModel) {
                         ForEach(LocalWhisperModel.options) { option in
                             Text("\(option.title) — \(option.id)").tag(option.id)
@@ -343,15 +344,15 @@ private struct TranscriptionSettingsTab: View {
                             .accessibilityLabel("Подстройка распознавания")
                             .accessibilityIdentifier("settings.transcription.adaptive")
                     }
-                    Text("If captions repeatedly fall behind, Cruxwing selects the next lighter validated local model for the next recording. At Base, it can offer Deepgram, but never switches to cloud without your choice.")
+                    Text("Если расшифровка раз за разом отстаёт, orakul возьмёт для следующей записи модель полегче. На Base предложит Deepgram, но в облако сам не уйдёт.")
                         .font(Typo.caption).foregroundStyle(Theme.inkTertiary)
                         .fixedSize(horizontal: false, vertical: true)
                     }
                 }
 
                 if !Config.assemblyAIAPIKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    SettingsSection(title: "Post-call speaker labels",
-                                    caption: "Optional AssemblyAI processing. Applies on your next recording: Cruxwing retains its remote audio track, then uploads only after you press Diarize—never as a live fallback.") {
+                    SettingsSection(title: "Кто говорил — после звонка",
+                                    caption: "Необязательная обработка через AssemblyAI. Действует со следующей записи: orakul сохраняет дорожку собеседников и отправляет её только после нажатия «Определить говорящих» — никогда сам по ходу звонка.") {
                         SettingsRow {
                             Label("Разрешить облачное определение говорящих", systemImage: "person.2.wave.2")
                                 .labelStyle(SettingLabelStyle())
@@ -365,8 +366,8 @@ private struct TranscriptionSettingsTab: View {
                     }
                 }
 
-                SettingsSection(title: "Custom vocabulary",
-                                caption: "Product names, acronyms, people — one per line or comma-separated. Biases every engine toward the right spelling. Connected-app suggestions are review-only; accepted terms apply on your next recording, including when you review them during a call.") {
+                SettingsSection(title: "Свой словарь",
+                                caption: "Названия продуктов, сокращения, имена — по одному в строке или через запятую. Подсказывает любому движку правильное написание. Термины из подключённых приложений сначала показываются на проверку; принятые действуют со следующей записи, даже если вы приняли их посреди звонка.") {
                     TextEditor(text: $glossary)
                         .font(.system(size: 12, design: .monospaced))
                         .foregroundStyle(Theme.ink)
@@ -392,7 +393,10 @@ private struct TranscriptionSettingsTab: View {
                         .accessibilityLabel("Свой словарь распознавания")
                         .accessibilityIdentifier("settings.transcription.glossary")
                     if !glossary.isEmpty {
-                        Text("\(Config.glossaryTerms.count) term\(Config.glossaryTerms.count == 1 ? "" : "s") active")
+                        // Русский счёт, а не «term/terms»: 1 термин, 2 термина,
+                        // 5 терминов. Английское «-s» на числе — та мелочь, по
+                        // которой сразу видно переведённый продукт.
+                        Text("Активно \(Config.glossaryTerms.count) \(DisplayFormatting.termsWord(Config.glossaryTerms.count))")
                             .font(Typo.caption).foregroundStyle(Theme.inkTertiary)
                     }
 
@@ -464,7 +468,7 @@ private struct TranscriptionSettingsTab: View {
                                     state.rejectConnectedGlossarySuggestion(id: suggestion.id)
                                 }
                                 .buttonStyle(.borderless)
-                                .accessibilityLabel("Dismiss \(suggestion.term)")
+                                .accessibilityLabel("Скрыть \(suggestion.term)")
                                 Button("Добавить") {
                                     if state.acceptConnectedGlossarySuggestion(id: suggestion.id) {
                                         glossary = Config.transcriptionGlossary
@@ -472,7 +476,7 @@ private struct TranscriptionSettingsTab: View {
                                 }
                                 .buttonStyle(.borderedProminent)
                                 .controlSize(.small)
-                                .accessibilityLabel("Add \(suggestion.term) to transcription dictionary")
+                                .accessibilityLabel("Добавить \(suggestion.term) в словарь расшифровки")
                             }
                             .padding(.vertical, 3)
                         }
@@ -508,14 +512,14 @@ private struct TranscriptionSettingsTab: View {
     private var connectedGlossaryCostCaption: String {
         let model = LLMCatalog.background(for: Config.selectedModel)
         let credits = CreditCostEstimate.credits(model: model.id, inputTokens: 0)
-        return "Reads up to \(ConnectedGlossarySuggestionService.maxSources) bounded app excerpts, then ranks locally extracted candidates with \(model.label) (\(credits) compute credits + 1 research cycle). No call transcript is sent."
+        return "Прочитает не больше \(ConnectedGlossarySuggestionService.maxSources) коротких выдержек из приложений и отранжирует найденные термины моделью \(model.label). Транскрипт звонка при этом никуда не уходит."
     }
 
     private var connectedGlossaryStatusMessage: String? {
         if let message = state.connectedGlossarySuggestionMessage { return message }
         switch state.connectedGlossarySuggestionStatus {
         case .idle, .loading, .ready: return nil
-        case .empty: return "No new connected-app terms are waiting for review."
+        case .empty: return "Новых терминов из подключённых приложений нет."
         case .unavailable(let message), .failed(let message): return message
         }
     }
@@ -540,29 +544,25 @@ private struct AISettingsTab: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.xl) {
-            SettingsSection(title: "Тариф",
-                            caption: "Your plan sets which models are available.") {
-                SettingsRow {
-                    Label("Тариф", systemImage: "creditcard")
-                        .labelStyle(SettingLabelStyle())
-                    Text(state.tierStatus)
-                        .font(Typo.caption).foregroundStyle(Theme.inkTertiary)
-                        .lineLimit(1).truncationMode(.tail)
-                    Spacer()
-                    PlanBadge(tier: state.currentTier)
-                    Button("Управление…") { showPaywall = true }
-                        .buttonStyle(QuietButtonStyle())
-                        .accessibilityIdentifier("settings.ai.manage-plan")
-                }
+            // Блока «Тариф» здесь нет и не будет. Значок кредитной карты,
+            // бейдж плана и кнопка «Управление…» — это интерфейс продукта, за
+            // который платят; orakul бесплатен целиком, и строка про план
+            // означала бы, что где-то есть другой.
+
+            // Выше выбора модели: модель без ключа не отвечает, а в готовом
+            // установщике ключей нет ни одного.
+            SettingsSection(title: "Ключи провайдеров",
+                            caption: "Ключ вводится один раз и лежит в Связке ключей. Расход идёт по вашему договору с провайдером — orakul не посредник и денег не берёт. Без ключа модель не ответит: в готовые установщики ключи не зашиваются намеренно.") {
+                ProviderKeysSection()
             }
 
-            SettingsSection(title: "Model",
-                            caption: "Pick a provider, then a version — or leave both on Auto and Cruxwing chooses per request.") {
+            SettingsSection(title: "Модель",
+                            caption: "Выберите провайдера и версию — или оставьте «Авто», и orakul выберет под запрос. Доступны все модели: закрытых нет.") {
                 ModelSelectionRows()
             }
 
             SettingsSection(title: "Ко-пилот",
-                            caption: "While recording, Brainstorm surfaces blind spots from your goal + transcript. Each scan uses Free 1 · Pro 3 · Premium 4 · Ultra 5 credits. Connected apps use the separate grounded-cycle allowance; larger context is size-metered. Optional watches share one hourly budget, so turning one off makes Blind Spot refresh sooner. Pro probes 2 workflows · Premium 3 · Ultra 4 per scan. Off stops the spend.") {
+                            caption: "По ходу записи ищет слепые зоны — по вашей цели и расшифровке. Подключённые приложения он тоже спрашивает, российские трекеры в том числе. Наблюдения делят один часовой бюджет: выключите одно — остальные обновляются чаще. Кредитов и лимитов по тарифу нет.") {
                 SettingsRow {
                     Label("Мозговой штурм на звонке", systemImage: "lightbulb")
                         .labelStyle(SettingLabelStyle())
@@ -635,18 +635,44 @@ private struct ConnectedAppsTab: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Space.xl) {
-                SettingsSection(title: "Google",
-                                caption: "Calendar, Docs, Sheets, and Drive use separate scopes you control. Search is read-only; exporting to a Google Doc or Sheet can create and manage only files Cruxwing creates.") {
+                // Первым блоком, а не по алфавиту: человек, у которого задачи
+                // в Яндекс Трекере, ищет здесь именно его. Список, начатый с
+                // Notion, читается как «нашего нет» — и дальше не листается.
+                SettingsSection(title: "Российские трекеры",
+                                caption: "MCP-серверов у этих сервисов нет, поэтому подключение по токену: создаёте его у себя в трекере и вставляете сюда. Токен лежит в Связке ключей, запросы уходят прямо в сервис.") {
+                    RussianTrackersSection()
+                }
+
+                // Сразу за трекерами: вопрос соседний, но другой — не
+                // «заводили ли задачу», а «обсуждали ли это». Ответ на второй
+                // чаще лежит в переписке, чем в трекере.
+                SettingsSection(title: "Рабочие мессенджеры",
+                                caption: "Пачка, Mattermost и Rocket.Chat умеют искать по сообщениям, и orakul спрашивает их по ходу звонка. Подключение по токену, как у трекеров. Telegram и VK Teams сюда добавить нельзя: их Bot API не отдаёт историю чата и не ищет по ней.") {
+                    WorkMessengersSection()
+                }
+
+                SettingsSection(title: "Открытые трекеры на своём сервере",
+                                caption: "GitLab и Gitea (а также Forgejo — это форк Gitea с тем же API) команда поднимает у себя, поэтому кроме токена нужен адрес сервера. GitHub подключается выше: у него адрес один и тот же.") {
+                    SelfHostedTrackersSection()
+                }
+
+                SettingsSection(title: "База знаний",
+                                caption: "Outline умеет искать по документам, и orakul спрашивает его по ходу звонка: решение, записанное в вики полгода назад, не найдётся ни в задачах, ни в переписке. Яндекс Вики и Teamly подключить нельзя — у первой в открытой документации нет поиска по тексту, у второй нет публичного описания API.") {
+                    TeamNotesSection()
+                }
+
+                SettingsSection(title: "Google",  // имя сервиса, не переводится
+                                caption: "Календарь, Документы, Таблицы и Диск подключаются отдельными правами, которыми управляете вы. Поиск — только чтение; при экспорте orakul создаёт и меняет лишь те файлы, которые создал сам.") {
                     GoogleSignInRow()
                 }
 
-                SettingsSection(title: "Work apps",
-                                caption: "Hosted MCP servers connect with one click — standard OAuth in your browser, no API keys. Tokens stay in your Keychain. Salesforce, Affinity, and thousands more also connect through Zapier.") {
+                SettingsSection(title: "Рабочие приложения",
+                                caption: "MCP-серверы подключаются в одно нажатие: обычный OAuth в браузере, без ключей. Токены остаются в Связке ключей. Salesforce, Affinity и тысячи других — через Zapier.") {
                     MCPAppsSection()
                 }
 
-                SettingsSection(title: "Bring your meetings to your AI tools",
-                                caption: "Cruxwing is also an MCP server: your meetings and decision ledger, available inside Claude, ChatGPT, Cursor — any MCP-enabled tool.") {
+                SettingsSection(title: "Звонки — в ваш ИИ-инструмент",
+                                caption: "orakul сам работает как MCP-сервер: ваши звонки и журнал решений доступны внутри Claude, ChatGPT, Cursor — любого инструмента с поддержкой MCP.") {
                     OwnMCPCard()
                 }
 
@@ -709,9 +735,9 @@ private struct OwnMCPCard: View {
             }
 
             VStack(alignment: .leading, spacing: Space.xs) {
-                setupStep(1, "In your AI tool, add Cruxwing as a connector using the URL above.")
-                setupStep(2, "Authenticate in the browser with your Cruxwing account email.")
-                setupStep(3, "Chat, search, and work with your meeting context anywhere.")
+                setupStep(1, "В своём ИИ-инструменте добавьте orakul как коннектор по адресу выше.")
+                setupStep(2, "Подтвердите вход в браузере — той же почтой, что и в orakul.")
+                setupStep(3, "Переписка, поиск и работа с контекстом звонков в любом инструменте.")
             }
         }
     }
@@ -746,28 +772,39 @@ private struct AccountPrivacyTab: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.xl) {
-            SettingsSection(title: "Account",
-                            caption: "Sign in to use managed AI models and sync your Decision Ledger.") {
-                WheesprAccountRow(showSheet: $showSignIn)
+            // Раздел показывается, только когда есть куда входить.
+            //
+            // Он единственный из четырёх мест со входом не был ничем закрыт —
+            // остальные смотрят на `wheesprAvailable`, и после того как адрес
+            // сервера перестал зашиваться, они исчезли сами. А этот оставался
+            // на экране и обещал ровно то, чего у orakul нет: «модели без своих
+            // ключей» (нет сервера) и синхронизацию журнала решений (тоже нет).
+            // Ключ провайдера вводится ниже, в разделе «ИИ», и вход для него не
+            // нужен.
+            if !Config.backendBaseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                SettingsSection(title: "Аккаунт",
+                                caption: "Вход нужен, чтобы пользоваться моделями без своих ключей и синхронизировать журнал решений.") {
+                    WheesprAccountRow(showSheet: $showSignIn)
 
-                if state.wheesprConnected {
-                    SettingsRow {
-                        Label("Удалить аккаунт", systemImage: "trash")
-                            .labelStyle(SettingLabelStyle())
-                        Spacer()
-                        Button(deleting ? "Deleting…" : "Delete…", role: .destructive) {
-                            confirmDelete = true
+                    if state.wheesprConnected {
+                        SettingsRow {
+                            Label("Удалить аккаунт", systemImage: "trash")
+                                .labelStyle(SettingLabelStyle())
+                            Spacer()
+                            Button(deleting ? "Удаление…" : "Удалить…", role: .destructive) {
+                                confirmDelete = true
+                            }
+                            .disabled(deleting)
+                            .accessibilityIdentifier("settings.account.delete")
                         }
-                        .disabled(deleting)
-                        .accessibilityIdentifier("settings.account.delete")
                     }
                 }
             }
 
-            SettingsSection(title: "Recording consent",
-                            caption: "You affirmed responsibility for participant consent before your first recording. Revoking shows the consent screen again next time.") {
+            SettingsSection(title: "Согласие на запись",
+                            caption: "Перед первой записью вы подтвердили, что отвечаете за согласие участников. Если отозвать, экран согласия покажется снова.") {
                 SettingsRow {
-                    Label(Config.recordingConsentAccepted ? "Consent affirmed" : "Not yet affirmed",
+                    Label(Config.recordingConsentAccepted ? "Согласие подтверждено" : "Ещё не подтверждено",
                           systemImage: Config.recordingConsentAccepted ? "checkmark.shield" : "shield")
                         .labelStyle(SettingLabelStyle())
                     Spacer()
@@ -779,8 +816,8 @@ private struct AccountPrivacyTab: View {
                 }
             }
 
-            SettingsSection(title: "Remove secrets before sending",
-                            caption: "Card numbers, API keys, government ID numbers and labelled credentials are stripped from anything sent to an AI provider. Detection is structural — a card must pass a checksum, a key must carry a known prefix — so ordinary meeting numbers like dates, prices and room numbers are left alone. A request is never blocked: the secret is removed and the rest is sent.") {
+            SettingsSection(title: "Убирать секреты перед отправкой",
+                            caption: "Номера карт, ключи API, номера документов и подписанные учётные данные вырезаются из всего, что уходит провайдеру ИИ. Распознаются по структуре: у карты сходится контрольная сумма, у ключа есть известный префикс — поэтому обычные числа со звонка (даты, цены, номер переговорки) остаются на месте. Запрос при этом не блокируется: секрет убирается, остальное уходит.") {
                 SettingsRow {
                     Label("Фильтровать исходящие запросы", systemImage: "eye.slash")
                         .labelStyle(SettingLabelStyle())
@@ -795,7 +832,7 @@ private struct AccountPrivacyTab: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Label("Убрать и эти термины", systemImage: "text.badge.minus")
                             .labelStyle(SettingLabelStyle())
-                        Text("Project code names, client names — one per line. Removed wherever they appear.")
+                        Text("Кодовые названия проектов, имена клиентов — по одному в строке. Вырезаются везде, где встретятся.")
                             .font(Typo.caption)
                             .foregroundStyle(Theme.inkTertiary)
                         TextEditor(text: $redactionTerms)
@@ -817,13 +854,13 @@ private struct AccountPrivacyTab: View {
                 }
             }
 
-            SettingsSection(title: "Where your data goes",
-                            caption: "Transcription runs on this Mac by default. Transcript excerpts are sent to the AI provider behind your selected model only when you run an AI action — the provider list shows each model's vendor. Nothing is used for advertising or sold.") {
+            SettingsSection(title: "Куда уходят ваши данные",
+                            caption: "Расшифровка по умолчанию идёт на этом компьютере. Куски расшифровки уходят провайдеру выбранной модели только когда вы сами запускаете действие ИИ — чей это провайдер, видно в списке моделей. Ничего не продаётся и не используется для рекламы.") {
                 EmptyView()
             }
 
-            SettingsSection(title: "Usage analytics",
-                            caption: "Anonymous, cookieless product events (which screens you reach, which actions you run) — no account, no meeting content, no cross-app tracking. Helps us see where the app helps or gets in the way. Turn off to send nothing.") {
+            SettingsSection(title: "Аналитика использования",
+                            caption: "Обезличенные события без cookie: какие экраны открывали, какие действия запускали. Без аккаунта, без содержимого звонков, без слежки между приложениями. Помогает понять, где приложение помогает, а где мешает. Выключите — не уйдёт ничего.") {
                 SettingsRow {
                     Label("Отправлять обезличенную статистику", systemImage: "chart.bar.xaxis")
                         .labelStyle(SettingLabelStyle())
@@ -837,8 +874,8 @@ private struct AccountPrivacyTab: View {
             }
 
             if Config.isDevBuild {
-                SettingsSection(title: "Developer",
-                                caption: "Dev builds only — dist builds bake this section out. The preview drives the real gates (model catalog, co-pilot hours, compute credits, grounded cycles), so the app behaves exactly as a user on that plan. \"Real entitlement\" returns to your actual plan.") {
+                SettingsSection(title: "Для разработчика",
+                                caption: "Только для сборок разработчика — в собранном приложении этого раздела нет. Превью переключает те же ограничения, что видит пользователь на этом плане. «Реальный доступ» возвращает как есть.") {
                     SettingsRow {
                         Label("Посмотреть тариф", systemImage: "wrench.and.screwdriver")
                             .labelStyle(SettingLabelStyle())
@@ -876,7 +913,7 @@ private struct AccountPrivacyTab: View {
             devTierPreview = Config.devTierOverride?.rawValue ?? "off"
         }
         .sheet(isPresented: $showSignIn) { SignInSheet() }
-        .confirmationDialog("Delete your account?", isPresented: $confirmDelete) {
+        .confirmationDialog("Удалить аккаунт?", isPresented: $confirmDelete) {
             Button("Удалить аккаунт и все данные", role: .destructive) {
                 deleting = true
                 Task {
@@ -886,7 +923,7 @@ private struct AccountPrivacyTab: View {
             }
             Button("Отмена", role: .cancel) {}
         } message: {
-            Text("This permanently removes your account, sessions, and plan from the server. Meetings saved on this Mac are not affected.")
+            Text("Учётная запись и сессии будут удалены с сервера навсегда. Звонков, сохранённых на этом компьютере, это не касается.")
         }
     }
 
@@ -976,7 +1013,7 @@ private struct EngineChoiceRow: View {
         .disabled(!available)
         .opacity(available ? 1 : 0.55)
         .accessibilityLabel("\(engine.advantageTitle) transcription engine")
-        .accessibilityValue(selected ? "Selected" : "Not selected")
+        .accessibilityValue(selected ? "Selected" : "Не выбрано")
         .accessibilityIdentifier("settings.transcription.engine.\(engine.rawValue)")
     }
 }
@@ -1004,7 +1041,7 @@ private struct GoogleSignInRow: View {
         VStack(alignment: .leading, spacing: Space.s) {
             HStack(spacing: Space.s) {
                 VStack(alignment: .leading, spacing: Space.xxs) {
-                    Label(state.googleConnected ? "Google Calendar connected" : "Google Calendar",
+                    Label(state.googleConnected ? "Google Календарь подключён" : "Google Calendar",
                           systemImage: state.googleConnected ? "checkmark.seal.fill" : "calendar")
                         .labelStyle(SettingLabelStyle())
                     if state.googleConnected {
@@ -1045,7 +1082,7 @@ private struct GoogleSignInRow: View {
                 Text("Добавьте GOOGLE_CLIENT_ID в mac/.env и пересоберите orakul.")
                     .font(Typo.caption).foregroundStyle(Theme.inkTertiary)
             } else if !state.hasGoogleClientSecret {
-                Text("Add GOOGLE_CLIENT_SECRET for the same Google Desktop OAuth client, then rebuild Cruxwing.")
+                Text("Добавьте GOOGLE_CLIENT_SECRET для того же клиента Google Desktop OAuth и пересоберите orakul.")
                     .font(Typo.caption).foregroundStyle(Theme.inkTertiary)
             } else if let error = state.googleConnectionError, !error.isEmpty {
                 Label(error, systemImage: "exclamationmark.triangle.fill")
@@ -1117,7 +1154,7 @@ private struct GoogleSignInButton: View {
         .buttonStyle(.plain)
         .disabled(!enabled)
         .onHover { hovering = $0 }
-        .help(enabled ? "Connect Google Calendar (and optional Docs/Sheets)" : "Google Calendar isn't available in this build")
+        .help(enabled ? "Подключить Google Календарь (и, если нужно, Документы и Таблицы)" : "Google Календарь в этой сборке недоступен")
         .accessibilityIdentifier("settings.connected.google.connect")
         .animation(Motion.quick, value: hovering)
     }
@@ -1130,9 +1167,9 @@ private struct WheesprAccountRow: View {
     @Binding var showSheet: Bool
 
     private var title: String {
-        guard state.wheesprConnected else { return "Account" }
-        if let email = state.wheesprEmail, !email.isEmpty { return "Signed in · \(email)" }
-        return "Signed in"
+        guard state.wheesprConnected else { return "Аккаунт" }
+        if let email = state.wheesprEmail, !email.isEmpty { return "Вход выполнен · \(email)" }
+        return "Вход выполнен"
     }
 
     var body: some View {
@@ -1219,14 +1256,14 @@ struct SignInSheet: View {
                 HStack {
                     Spacer()
                     Button("Отмена") { dismiss() }.buttonStyle(QuietButtonStyle())
-                    Button(state.authWorking ? "Sending…" : "Send code") {
+                    Button(state.authWorking ? "Sending…" : "Отправить код") {
                         Task { await state.requestSignInCode(email: email) }
                     }
                     .buttonStyle(PrimaryButtonStyle())
                     .disabled(email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || state.authWorking)
                 }
             } else {
-                Text("Enter the code sent to \(state.pendingAuthEmail ?? "").")
+                Text("Введите код, отправленный на \(state.pendingAuthEmail ?? "").")
                     .font(Typo.callout).foregroundStyle(Theme.inkSecondary)
                 field($code, prompt: "123456")
                 HStack {
@@ -1267,7 +1304,7 @@ struct SignInSheet: View {
             } label: {
                 HStack(spacing: Space.s) {
                     Text("G").font(.system(size: 13, weight: .bold, design: .rounded))
-                    Text(state.authWorking ? "Restart Google sign-in" : "Continue with Google")
+                    Text(state.authWorking ? "Начать вход через Google заново" : "Продолжить через Google")
                         .font(Typo.callout.weight(.semibold))
                 }
                 .frame(maxWidth: .infinity)
@@ -1287,11 +1324,11 @@ struct SignInSheet: View {
             .buttonStyle(QuietButtonStyle(prominent: true))
             .disabled(!state.hasGoogleSignInClient)
             .help(state.authWorking
-                  ? "A sign-in window is already open — click to start over"
-                  : "Sign in to your Cruxwing account with Google")
+                  ? "Окно входа уже открыто — нажмите, чтобы начать заново"
+                  : "Войти в orakul через Google")
             }
 
-            Text("Account login is separate from Connect Google Calendar in Connected Apps.")
+            Text("Вход в аккаунт — не то же самое, что подключение Google Календаря в «Рабочих приложениях».")
                 .font(Typo.caption)
                 .foregroundStyle(Theme.inkTertiary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -1315,7 +1352,7 @@ struct SignInSheet: View {
             HStack {
                 Spacer()
                 Button("Отмена") { dismiss() }.buttonStyle(QuietButtonStyle())
-                Button(working ? "Working…" : (registering ? "Create account" : "Войти")) {
+                Button(working ? "Working…" : (registering ? "Создать аккаунт" : "Войти")) {
                     Task { await runProvider {
                         registering
                             ? try await WheesprAuth.registerPassword(email: email, password: password)
@@ -1328,13 +1365,13 @@ struct SignInSheet: View {
         }
     }
 
-    // MARK: Phone provider (SMS code)
+    // MARK: Phone provider (Код из SMS)
 
     private var phoneFlow: some View {
         VStack(alignment: .leading, spacing: Space.m) {
             field($phone, prompt: "+15551234567")
                 .disabled(phoneCodeSent)
-            if phoneCodeSent { field($code, prompt: "SMS code") }
+            if phoneCodeSent { field($code, prompt: "Код из SMS") }
             if let providerError {
                 Text(providerError).font(Typo.caption).foregroundStyle(Theme.recordRed)
             }
@@ -1344,7 +1381,7 @@ struct SignInSheet: View {
                 }
                 Spacer()
                 Button("Отмена") { dismiss() }.buttonStyle(QuietButtonStyle())
-                Button(working ? "Working…" : (phoneCodeSent ? "Verify" : "Send SMS code")) {
+                Button(working ? "Отправляю…" : (phoneCodeSent ? "Проверить" : "Отправить код по SMS")) {
                     Task {
                         if phoneCodeSent {
                             await runProvider { try await WheesprAuth.verifyPhone(phone: phone, code: code) }

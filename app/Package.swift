@@ -20,7 +20,14 @@ let package = Package(
         .package(url: "https://github.com/FluidInference/FluidAudio.git", from: "0.12.4"),
         // Test-only: inspect SwiftUI view hierarchies to assert view-logic
         // (conditional rendering, labels, disabled state) without a UI host.
-        .package(url: "https://github.com/nalexn/ViewInspector.git", from: "0.9.0")
+        .package(url: "https://github.com/nalexn/ViewInspector.git", from: "0.9.0"),
+        // Портируемое ядро orakul: русский словарь, поиск по звонкам, архив.
+        // Оно же — то, что переживёт порт на Windows: `PortabilityTests` не
+        // пускает туда ничего, кроме Foundation.
+        //
+        // Зависимость появилась вместо второй копии словаря: копий было две, и
+        // каждая правка вносилась в обе руками.
+        .package(path: "../mvp")
     ],
     targets: [
         .executableTarget(
@@ -28,7 +35,8 @@ let package = Package(
             dependencies: [
                 .product(name: "MCP", package: "swift-sdk"),
                 .product(name: "WhisperKit", package: "WhisperKit"),
-                .product(name: "FluidAudio", package: "FluidAudio")
+                .product(name: "FluidAudio", package: "FluidAudio"),
+                .product(name: "OrakulCore", package: "mvp")
             ],
             path: "Sources/MeetGPT",
             // Vendored third-party Agent Skills (permissively licensed) copied

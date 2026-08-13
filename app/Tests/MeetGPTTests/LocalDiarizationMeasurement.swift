@@ -20,10 +20,12 @@ import Testing
 @Suite("Local diarization measurement")
 struct LocalDiarizationMeasurement {
 
-    @Test("measure: known-speaker-count recordings")
+    @Test("measure: known-speaker-count recordings",
+          .enabled(if: ProcessInfo.processInfo.environment["CRUXWING_DIARIZE_DIR"] != nil))
     func measureAgainstKnownRecordings() async throws {
+        // Наличие гарантирует трейт выше — без переменной тело не соберётся.
+        let dir = ProcessInfo.processInfo.environment["CRUXWING_DIARIZE_DIR"]!
         let env = ProcessInfo.processInfo.environment
-        guard let dir = env["CRUXWING_DIARIZE_DIR"] else { return }
         let expected = Int(env["CRUXWING_DIARIZE_EXPECT"] ?? "2") ?? 2
 
         let files = (try FileManager.default.contentsOfDirectory(atPath: dir))
@@ -93,10 +95,12 @@ struct LocalDiarizationMeasurement {
     ///
     /// Each `<stem>.wav` needs a sibling `<stem>.gt`: tab-separated
     /// `start<TAB>end<TAB>speaker`, seconds from the start of the file.
-    @Test("measure: attribution against per-turn ground truth")
+    @Test("measure: attribution against per-turn ground truth",
+          .enabled(if: ProcessInfo.processInfo.environment["CRUXWING_DIARIZE_GT_DIR"] != nil))
     func measureAttributionAgainstGroundTruth() async throws {
+        // Наличие гарантирует трейт выше — без переменной тело не соберётся.
+        let dir = ProcessInfo.processInfo.environment["CRUXWING_DIARIZE_GT_DIR"]!
         let env = ProcessInfo.processInfo.environment
-        guard let dir = env["CRUXWING_DIARIZE_GT_DIR"] else { return }
         let root = URL(fileURLWithPath: dir)
 
         let stems = (try FileManager.default.contentsOfDirectory(atPath: dir))

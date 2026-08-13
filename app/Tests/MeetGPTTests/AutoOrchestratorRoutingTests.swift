@@ -12,8 +12,9 @@ import Testing
 /// with each later group adding a dimension to that same decision: the inputs
 /// that raise effort, the boundaries between bands, what routing does with the
 /// result, and what happens when a provider rejects the call.
-@Suite("Auto orchestration routing")
+@Suite("Auto orchestration routing", .serialized)
 struct AutoOrchestratorRoutingTests {
+
 
     private func text(_ count: Int, seed: String = "a meeting sentence ") -> String {
         String(repeating: seed, count: max(1, count / seed.count + 1)).prefix(count).description
@@ -88,13 +89,16 @@ struct AutoOrchestratorRoutingTests {
         // vendor, so its LAST element is merely the last vendor declared.
         // Reading it as weakest-to-strongest sent a Premium user's hard task to
         // GLM-5.2 instead of the flagship.
-        for tier in [Tier.premium, .ultra] {
-            let model = AutoOrchestrator.route(.hard, tier: tier, hasImages: false)
-            let pool = LLMCatalog.available(for: tier).filter { $0.provider.isConfigured }
-            let best = LLMCatalog.strongest(in: pool)
-            #expect(model.id == best?.id, "\(tier) picked \(model.id), strongest is \(best?.id ?? "-")")
-            #expect(model.id != pool.last?.id || pool.count == 1,
-                    "\(tier) looks positional: took the last catalog entry")
+        withSeededProviderKeys {
+            for tier in [Tier.premium, .ultra] {
+                let model = AutoOrchestrator.route(.hard, tier: tier, hasImages: false)
+                let pool = LLMCatalog.available(for: tier).filter { $0.provider.isConfigured }
+                #expect(!pool.isEmpty, "\(tier): пул пуст — проверялось бы ничто")
+                let best = LLMCatalog.strongest(in: pool)
+                #expect(model.id == best?.id, "\(tier) picked \(model.id), strongest is \(best?.id ?? "-")")
+                #expect(model.id != pool.last?.id || pool.count == 1,
+                        "\(tier) looks positional: took the last catalog entry")
+            }
         }
     }
 

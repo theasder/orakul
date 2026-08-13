@@ -24,7 +24,17 @@ import Testing
 @Suite("Decision recall — cost on a real history")
 struct DecisionRecallPerformanceTests {
 
-    private var enabled: Bool { ProcessInfo.processInfo.environment["CRUXWING_PERF"] != nil }
+    /// Точные замеры — по требованию: на шумной машине один и тот же вызов
+    /// давали 2.4 с и 4.6 с, и держать по такому числу узкий бюджет нельзя.
+    ///
+    /// Раньше это был `guard enabled else { return }` в теле, то есть
+    /// пропущенный тест отчитывался как ПРОЙДЕННЫЙ. Шесть таких проверок
+    /// молчали во всех прогонах и в CI, и «250 сессий укладываются в бюджет»
+    /// означало ровно ничего. Трейт `.enabled(if:)` печатает «skipped» —
+    /// разница между «проверено» и «не запускалось» снова видна.
+    static var preciseRunEnabled: Bool {
+        ProcessInfo.processInfo.environment["CRUXWING_PERF"] != nil
+    }
 
     /// Best of N, because a developer machine is never quiet: measured on this
     /// one during a notarization run the same call took 2.4 s and 4.6 s. The
@@ -73,9 +83,34 @@ struct DecisionRecallPerformanceTests {
         return store
     }
 
-    @Test("a year of meetings still answers inside the interactive budget")
+    /// Всегда включён, в отличие от точных замеров выше.
+    ///
+    /// Ловит не «медленнее на 20%», а возврат катастрофы: в командной строке
+    /// такая же ошибка — таблицы словаря перестраивались на каждое слово —
+    /// превратила поиск по 20 звонкам в 118 секунд, а по 200 не заканчивался
+    /// вовсе. Все тесты при этом были зелёными: в них по две-три фразы.
+    ///
+    /// Бюджет намеренно в десять раз выше настоящего времени (≈2.3 с), чтобы
+    /// шум загруженной машины не ронял прогон. Узкий бюджет — в точной
+    /// проверке под `CRUXWING_PERF`.
+    @Test("recall over a year of meetings never collapses into minutes")
+    func recallDoesNotCollapse() throws {
+        let store = try populatedStore()
+        let began = Date()
+        let hits = DecisionRecallService.recall(query: "what did we decide about pricing",
+                                                store: store,
+                                                embedder: RecallEmbedder.production)
+        let elapsed = Date().timeIntervalSince(began)
+
+        #expect(!hits.isEmpty, "recall found nothing — the measurement was of empty work")
+        let report = "recall over \(Self.sessionCount) sessions took "
+            + String(format: "%.1f", elapsed) + "s — something rebuilds per token again"
+        #expect(elapsed < 25, "\(report)")
+    }
+
+    @Test("a year of meetings still answers inside the interactive budget",
+          .enabled(if: Self.preciseRunEnabled))
     func recallStaysInteractive() throws {
-        guard enabled else { return }
         let store = try populatedStore()
         var hits: [DecisionRecallService.RecallHit] = []
         let elapsed = fastest {
@@ -90,9 +125,9 @@ struct DecisionRecallPerformanceTests {
                 "recall over \(Self.sessionCount) sessions took \(elapsed)s — the ask path blocks on this")
     }
 
-    @Test("the two-stage shortlist still returns the right meeting")
+    @Test("the two-stage shortlist still returns the right meeting",
+          .enabled(if: Self.preciseRunEnabled))
     func shortlistDoesNotLoseTheAnswer() throws {
-        guard enabled else { return }
         // The speed fix only engages ABOVE the session cap, so at this size the
         // behaviour is NOT the same as scoring everything — the cheap first
         // pass decides which twelve meetings the good embedder ever sees. If
@@ -119,9 +154,9 @@ struct DecisionRecallPerformanceTests {
         }
     }
 
-    @Test("hit@1 across a spread of real-shaped questions")
+    @Test("hit@1 across a spread of real-shaped questions",
+          .enabled(if: Self.preciseRunEnabled))
     func hitRateAcrossManyTargets() throws {
-        guard enabled else { return }
         // One target with three phrasings is the same thin evidence that made
         // the diarization threshold look solved at n=3. Ten distinct meetings,
         // each asked about the way somebody actually would.
@@ -177,9 +212,9 @@ struct DecisionRecallPerformanceTests {
         #expect(found == cases.count)
     }
 
-    @Test("the brief's two builders are cheap enough to run before every meeting")
+    @Test("the brief's two builders are cheap enough to run before every meeting",
+          .enabled(if: Self.preciseRunEnabled))
     func briefSourcesStayCheap() throws {
-        guard enabled else { return }
         let store = try populatedStore()
         let meeting = UpcomingMeeting(id: "evt", title: "Sync 7",
                                       start: Date().addingTimeInterval(600))

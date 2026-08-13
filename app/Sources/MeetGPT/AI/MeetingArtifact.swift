@@ -122,27 +122,27 @@ struct MinutesArtifact: Codable, Equatable {
 
     var markdown: String {
         var lines = ["# \(title)"]
-        if let date, !date.isEmpty { lines.append("**Date:** \(date)") }
-        if let attendees, !attendees.isEmpty { lines.append("**Attendees:** \(attendees.joined(separator: ", "))") }
+        if let date, !date.isEmpty { lines.append("**Дата:** \(date)") }
+        if let attendees, !attendees.isEmpty { lines.append("**Участники:** \(attendees.joined(separator: ", "))") }
         if let summary, !summary.isEmpty { lines.append("\n\(summary)") }
 
         if let highlights, !highlights.isEmpty {
-            lines.append("\n## What matters")
+            lines.append("\n## Главное")
             highlights.forEach { lines.append("- \($0)") }
         }
         if let decisions, !decisions.isEmpty {
-            lines.append("\n## Decisions")
+            lines.append("\n## Решения")
             decisions.forEach { lines.append("- \($0)") }
         }
         if let discussion, !discussion.isEmpty {
-            lines.append("\n## Discussion")
+            lines.append("\n## Обсуждение")
             for topic in discussion {
                 lines.append("\n### \(topic.topic)")
                 (topic.points ?? []).forEach { lines.append("- \($0)") }
             }
         }
         if let actionItems, !actionItems.isEmpty {
-            lines.append("\n## Action items")
+            lines.append("\n## Задачи")
             for item in actionItems {
                 let owner = item.owner.map { " — **\($0)**" } ?? ""
                 let due = item.due.map { " (due \($0))" } ?? ""
@@ -153,12 +153,12 @@ struct MinutesArtifact: Codable, Equatable {
             // no tracker, no notification, just the list refusing to pretend.
             let ownerless = actionItems.filter { ($0.owner ?? "").isEmpty }
             if !ownerless.isEmpty {
-                lines.append("\n### Needs an owner")
+                lines.append("\n### Нужен владелец")
                 ownerless.forEach { lines.append("- \($0.task)") }
             }
         }
         if let nextSteps, !nextSteps.isEmpty {
-            lines.append("\n## Next steps")
+            lines.append("\n## Дальнейшие шаги")
             nextSteps.forEach { lines.append("- \($0)") }
         }
         if let unverifiedFigures, !unverifiedFigures.isEmpty {
@@ -168,7 +168,7 @@ struct MinutesArtifact: Codable, Equatable {
             let shown = unverifiedFigures.prefix(Self.maxFlaggedFigures)
             let rest = unverifiedFigures.count - shown.count
             let tail = rest > 0 ? ", and \(rest) more" : ""
-            lines.append("\n### ⚠️ Verify these figures")
+            lines.append("\n### ⚠️ Проверьте эти цифры")
             lines.append("Not found in the transcript: \(shown.joined(separator: ", "))\(tail).")
         }
         return lines.joined(separator: "\n")

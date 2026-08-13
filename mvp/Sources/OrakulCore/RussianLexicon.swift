@@ -54,7 +54,7 @@ public enum RussianLexicon {
     // MARK: - Починка
 
     /// Нормализованная форма для сравнения: регистр и «ё» не различают слова.
-    static func normalized(_ term: String) -> String {
+    public static func normalized(_ term: String) -> String {
         term.lowercased().replacingOccurrences(of: "ё", with: "е")
     }
 
@@ -92,7 +92,17 @@ public enum RussianLexicon {
     ]
 
     /// Канонические написания, разобранные по нормализованной форме.
-    static func canonicalForms() -> [String: String] {
+    /// Таблица строится ОДИН раз.
+    ///
+    /// Была функцией, и её звали из `stem` на каждое слово: 20 звонков —
+    /// 3000 слов — 3000 перестроений словаря. Один поиск занимал 118 секунд, а
+    /// на 200 звонках не заканчивался вовсе. Тесты этого не видели: в них по
+    /// две-три фразы, где разница незаметна.
+    static let canonicalIndex: [String: String] = buildCanonicalForms()
+
+    public static func canonicalForms() -> [String: String] { canonicalIndex }
+
+    private static func buildCanonicalForms() -> [String: String] {
         var forms: [String: String] = [:]
         for term in allTerms {
             forms[normalized(term)] = term
@@ -104,12 +114,116 @@ public enum RussianLexicon {
         return forms
     }
 
+    /// Канонический токен слова: сам термин, его падеж — или nil.
+    ///
+    /// Один поиск в двух местах. Приложение и командная строка разбирают слова
+    /// по-разному (разные стоп-слова, разная обрезка), но ЭТОТ шаг у них был
+    /// одинаковый и написан дважды: сначала таблица канонов, потом таблица
+    /// падежей, иначе слово как есть. Кросс-алфавитный поиск и падежи чинились
+    /// в обеих копиях руками — ровно та работа, которой быть не должно.
+    ///
+    /// nil означает «слова нет в словаре», и вызывающий решает сам: командная
+    /// строка обрежет окончание, приложение оставит как есть.
+    public static func canonicalToken(for word: String) -> String? {
+        let key = normalized(word)
+        if let canonical = canonicalIndex[key] { return normalized(canonical) }
+        if let canonical = inflectionIndex[key] { return normalized(canonical) }
+        return nil
+    }
+
+    /// Падежи и числа терминов → сам термин.
+    ///
+    /// Зачем отдельной таблицей, а не обрезкой окончаний. Обрезка не знает
+    /// слова: у «коммит» на конце «ит», у «деплой» — «ой», и то и другое
+    /// выглядит как русское окончание. Обрезать термины нельзя. А их падежи
+    /// обрезка режет — и обе стороны перестают сходиться: в архиве «деплой», в
+    /// запросе «деплою» → «депло», и человек не находит свой же звонок, хотя
+    /// страница обещает, что падежи понимаются.
+    ///
+    /// Словарь закрытый и маленький, поэтому формы порождаются механически и
+    /// проверяются целиком — на каждый термин есть тест.
+    ///
+    /// Правила ровно три, по типу окончания термина:
+    ///   * на «й» (деплой) — «й» заменяется: деплоя, деплою, деплое, деплоем…
+    ///   * на «а»/«я» (фича, миграция) — заменяется тем же набором;
+    ///   * согласный (коммит, баг) — окончание добавляется.
+    ///
+    /// Латинские написания получают ещё и английское множественное: `prompts`
+    /// — то, что человек наберёт, если привык писать термин латиницей.
+    /// Тоже один раз: внутри цикл по терминам × окончаниям, и каждая
+    /// итерация ещё спрашивала `canonicalForms()`. На каждое слово запроса.
+    static let inflectionIndex: [String: String] = buildInflections()
+
+    public static func inflections() -> [String: String] { inflectionIndex }
+
+    private static func buildInflections() -> [String: String] {
+        var forms: [String: String] = [:]
+        let replaced = ["а", "я", "у", "ю", "е", "и", "ы", "ом", "ем", "ов", "ев",
+                        "ам", "ах", "ями", "ами", "ой", "ей"]
+        let appended = ["а", "у", "е", "и", "ы", "ом", "ов", "ам", "ах", "ами"]
+
+        for term in allTerms {
+            let key = normalized(term)
+            guard let last = key.last else { continue }
+            let endings: [String]
+            let base: String
+            if last == "й" || last == "а" || last == "я" {
+                base = String(key.dropLast())
+                endings = replaced
+            } else {
+                base = key
+                endings = appended
+            }
+            for ending in endings {
+                let form = base + ending
+                // Сам термин не перезаписываем и чужие термины не крадём:
+                // порождённая форма, совпавшая с настоящим термином, — не форма.
+                guard form != key, canonicalIndex[form] == nil else { continue }
+                forms[form] = term
+            }
+        }
+
+        // Английское множественное для латинских написаний.
+        for (variant, canonical) in variants where variant.allSatisfy({ $0.isASCII }) {
+            let plural = normalized(variant) + "s"
+            if canonicalIndex[plural] == nil { forms[plural] = canonical }
+        }
+        return forms
+    }
+
     /// Приводит термины в расшифровке к каноническому написанию.
     ///
     /// Только целые слова: замена по подстроке испортила бы «продукт» и
     /// «апишку». Ничего не удаляет и не добавляет — количество слов остаётся
     /// прежним, и это проверяется тестом, потому что молчание движка уже
     /// однажды оказалось дороже искажения.
+    /// Чинит только то, что похоже на русскую речь.
+    ///
+    /// Английская расшифровка не должна кириллизоваться: словарь приводит
+    /// `prompt` к «промпт», и на английском тексте это порча, а не починка.
+    ///
+    /// Жило в отдельной копии словаря внутри приложения. Копий было две, и
+    /// каждая правка — кросс-алфавитный поиск, падежи, кэш таблиц — вносилась
+    /// в обе руками. Работало это ровно до первого раза, когда кто-нибудь
+    /// забудет.
+    public static func restoreIfRussian(_ transcript: String) -> String {
+        guard looksRussian(transcript) else { return transcript }
+        return restore(transcript)
+    }
+
+    static func looksRussian(_ text: String) -> Bool {
+        var cyrillic = 0
+        var latin = 0
+        for character in text.unicodeScalars {
+            if ("\u{0400}"..."\u{04FF}").contains(character) { cyrillic += 1 }
+            else if ("a"..."z").contains(character) || ("A"..."Z").contains(character) { latin += 1 }
+        }
+        // Треть — намеренно низко: фраза «поднимем LLM-фильтр в prod» на три
+        // четверти латиница и всё-таки русская.
+        let letters = cyrillic + latin
+        return letters > 0 && Double(cyrillic) / Double(letters) > 0.33
+    }
+
     public static func restore(_ transcript: String) -> String {
         let forms = canonicalForms()
         guard !forms.isEmpty, !transcript.isEmpty else { return transcript }

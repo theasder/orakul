@@ -220,8 +220,8 @@ private struct FocusRow: View {
                 }
                 .buttonStyle(IconButtonStyle(size: 16))
                 .opacity(hovering ? 1 : 0)
-                .accessibilityLabel("Hide \(item.title)")
-                .help("Hide this meeting — it stays in your calendar")
+                .accessibilityLabel("Скрыть \(item.title)")
+                .help("Убрать отсюда — в календаре звонок останется")
             }
         }
         .padding(Space.s)
@@ -243,9 +243,9 @@ private struct FocusRow: View {
         case .alert:    return "Скрыть"
         case .reminder:
             return item.meetingID == nil
-                ? "Upcoming meeting"
-                : "Load this meeting's title, agenda and attendees into the call context"
-        default:        return "Send to the assistant"
+                ? "Ближайший звонок"
+                : "Подставить название, повестку и участников в контекст звонка"
+        default:        return "Отправить ассистенту"
         }
     }
 }
@@ -289,6 +289,6 @@ struct FocusBriefLines: View {
         .padding(.trailing, Space.s)
         .padding(.bottom, 2)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Brief: " + brief.focusLines.map(\.text).joined(separator: ". "))
+        .accessibilityLabel("Кратко: " + brief.focusLines.map(\.text).joined(separator: ". "))
     }
 }

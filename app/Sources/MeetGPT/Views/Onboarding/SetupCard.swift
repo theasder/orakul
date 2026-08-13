@@ -10,16 +10,24 @@ import SwiftUI
 struct SetupCard: View {
     @EnvironmentObject var state: AppState
     @EnvironmentObject var mcp: MCPConnectionManager
-    @State private var showSignIn = false
+    @Environment(\.openSettings) private var openSettings
     @AppStorage("onboarding.setupCardDismissed") private var dismissed = false
-    @AppStorage("onboarding.signInRowDismissed") private var signInDismissed = false
+    // Ключ намеренно новый, а не переименованный старый: кто отложил вход, тот
+    // не откладывал «вставить ключ». Это разные просьбы, и вторая — та самая,
+    // без которой не будет ответов модели.
+    @AppStorage("onboarding.providerKeyRowDismissed") private var keyDismissed = false
 
     private var captureVerified: Bool { state.micGranted && state.screenRecordingGranted }
-    private var signedIn: Bool { state.wheesprConnected || !state.wheesprAvailable }
+    /// Строка держалась на признаке входа, хотя текст в ней уже был про ключ.
+    /// Пока адрес сервера подставлялся сам, признак был ложным и строка
+    /// показывалась. Как только адрес перестал подставляться,
+    /// `wheesprAvailable` стал false, «вошёл» — true, и единственная строка про
+    /// ключ исчезла из установщика целиком.
+    private var hasProviderKey: Bool { !ProviderKeyStore.current.configured.isEmpty }
     private var appsConnected: Bool { !mcp.authorizedServerIDs.isEmpty }
 
-    private var showsSignInRow: Bool {
-        OnboardingPrompts.showsSignInRow(signedIn: signedIn, dismissed: signInDismissed)
+    private var showsProviderKeyRow: Bool {
+        OnboardingPrompts.showsProviderKeyRow(hasKey: hasProviderKey, dismissed: keyDismissed)
     }
 
     private var remaining: Int {
@@ -28,7 +36,7 @@ struct SetupCard: View {
                                          // outstanding work; counting it leaves
                                          // the card saying "1 left" with nothing
                                          // under it to do.
-                                         signedIn: signedIn || signInDismissed,
+                                         keyReady: hasProviderKey || keyDismissed,
                                          appsConnected: appsConnected)
     }
 
@@ -36,7 +44,7 @@ struct SetupCard: View {
         if !dismissed, remaining > 0 {
             VStack(alignment: .leading, spacing: Space.s) {
                 HStack(spacing: Space.xs) {
-                    SectionLabel("Setup · \(remaining) left")
+                    SectionLabel("Настройка · осталось \(remaining)")
                     Spacer(minLength: 0)
                     Button { dismissed = true } label: {
                         Image(systemName: "xmark").font(.system(size: 8, weight: .bold))
@@ -50,18 +58,22 @@ struct SetupCard: View {
                     // "Verified" would be an overclaim: this row knows the two
                     // permissions are granted, which is exactly the thing the
                     // capture check exists to prove is not the same as working.
-                    SetupRow(done: captureVerified, title: "Capture permissions granted")
-                    if showsSignInRow {
+                    SetupRow(done: captureVerified, title: "Разрешения на захват выданы")
+                    if showsProviderKeyRow {
+                        // Раньше здесь предлагался вход ради «моделей без своих
+                        // ключей» — обещание сервера, которого у orakul нет.
+                        // Человек, дошедший до этой строки, не мог по ней ничего
+                        // сделать: она открывала SignInSheet. Настоящий шаг один
+                        // — вставить свой ключ, а вводят его в настройках.
                         SetupRow(done: false,
-                                 title: "Sign in — managed AI & sync",
-                                 action: { showSignIn = true },
-                                 // Signing in is optional and always available
-                                 // from the sidebar footer, so this row can be
-                                 // put off without losing the rest of the card.
-                                 onDismiss: { signInDismissed = true })
+                                 title: "Вставить ключ провайдера — иначе не будет ответов",
+                                 action: { openSettings() },
+                                 // Шаг необязательный: запись, расшифровка и
+                                 // поиск по звонкам работают и без ключа.
+                                 onDismiss: { keyDismissed = true })
                     }
                     if !appsConnected {
-                        SetupRow(done: false, title: "Connect Notion, Linear, Asana…")
+                        SetupRow(done: false, title: "Подключить Яндекс Трекер, Kaiten, Notion…")
                     }
                     Text("Запись работает и без того, и без другого.")
                         .font(Typo.caption).foregroundStyle(Theme.inkTertiary)
@@ -74,9 +86,6 @@ struct SetupCard: View {
                             in: RoundedRectangle(cornerRadius: Radius.s, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: Radius.s, style: .continuous)
                     .strokeBorder(Theme.hairline, lineWidth: 1))
-            }
-            .sheet(isPresented: $showSignIn) {
-                SignInSheet().environmentObject(state)
             }
         }
     }
@@ -108,12 +117,12 @@ private struct SetupRow: View {
                     Image(systemName: "xmark").font(.system(size: 8, weight: .bold))
                 }
                 .buttonStyle(IconButtonStyle(size: 16))
-                .help("Not now — you can sign in later from the sidebar")
-                .accessibilityLabel("Dismiss: \(title)")
+                .help("Не сейчас — ключ можно вставить в настройках когда угодно")
+                .accessibilityLabel("Скрыть: \(title)")
             }
         }
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("\(title): \(done ? "done" : "not done")")
+        .accessibilityLabel("\(title): \(done ? "сделано" : "не сделано")")
     }
 }
 
@@ -139,13 +148,18 @@ struct NoCallTodayCard: View {
         if eligible {
             VStack(alignment: .leading, spacing: Space.s) {
                 HStack(spacing: Space.xs) {
-                    SectionLabel("До понедельника звонков нет?")
+                    // Было «До понедельника звонков нет?» — 233 pt в верхнем
+                    // регистре при 212 доступных. Заголовок раздвигал боковую
+                    // панель, и у КАЖДОЙ строки в ней пропадала первая буква.
+                    // SectionLabel теперь такого не позволит, но обрезанный
+                    // заголовок — тоже плохо, поэтому строка короче.
+                    SectionLabel("До понедельника пусто?")
                     Spacer(minLength: 0)
                     Button { dismissed = true } label: {
                         Image(systemName: "xmark").font(.system(size: 8, weight: .bold))
                     }
                     .buttonStyle(IconButtonStyle(size: 16))
-                    .help("Hide")
+                    .help("Скрыть")
                     .accessibilityLabel("Скрыть подсказку")
                 }
 
@@ -155,12 +169,12 @@ struct NoCallTodayCard: View {
                         .fixedSize(horizontal: false, vertical: true)
                     SuggestedSource(
                         icon: "graduationcap",
-                        title: "A talk or lecture",
-                        detail: "Concepts, evidence and open questions — with a learning plan.")
+                        title: "Доклад или лекция",
+                        detail: "Понятия, доводы и открытые вопросы — вместе с планом, что изучить.")
                     SuggestedSource(
                         icon: "mic",
-                        title: "A podcast",
-                        detail: "Hosts and guests separated, arguments summarised, no invented action items.")
+                        title: "Подкаст",
+                        detail: "Ведущие и гости разделены, доводы собраны, выдуманных задач нет.")
                     Text("Выберите тип на плашке записи или оставьте автоопределение.")
                         .font(Typo.caption).foregroundStyle(Theme.inkTertiary)
                         .fixedSize(horizontal: false, vertical: true)

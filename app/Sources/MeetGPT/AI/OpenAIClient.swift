@@ -10,17 +10,29 @@ final class OpenAIClient {
     private let providerName: String
     private let keyProvider: () -> String
     private let session: URLSession
+    /// Как назвать модель в теле запроса. У большинства провайдеров — как есть;
+    /// YandexGPT требует `gpt://<каталог>/<модель>/latest`, где каталог свой у
+    /// каждого пользователя, поэтому подстановка живёт здесь, а не в каталоге
+    /// моделей: там она была бы одинаковой для всех.
+    private let modelIDTransform: (String) -> String
+    /// Заголовки сверх Authorization и Content-Type. Яндексу нужен ещё
+    /// `x-folder-id`.
+    private let extraHeaders: () -> [String: String]
 
     /// Defaults to OpenAI proper; pass a base URL + key lookup for any
     /// OpenAI-compatible provider.
     init(session: URLSession = .shared,
          providerName: String = "OpenAI",
          endpoint: URL = URL(string: "https://api.openai.com/v1/chat/completions")!,
-         keyProvider: @escaping () -> String = { Config.openAIAPIKey }) {
+         keyProvider: @escaping () -> String = { Config.openAIAPIKey },
+         modelIDTransform: @escaping (String) -> String = { $0 },
+         extraHeaders: @escaping () -> [String: String] = { [:] }) {
         self.session = session
         self.providerName = providerName
         self.endpoint = endpoint
         self.keyProvider = keyProvider
+        self.modelIDTransform = modelIDTransform
+        self.extraHeaders = extraHeaders
     }
 
     struct Message: Encodable {
@@ -43,6 +55,9 @@ final class OpenAIClient {
         request.timeoutInterval = 120
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        for (field, value) in extraHeaders() {
+            request.setValue(value, forHTTPHeaderField: field)
+        }
 
         // With images, the user message becomes multimodal content (vision).
         let userContent: Any
@@ -58,7 +73,7 @@ final class OpenAIClient {
         }
 
         var body: [String: Any] = [
-            "model": model,
+            "model": modelIDTransform(model),
             "stream": true,
             "messages": [
                 ["role": "system", "content": system],

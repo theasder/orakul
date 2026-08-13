@@ -77,6 +77,7 @@ private final class ConcurrentDeltaFailureGateway: LLMGateway, @unchecked Sendab
 
 @Suite("Direct-provider orchestration failover", .serialized)
 struct AutoOrchestratorFailoverTests {
+
     private let openAI = LLMModel(id: "test-openai", label: "OpenAI test",
                                   provider: .openAI, minTier: .free, supportsVision: true)
     private let google = LLMModel(id: "test-google", label: "Google test",
@@ -103,26 +104,30 @@ struct AutoOrchestratorFailoverTests {
 
     @Test("captured provider-pinned Auto selection beats a later live setting")
     func capturedProviderPinWins() async throws {
-        let gateway = FailoverScriptGateway([
-            .init(deltas: ["ok"], result: .success("ok")),
-        ])
-        let captured = LLMModel(
-            id: LLMCatalog.auto.id, label: LLMCatalog.auto.label,
-            provider: .anthropic, minTier: .free, supportsVision: true,
-            requestSelectionID: "auto:anthropic")
-        let sut = AutoOrchestrator(
-            inner: gateway,
-            selectionProvider: { "auto:openAI" },
-            tierProvider: { .ultra },
-            directClientMode: { false },
-            fallbackResolver: { _, _, _ in [] })
+        // Маршрутизация смотрит на наличие ключа: без него пул пуст
+        // и закреплённый провайдер теряется на запасном пути.
+        try await withSeededProviderKeys {
+            let gateway = FailoverScriptGateway([
+                .init(deltas: ["ok"], result: .success("ok")),
+            ])
+            let captured = LLMModel(
+                id: LLMCatalog.auto.id, label: LLMCatalog.auto.label,
+                provider: .anthropic, minTier: .free, supportsVision: true,
+                requestSelectionID: "auto:anthropic")
+            let sut = AutoOrchestrator(
+                inner: gateway,
+                selectionProvider: { "auto:openAI" },
+                tierProvider: { .ultra },
+                directClientMode: { false },
+                fallbackResolver: { _, _, _ in [] })
 
-        _ = try await sut.streamChat(
-            system: "s", user: "short", images: [], model: captured,
-            onDelta: { _ in })
+            _ = try await sut.streamChat(
+                system: "s", user: "short", images: [], model: captured,
+                onDelta: { _ in })
 
-        #expect(gateway.calledModels.count == 1)
-        #expect(gateway.calledModels.first?.provider == .anthropic)
+            #expect(gateway.calledModels.count == 1)
+            #expect(gateway.calledModels.first?.provider == .anthropic)
+        }
     }
 
     @Test("a selected provider's HTTP 402 falls back before output without duplicate deltas")

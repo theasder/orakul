@@ -3,7 +3,7 @@
 # app bundle, then sign, notarize and staple the IMAGE itself.
 #
 #   ./dmg.sh            # arm64 (orakul.app       -> dist/orakul-AppleSilicon.dmg)
-#   ./dmg.sh x86_64     # intel (orakul-Intel.app -> dist/orakul-Intel.dmg)
+#   ./dmg.sh x86_64     # intel (orakul-Intel.app -> dist/orakul-Intel.dmg, внутри orakul.app)
 #
 # Why a DMG when notarize.sh already produces a working zip:
 #
@@ -34,6 +34,15 @@ APP="$ROOT/build/$APP_BASENAME.app"
 DIST="$ROOT/dist"
 DMG="$DIST/$PUBLISH_NAME.dmg"
 VOLNAME="orakul"
+# Имя, под которым приложение уезжает к человеку, — одно на обе архитектуры.
+#
+# В build/ имена обязаны различаться, иначе вторая сборка затрёт первую. Но это
+# различие протекало в образ: с Intel-диска в «Программы» переносился
+# `orakul-Intel.app`. В доке подписано «orakul-Intel», в Spotlight — тоже, а
+# главное, для macOS это другое приложение: разрешения на микрофон и запись
+# экрана, выданные одному, к другому не относятся. Разрядность видна в имени
+# файла образа ($PUBLISH_NAME) — там она и нужна.
+SHIP_NAME="orakul"
 
 [ -d "$APP" ] || { echo "!! no app at $APP — run ./notarize.sh first" >&2; exit 2; }
 
@@ -67,8 +76,8 @@ while IFS= read -r VOL; do
 done < <(ls -d "/Volumes/$VOLNAME" "/Volumes/$VOLNAME "* 2>/dev/null)
 
 STAGE="$(mktemp -d /tmp/cruxwing-dmg.XXXXXX)"
-echo ">> staging $APP_BASENAME.app"
-/usr/bin/ditto "$APP" "$STAGE/$APP_BASENAME.app"
+echo ">> staging $SHIP_NAME.app (из $APP_BASENAME.app)"
+/usr/bin/ditto "$APP" "$STAGE/$SHIP_NAME.app"
 # The other half of the gesture: without this symlink the window has nowhere to
 # drag TO, and the user is back to copying by hand.
 ln -s /Applications "$STAGE/Applications"
@@ -137,9 +146,11 @@ func text(_ s: String, _ size: CGFloat, _ y: CGFloat, _ alpha: CGFloat, bold: Bo
     line.draw(at: NSPoint(x: (CGFloat(bw) - size.width) / 2, y: y))
     NSGraphicsContext.restoreGraphicsState()
 }
-text("Drag Cruxwing into Applications", 17, CGFloat(bh) - 92, 0.95, bold: true)
-text("Launching it from Applications keeps Screen Recording and", 12, 58, 0.6)
-text("Microphone permissions attached to the app.", 12, 40, 0.6)
+// Это окно человек видит при каждой установке. До сих пор оно было на
+// английском и звало перенести Cruxwing — чужое имя в чужом языке.
+text("Перенесите orakul в «Программы»", 17, CGFloat(bh) - 92, 0.95, bold: true)
+text("Запуск из «Программ» сохраняет выданные разрешения", 12, 58, 0.6)
+text("на запись экрана и микрофон.", 12, 40, 0.6)
 
 let img = ctx.makeImage()!
 let rep = NSBitmapImageRep(cgImage: img)
@@ -166,15 +177,28 @@ rm -f "$RW"
 MOUNT="$(/usr/bin/hdiutil attach -readwrite -noverify -noautoopen "$RW" \
     | grep -o '/Volumes/.*' | head -1)"
 [ -n "$MOUNT" ] || { echo "!! could not mount the staging image" >&2; exit 1; }
+# Finder спрашивают о томе по имени, и это имя берётся у самого тома, а не из
+# $VOLNAME. Если одноимённый том уже примонтирован, macOS даёт новому «orakul 1»,
+# и обращение к disk "orakul" уходит в чужой том или, чаще, в никуда:
+# «Can't get disk "orakul"» (-1728). Оформление молча не применялось, и образ
+# уезжал без фона — оба раза до этой правки.
+VOL_ACTUAL="$(basename "$MOUNT")"
 
 # Finder scripting is the flakiest step in any DMG pipeline — it needs Automation
 # permission and fails on a machine with no window server. Non-fatal on purpose:
 # an unstyled DMG still installs correctly, so a cosmetic failure must not block
 # a release.
+#
+# С повторами, потому что чаще всего это гонка, а не отказ. Том уже
+# примонтирован, `hdiutil` вернул путь, но Finder о нём ещё не знает и отвечает
+# «Can't get disk "orakul"» (-1728). Из двух архитектур подряд так падала то
+# одна, то другая — и образ уезжал без фона. Секунда паузы это закрывает;
+# три попытки на случай, если Finder занят.
 echo ">> arranging the window"
-if ! /usr/bin/osascript <<APPLESCRIPT
+style_window() {
+    /usr/bin/osascript <<APPLESCRIPT
 tell application "Finder"
-    tell disk "$VOLNAME"
+    tell disk "$VOL_ACTUAL"
         open
         set current view of container window to icon view
         set toolbar visible of container window to false
@@ -188,7 +212,7 @@ tell application "Finder"
         -- close the gap the arrow occupies, and ~230 has them touching.
         set icon size of opts to 112
         set background picture of opts to file ".background:bg.tiff"
-        set position of item "$APP_BASENAME.app" of container window to {170, 210}
+        set position of item "$SHIP_NAME.app" of container window to {170, 210}
         set position of item "Applications" of container window to {490, 210}
         update without registering applications
         delay 1
@@ -196,9 +220,24 @@ tell application "Finder"
     end tell
 end tell
 APPLESCRIPT
-then
+}
+
+# Успех проверяется по `.DS_Store`, а не по коду возврата. Именно в нём Finder
+# держит раскладку окна, места иконок и ссылку на фон, и один раз osascript
+# вернул ноль, не записав ничего: сборка отчиталась об успехе, а образ уехал
+# без оформления. Кода возврата мало — нужен файл.
+STYLED=0
+for attempt in 1 2 3; do
+    if style_window 2>/tmp/dmg-style-$$.err && [ -f "$MOUNT/.DS_Store" ]; then
+        STYLED=1; break
+    fi
+    [ "$attempt" -lt 3 ] && sleep 1
+done
+if [ "$STYLED" = "0" ]; then
     echo "   (Finder styling failed — shipping an unstyled but working image)" >&2
+    tail -1 "/tmp/dmg-style-$$.err" >&2 || true
 fi
+rm -f "/tmp/dmg-style-$$.err"
 
 /bin/sync
 /usr/bin/hdiutil detach "$MOUNT" -quiet || /usr/bin/hdiutil detach "$MOUNT" -force -quiet
@@ -218,4 +257,4 @@ rm -rf "$STAGE"
 
 echo ">> done: $DMG"
 echo "   arch: $ARCH"
-echo "   Double-click, drag Cruxwing to Applications, launch from there."
+echo "   Открыть, перенести orakul в «Программы», запускать оттуда."

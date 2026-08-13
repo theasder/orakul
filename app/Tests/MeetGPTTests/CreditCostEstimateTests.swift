@@ -174,7 +174,14 @@ struct CreditCostEstimateTests {
         // A model in the picker but not the table quotes the fallback price,
         // which is wrong in both directions depending on the model.
         for tier in [Tier.free, .pro, .premium, .ultra] {
-            for model in LLMCatalog.available(for: tier) {
+            let selectable = LLMCatalog.available(for: tier)
+            // Без этой строки проверка тихо вырождается: подними у всех моделей
+            // minTier — и список для младшего уровня станет пустым, цикл не
+            // выполнится ни разу, а тест останется зелёным. Каталог приезжает
+            // сверху из Cruxwing, где уровни настоящие, так что это не
+            // гипотеза, а обычный сценарий переноса.
+            #expect(!selectable.isEmpty, "на уровне \(tier) не осталось моделей — проверять нечего")
+            for model in selectable {
                 #expect(CreditCostEstimate.baseCredits[model.id] != nil,
                         "\(model.id) is selectable on \(tier) but has no listed price")
             }

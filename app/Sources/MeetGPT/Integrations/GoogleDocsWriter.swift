@@ -67,11 +67,11 @@ enum AssistantDocHTML {
                       blindSpots: [String],
                       earlierExchanges: [AIExchange] = []) -> String {
         let df = DateFormatter()
-        df.locale = Locale(identifier: "en_US_POSIX")
+        df.locale = DisplayFormatting.locale
         df.dateFormat = "d MMMM yyyy"
 
         var html = "<h1>\(esc(title))</h1>"
-        html += "<p><i>Cruxwing assistant export · \(esc(df.string(from: date)))</i></p>"
+        html += "<p><i>orakul · \(esc(df.string(from: date)))</i></p>"
 
         // The archived dialog before the live turn, oldest first — the doc is
         // titled "Assistant chat" and must contain the chat.

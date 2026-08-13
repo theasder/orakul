@@ -33,10 +33,10 @@ enum TranscriptionEngine: String, CaseIterable, Identifiable, Codable {
 
     var label: String {
         switch self {
-        case .local:    return "Local · on-device Whisper"
-        case .server:   return "Cruxwing · large-v3"
-        case .deepgram: return "Deepgram · live + speakers"
-        case .whisper:  return "Whisper · OpenAI chunks"
+        case .local:    return "На устройстве · Whisper"
+        case .server:   return "На сервере · large-v3"
+        case .deepgram: return "Deepgram · вживую, с говорящими"
+        case .whisper:  return "Whisper · кусками через OpenAI"
         }
     }
 
@@ -44,10 +44,10 @@ enum TranscriptionEngine: String, CaseIterable, Identifiable, Codable {
     // vendor name.
     var advantageTitle: String {
         switch self {
-        case .local:    return "Private — runs on this Mac"
-        case .server:   return "Accurate — large-v3 on Cruxwing"
-        case .deepgram: return "Instant — word-by-word captions & speaker names"
-        case .whisper:  return "Accurate — billed to your own API key"
+        case .local:    return "Приватно — считается на этом компьютере"
+        case .server:   return "Точно — large-v3 на сервере"
+        case .deepgram: return "Мгновенно — пословно и с именами говорящих"
+        case .whisper:  return "Точно — по вашему ключу"
         }
     }
     // The frame (D35): every option answers the four things businesses ask —
@@ -55,10 +55,14 @@ enum TranscriptionEngine: String, CaseIterable, Identifiable, Codable {
     // the copy contrasts latency without implying only one option is "live".
     var advantageCaption: String {
         switch self {
-        case .local:    return "Audio never leaves your Mac; works offline. Solid accuracy, sized to your chip. Live captions a few seconds behind. Free — no credits."
-        case .server:   return "Best accuracy — large-v3 + per-language models on Cruxwing servers only; audio is discarded after transcription. Live captions a few seconds behind; requires sign-in. ≈10 min per credit."
-        case .deepgram: return "Fastest live transcript with who-said-what, streamed to Deepgram's cloud. ≈4 min of streamed audio per credit; your own key bills Deepgram instead."
-        case .whisper:  return "Bring your own OpenAI key; usage bills to your account, not your credits. Live captions a few seconds behind."
+        // Про кредиты здесь больше нет ни слова: их не существует. Раньше в
+        // каждой строке стояла цена в кредитах — «Free — no credits», «≈4 min
+        // per credit», — и это был единственный оставшийся на экране счёт за
+        // то, за что orakul денег не берёт.
+        case .local:    return "Звук не уходит с компьютера, работает без сети. Точность приличная, по силам вашего процессора. Титры отстают на пару секунд. Бесплатно."
+        case .server:   return "Лучшая точность — large-v3 и модели под язык на сервере; звук стирается после расшифровки. Титры отстают на пару секунд, нужен вход."
+        case .deepgram: return "Самый быстрый транскрипт, сразу видно кто говорит; звук идёт в облако Deepgram. Платите Deepgram по своему ключу."
+        case .whisper:  return "По вашему ключу OpenAI: расход идёт по вашему договору. Титры отстают на пару секунд."
         }
     }
     var advantageSymbol: String {
@@ -146,21 +150,44 @@ enum Config {
     private static let credentialPersistenceQueue = DispatchQueue(
         label: "ai.wheespr.meetgpt.credential-persistence",
         qos: .utility)
-    // MARK: Provider keys (build-time, from mac/.env → Secrets)
+    // MARK: Ключи провайдеров
     //
-    // These used to be user-entered. They now come from `Secrets`, which
-    // build.sh generates from mac/.env. Users no longer paste keys; they only
-    // choose a model (gated by tier). Kept as computed getters so a future
-    // backend gateway can override the source without touching call sites.
-    static var openAIAPIKey: String   { Secrets.openAIAPIKey }
-    static var anthropicAPIKey: String { Secrets.anthropicAPIKey }
-    static var googleAIAPIKey: String { Secrets.googleAIAPIKey }
+    // Два источника, порядок важен: сначала ключ, введённый в настройках
+    // (`ProviderKeyStore`, Связка ключей), потом зашитый при сборке из
+    // `mac/.env`.
+    //
+    // У Cruxwing пользовательский ввод убрали, когда появился серверный шлюз:
+    // ключи уехали на сервер. orakul этот код унаследовал, но сервера у него
+    // нет, а в готовые установщики ключи не зашиваются намеренно — без ввода
+    // в настройках ИИ-ответы там не работают вовсе.
+    static var openAIAPIKey: String {
+        ProviderKeyStore.current.resolvedKey(for: .openAI, baked: Secrets.openAIAPIKey)
+    }
+    static var anthropicAPIKey: String {
+        ProviderKeyStore.current.resolvedKey(for: .anthropic, baked: Secrets.anthropicAPIKey)
+    }
+    static var googleAIAPIKey: String {
+        ProviderKeyStore.current.resolvedKey(for: .google, baked: Secrets.googleAIAPIKey)
+    }
+    /// У Яндекса зашитого ключа нет вовсе: провайдер появился уже после того,
+    /// как ключи перестали попадать в сборку. Значит, только из настроек.
+    static var yandexGPTAPIKey: String {
+        ProviderKeyStore.current.resolvedKey(for: .yandexGPT, baked: "")
+    }
     static var deepgramAPIKey: String { Secrets.deepgramAPIKey }
     static var assemblyAIAPIKey: String { Secrets.assemblyAIAPIKey }
-    static var deepSeekAPIKey: String { Secrets.deepSeekAPIKey }
-    static var dashScopeAPIKey: String { Secrets.dashScopeAPIKey }
-    static var zhipuAPIKey: String { Secrets.zhipuAPIKey }
-    static var moonshotAPIKey: String { Secrets.moonshotAPIKey }
+    static var deepSeekAPIKey: String {
+        ProviderKeyStore.current.resolvedKey(for: .deepSeek, baked: Secrets.deepSeekAPIKey)
+    }
+    static var dashScopeAPIKey: String {
+        ProviderKeyStore.current.resolvedKey(for: .qwen, baked: Secrets.dashScopeAPIKey)
+    }
+    static var zhipuAPIKey: String {
+        ProviderKeyStore.current.resolvedKey(for: .zhipu, baked: Secrets.zhipuAPIKey)
+    }
+    static var moonshotAPIKey: String {
+        ProviderKeyStore.current.resolvedKey(for: .moonshot, baked: Secrets.moonshotAPIKey)
+    }
     static var hubSpotClientID: String { Secrets.hubSpotClientID }
     static var hubSpotClientSecret: String { Secrets.hubSpotClientSecret }
     static var affinityClientID: String { Secrets.affinityClientID }
@@ -245,23 +272,34 @@ enum Config {
     /// scheme) can never become a bogus request URL ("unsupported URL") — it
     /// just falls back to direct providers with a clear "add a key" error.
     static var backendBaseURL: String {
-        let raw = Secrets.backendBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        resolveBackendBaseURL(Secrets.backendBaseURL)
+    }
+
+    /// Разбор вынесен отдельно, чтобы его можно было проверить целиком.
+    ///
+    /// Пока разбор сидел в вычисляемом свойстве, тест мог посмотреть только на
+    /// то значение, с которым собрана эта машина. Собирается она с
+    /// `http://localhost:8787`, а ломалось на пустом — на том, с которым
+    /// уходит установщик. Ветка, ради которой тест писали, не выполнялась ни
+    /// разу.
+    static func resolveBackendBaseURL(_ value: String) -> String {
+        let raw = value.trimmingCharacters(in: .whitespacesAndNewlines)
         if raw.hasPrefix("http://") || raw.hasPrefix("https://") { return raw }
         // Explicit opt-out for a local dev build with baked keys and no backend
         // deployed: BACKEND_URL=off/none/direct → no backend, so AI features call
         // providers directly and nothing dials the (possibly-undeployed) prod host.
         if ["off", "none", "direct", "local"].contains(raw.lowercased()) { return "" }
-        // Product default — the managed Cruxwing backend, same default
-        // build.sh bakes into dist builds. Keeps sign-in/plans available in
-        // every build; set BACKEND_URL in .env to point at a local server.
-        return defaultBackendBaseURL
+        // Пусто — значит сервера нет, и это конечный ответ.
+        //
+        // В cruxwing здесь стояла подстановка `https://api.cruxwing.ai`, чтобы
+        // вход и тарифы работали в любой сборке. В orakul она давала прямо
+        // противоположное задуманному: DIST-сборка не бакает адрес, пустое
+        // значение проваливалось в эту подстановку, и установщик orakul
+        // предлагал вход и счёт на сервере другого продукта. Проверка в
+        // build.sh это пропускала — она смотрела на своё значение, а не на
+        // то, что в итоге возвращает Config.
+        return ""
     }
-
-    /// The deployed host is `.ai`; `api.cruxwing.com` is NXDOMAIN and always
-    /// was. Every build that fell back to this default dialled a name that does
-    /// not resolve, which reads in-app as "the backend is down" rather than "the
-    /// backend was never there".
-    static let defaultBackendBaseURL = "https://api.cruxwing.ai"
 
     /// Serve chat through the backend's managed, tier-enforcing LLM gateway
     /// (LLM_GATEWAY=backend) instead of direct provider clients. Needs BACKEND_URL.
@@ -566,14 +604,24 @@ enum Config {
         set { UserDefaults.standard.set(newValue, forKey: "billing.periodAnchor") }
     }
 
-    /// Current plan. The server/purchased tier is the commercial truth; the
-    /// operator baseline exists only for development and managed deployments.
-    /// A dev-build tier preview (devTierOverride) beats everything — that's
-    /// its purpose: see exactly what a user on that plan gets.
+    /// План. У orakul он один и всегда самый полный: тарифов нет.
+    ///
+    /// Механика тарифов досталась от Cruxwing и осталась в коде — на ней висят
+    /// выбор модели, число источников для подсказки, лимиты. Вырезать её
+    /// целиком значило бы переписать полсотни файлов; вместо этого она
+    /// отвечает «всё доступно» в одной точке, через которую проходят все
+    /// остальные.
+    ///
+    /// Разблокировать тут нечего: платить orakul не за что, всё считается на
+    /// компьютере пользователя. Оставить `.free` значило бы отдать российскому
+    /// разработчику две модели из тринадцати и платный экран за остальные —
+    /// ровно то, чего в этом продукте быть не должно.
+    ///
+    /// Превью для разработчика остаётся: оно нужно, чтобы посмотреть чужой
+    /// экран, и в собранном приложении недоступно.
     static var currentTier: Tier {
         if let preview = devTierOverride { return preview }
-        let floor = [baselineTier, purchasedTier ?? .free].max(by: { $0.rank < $1.rank }) ?? baselineTier
-        return TierPolicy.effectiveTier(stats: UsageTracker.stats, floor: floor)
+        return .ultra
     }
 
     /// The paywall was answered (subscribed or explicit "continue with Free").
@@ -582,23 +630,16 @@ enum Config {
         set { UserDefaults.standard.set(newValue, forKey: "billing.paywallChoiceMade") }
     }
 
-    /// Mandatory paywall: shows until answered, and again when the trial has
-    /// lapsed without a purchase.
-    static var shouldShowPaywall: Bool {
-        if purchasedTier != nil { return false }
-        // Never before the first value moment: the user must have recorded a
-        // meeting or received an AI answer before we ask for money (launch
-        // loop M3 — the paywall used to be the literal first screen).
-        guard UsageTracker.meetings >= 1 || UsageTracker.aiRequests >= 1 else { return false }
-        // And never when it can't even sell: without a backend there are no
-        // plans to load and checkout is impossible.
-        guard !backendBaseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
-        if !paywallChoiceMade { return true }
-        // Re-prompt after a cooling-off window if the user stayed on Free.
-        return UsageTracker.stats.daysSinceFirstLaunch >= TierPolicy.paywallReminderDays
-            && currentTier == .free
-            && !UserDefaults.standard.bool(forKey: "billing.postTrialPromptShown")
-    }
+    /// Платный экран в orakul не показывается никогда.
+    ///
+    /// Не «отложен до появления тарифов» — их не будет. Экран, который просит
+    /// денег за то, что и так бесплатно, стоит доверия ровно столько же,
+    /// сколько кнопка «Подключить», ведущая в никуда.
+    ///
+    /// Сам экран из кода не выпилен: он тянет за собой покупки, состояния
+    /// аккаунта и половину настроек. Он просто недостижим, и это закреплено
+    /// тестом.
+    static var shouldShowPaywall: Bool { false }
 
     static func markPostTrialPromptShown() {
         UserDefaults.standard.set(true, forKey: "billing.postTrialPromptShown")

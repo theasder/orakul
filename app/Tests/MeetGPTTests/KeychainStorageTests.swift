@@ -368,3 +368,137 @@ struct KeychainStorageTests {
         #expect(!selected.contains("read:component:compass"))
     }
 }
+
+/// Связка ключей, которая отказывается писать.
+///
+/// Настоящая умеет отказать: заблокирована, или строка осталась от прежней
+/// подписи бинарника — в `Keychain.swift` для обоих случаев есть ветка. До
+/// сих пор ни один тест такого хранилища не имел, поэтому отказ записи не
+/// проверял никто, а код молча его игнорировал.
+final class RefusingKeychain: KeychainStore, @unchecked Sendable {
+    private let lock = NSLock()
+    private var attempts = 0
+
+    var writeAttempts: Int { lock.lock(); defer { lock.unlock() }; return attempts }
+
+    @discardableResult
+    func set(_ data: Data, for account: String) -> Bool {
+        lock.lock(); attempts += 1; lock.unlock()
+        return false            // как заблокированная связка
+    }
+    func get(_ account: String) -> Data? { nil }
+    func delete(_ account: String) {}
+}
+
+@Suite("Отказ Связки ключей")
+struct KeychainRefusalTests {
+
+    @Test("отказ записи доходит до вызывающего, а не теряется")
+    func refusedWriteIsReported() {
+        // Раньше `setKey` выбрасывал ответ `store.set`. Настройки показывали
+        // «ключ есть», поле очищалось, а каждый запрос к модели падал с «нет
+        // ключа»: человек вставлял ключ снова и снова, потому что интерфейс
+        // говорил, что всё сохранено.
+        let refusing = RefusingKeychain()
+        let store = ProviderKeyStore(store: refusing)
+
+        #expect(store.setKey("sk-synthetic", for: .openAI) == false,
+                "связка отказала, а хранилище отчиталось об успехе")
+        #expect(refusing.writeAttempts == 1, "запись даже не попробовали")
+        // И провайдер не должен считаться настроенным после отказа.
+        #expect(!store.hasKey(.openAI))
+    }
+
+    @Test("второе поле тоже сообщает об отказе")
+    func refusedSecondaryIsReported() {
+        // У Яндекса без идентификатора каталога запрос уходит с моделью,
+        // которую сервис не знает. Потерять его так же плохо, как ключ.
+        let store = ProviderKeyStore(store: RefusingKeychain())
+        #expect(store.setSecondary("b1g12345678", for: .yandexGPT) == false)
+    }
+
+    @Test("успешная запись по-прежнему успешна")
+    func successfulWriteStillReportsSuccess() {
+        // Иначе «всегда false» прошло бы проверки выше и сломало обычный путь.
+        let store = ProviderKeyStore(store: InMemoryKeychain())
+        #expect(store.setKey("sk-synthetic", for: .openAI) == true)
+        #expect(store.hasKey(.openAI))
+    }
+
+    @Test("очистка ключа — это успех, а не отказ")
+    func clearingIsNotAFailure() {
+        // Пустая строка убирает ключ. Если считать это отказом, интерфейс
+        // покажет ошибку там, где человек намеренно удалил ключ.
+        let store = ProviderKeyStore(store: InMemoryKeychain())
+        store.setKey("sk-synthetic", for: .openAI)
+        #expect(store.setKey("", for: .openAI) == true)
+        #expect(!store.hasKey(.openAI))
+    }
+}
+
+/// Экран ключей, когда Связка ключей отказывает.
+///
+/// Хранилище теперь честно возвращает false — но поломка была не в нём, а в
+/// том, что интерфейс этот ответ выбрасывал: поле очищалось, раздел
+/// закрывался, провайдер выглядел настроенным.
+///
+/// Проверка структурная, и это сказано прямо: нажатие кнопки меняет `@State`,
+/// а увидеть это ViewInspector без хостинга не может. Читается текст экрана —
+/// со снятыми комментариями, потому что комментарий рядом нарочно описывает
+/// как раз ту поломку, которой быть не должно.
+@Suite("Экран ключей при отказе Связки")
+struct ProviderKeysRefusalTests {
+
+    private static var code: String {
+        get throws {
+            let path = URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent().deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("Sources/MeetGPT/Views/ProviderKeysSection.swift").path
+            return try String(contentsOfFile: path, encoding: .utf8)
+                .split(separator: "\n", omittingEmptySubsequences: false)
+                .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
+                .joined(separator: "\n")
+        }
+    }
+
+    @Test("экран проверяет результат записи, а не предполагает успех")
+    func saveChecksTheResult() throws {
+        let code = try Self.code
+        let save = try #require(code.range(of: "let savedKey = store.setKey"),
+                                "кнопка «Сохранить» больше не читает результат записи")
+        let body = String(code[save.lowerBound...].prefix(460))
+        #expect(body.contains("guard savedKey && savedSecondary"),
+                "результат записи снова не проверяется")
+    }
+
+    @Test("при отказе набранный ключ остаётся в поле")
+    func refusalKeepsWhatWasTyped() throws {
+        // Очистить поле раньше проверки — значит заставить человека набирать
+        // ключ заново, ничего не объяснив.
+        // Срез берётся от НАЧАЛА действия кнопки, а не от строки `setKey`.
+        // Иначе очистка поля, вставленная ПЕРЕД сохранением, оказывается вне
+        // окна — мутация именно так и прошла мимо первой версии проверки.
+        let code = try Self.code
+        let action = try #require(code.range(of: "Button(\"Сохранить\")"),
+                                  "кнопки «Сохранить» больше нет")
+        let body = String(code[action.lowerBound...].prefix(700))
+        let save = try #require(body.range(of: "store.setKey"))
+        let clear = try #require(body.range(of: "key = \"\""))
+        #expect(save.lowerBound < clear.lowerBound,
+                "поле очищается раньше попытки записи — сохранять будет нечего")
+        let bail = try #require(body.range(of: "return"))
+        #expect(bail.lowerBound < clear.lowerBound,
+                "поле очищается раньше выхода по отказу — набранный ключ теряется")
+    }
+
+    @Test("человеку есть что прочитать при отказе")
+    func refusalHasAMessage() throws {
+        let code = try Self.code
+        #expect(code.contains("saveFailed = true"), "экран не отмечает отказ записи")
+        #expect(code.contains("Не удалось записать ключ в Связку ключей"),
+                "при отказе человеку нечего показать")
+        // Сообщение обязано назвать действие, иначе это просто «что-то не так».
+        #expect(code.contains("Разблокируйте"), "сообщение не подсказывает, что делать")
+    }
+}

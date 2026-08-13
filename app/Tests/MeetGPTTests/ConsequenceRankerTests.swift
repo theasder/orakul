@@ -116,13 +116,13 @@ struct ConsequenceRankerTests {
         ], actions: [
             .init(task: "Rotate the leaked signing key", owner: "Sam", due: "today"),
         ]).ranked()
-        #expect(big.markdown.contains("## What matters"))
+        #expect(big.markdown.contains("## Главное"))
         // The block must come before the full Decisions section, not after.
-        #expect(big.markdown.range(of: "## What matters")!.lowerBound
-                < big.markdown.range(of: "## Decisions")!.lowerBound)
+        #expect(big.markdown.range(of: "## Главное")!.lowerBound
+                < big.markdown.range(of: "## Решения")!.lowerBound)
 
         let small = minutes(decisions: ["Sunset the legacy API in June"]).ranked()
-        #expect(!small.markdown.contains("## What matters"))
+        #expect(!small.markdown.contains("## Главное"))
     }
 
     @Test("ownerless commitments are called out by name, owned ones are not")
@@ -133,8 +133,8 @@ struct ConsequenceRankerTests {
             .init(task: "Book the security review", owner: "", due: nil),
         ])
         let md = mixed.markdown
-        #expect(md.contains("### Needs an owner"))
-        let callout = String(md[md.range(of: "### Needs an owner")!.upperBound...])
+        #expect(md.contains("### Нужен владелец"))
+        let callout = String(md[md.range(of: "### Нужен владелец")!.upperBound...])
         #expect(callout.contains("Collect pricing feedback"))
         #expect(callout.contains("Book the security review"))
         #expect(!callout.contains("Draft the migration plan"))
@@ -142,7 +142,7 @@ struct ConsequenceRankerTests {
         let allOwned = minutes(decisions: [], actions: [
             .init(task: "Draft the migration plan", owner: "Priya", due: "Friday"),
         ])
-        #expect(!allOwned.markdown.contains("Needs an owner"))
+        #expect(!allOwned.markdown.contains("Нужен владелец"))
     }
 
     @Test("a paragraph-long decision is clipped in the highlights, not in the record")
@@ -169,7 +169,7 @@ struct ConsequenceRankerTests {
     func flaggedFiguresAreCapped() {
         let manyFigures = (1...30).map { "Line \($0) costs $\($0 * 111)" }
         let audited = minutes(decisions: manyFigures).auditingNumbers(against: "no numbers were said")
-        let footer = String(audited.markdown[audited.markdown.range(of: "Verify these figures")!.upperBound...])
+        let footer = String(audited.markdown[audited.markdown.range(of: "Проверьте эти цифры")!.upperBound...])
         #expect(footer.contains("and "), "the footer counts what it did not list")
         // A warning listing forty numbers is one nobody checks.
         #expect(footer.count < 400)

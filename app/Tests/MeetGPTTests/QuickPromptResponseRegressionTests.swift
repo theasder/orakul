@@ -136,7 +136,7 @@ struct QuickPromptResponseRegressionTests {
             mode: .aggregateAndStream, answer: answer))
         let advice = try advicePrompt()
         #expect(advice.id == "advice")
-        #expect(advice.title == "Give Advice")
+        #expect(advice.title == "Дать совет")
 
         // This is the exact state action invoked by the Give Advice PromptChip.
         state.runPrompt(advice)

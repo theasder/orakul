@@ -29,6 +29,18 @@ final class MicrophoneCapture {
     private var onBuffer: BufferHandler?
     private var configChangeObserver: NSObjectProtocol?
     private var restartWorkItem: DispatchWorkItem?
+
+    /// Кого позвать, если микрофон замолчал и вернуть его не удалось.
+    ///
+    /// Здесь это уже случалось: комментарий у `scheduleRestartAfterConfigChange`
+    /// описывает, как подавление уведомлений «оставило микрофон мёртвым на всю
+    /// запись». Тот случай починили, но неудачу самого перезапуска по-прежнему
+    /// писали в лог и возвращались — а это то же самое для человека: он
+    /// говорит, индикатор горит, и его половины разговора в расшифровке нет.
+    ///
+    /// Повод обыденный: наушники отключились, USB-микрофон вынули, macOS
+    /// переключила устройство. Не сбой, а вторник.
+    private var onStopped: (@Sendable (Error) -> Void)?
     /// Snapshotted for the whole recording. A route-change restart must not
     /// silently adopt a Settings edit that was documented as "next recording".
     private var noiseSuppressionEnabledForRun = false
@@ -37,8 +49,10 @@ final class MicrophoneCapture {
     private(set) var voiceProcessingActive = false
 
     func start(noiseSuppressionEnabled: Bool = Config.micNoiseSuppressionEnabled,
-               onBuffer: @escaping BufferHandler) throws {
+               onBuffer: @escaping BufferHandler,
+               onStopped: (@Sendable (Error) -> Void)? = nil) throws {
         self.onBuffer = onBuffer
+        self.onStopped = onStopped
         noiseSuppressionEnabledForRun = noiseSuppressionEnabled
         installConfigChangeObserver()
         do {
@@ -50,6 +64,11 @@ final class MicrophoneCapture {
     }
 
     func stop() {
+        // Первым делом: остановка по «Стоп» — не потеря микрофона. Без этой
+        // строки любое штатное завершение записи могло прийти наверх как
+        // «микрофон пропал», а тревога после каждого звонка перестаёт работать
+        // тревогой. Ровно эта же ошибка была в SystemAudioCapture.
+        onStopped = nil
         restartWorkItem?.cancel()
         restartWorkItem = nil
         if let configChangeObserver {
@@ -154,6 +173,24 @@ final class MicrophoneCapture {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: work)
     }
 
+    /// Что делать, когда микрофон вернуть не удалось.
+    ///
+    /// Отдельным методом, потому что настоящий отказ `AVAudioEngine` в прогоне
+    /// не воспроизвести: нужен реальный микрофон и реальное отключение
+    /// устройства. Проверять же нужно именно эту связь — раньше её и не было.
+    func handleRestartFailure(_ error: Error) {
+        Log.audio.error("Mic restart after route change failed: \(error.localizedDescription, privacy: .public)")
+        onStopped?(error)
+    }
+
+#if DEBUG
+    /// Поставить обработчик без запуска движка — `start()` требует настоящего
+    /// микрофона, которого в прогоне нет.
+    func setStoppedHandlerForTesting(_ handler: @escaping @Sendable (Error) -> Void) {
+        onStopped = handler
+    }
+#endif
+
     private func restartAfterConfigChangeIfNeeded() {
         restartWorkItem = nil
         guard onBuffer != nil, !engine.isRunning else { return }
@@ -162,7 +199,7 @@ final class MicrophoneCapture {
         do {
             try startEngine()
         } catch {
-            Log.audio.error("Mic restart after route change failed: \(error.localizedDescription, privacy: .public)")
+            handleRestartFailure(error)
         }
     }
 }

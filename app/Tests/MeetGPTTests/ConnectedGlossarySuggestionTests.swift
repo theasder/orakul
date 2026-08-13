@@ -290,36 +290,48 @@ struct ConnectedGlossarySuggestionTests {
     @Test("accepting during a call defers the active engine dictionary")
     func midCallDeferredApplication() async throws {
         try await preserveConfig {
-            Config.transcriptionGlossary = "Falcon"
-            let state = AppState(
-                llm: ConnectedGlossaryGateway(response: "unused"),
-                connectedGlossarySourceProvider: { self.snippets },
-                connectedGlossaryGroundedCycleConsumer: { _ in true })
-            state.useConnectedAppsInPrompts = true
-            let active = RecordingSettingsSnapshot(
-                engine: .local, language: "en", localModel: "base",
-                microphoneNoiseSuppression: false, glossary: "Falcon",
-                assemblyDiarization: false)
-            state.applyTestActiveRecordingSettings(active)
-            state.applyTestWorkspace(recording: true)
-            await state.generateConnectedGlossarySuggestions(useFastModel: false)
-            // `if let` here let the whole setup no-op silently: with no
-            // suggestion there is nothing to accept, so the two assertions
-            // below failed instead — reporting "the glossary was not written"
-            // when the truth was "nothing was ever suggested". Under a heavily
-            // loaded run that is what happened, and the message sent the reader
-            // to the wrong end of the feature. Require the precondition.
-            let candidate = try #require(state.connectedGlossarySuggestions.first,
-                                         "no suggestion to accept — the generate step produced none")
-            #expect(state.acceptConnectedGlossarySuggestion(id: candidate.id))
-            #expect(state.liveTranscriptionConfiguration().active?.glossary == "Falcon")
-            // `Config.transcriptionGlossary` is process-wide UserDefaults, so
-            // this read races any other suite writing the same key. That is
-            // what SharedDefaults exists for, and this suite was not using it.
-            SharedDefaults.withExclusiveAccess {
+            // Замок на ВЕСЬ тест, а не на одну строку чтения.
+            // `generateConnectedGlossarySuggestions` внутри себя читает
+            // `Config.transcriptionGlossary`, и соседний набор успевал
+            // записать туда «Falcon, Kubernetes» между установкой и
+            // чтением: кандидат «Falcon» отбрасывался как уже известный,
+            // подсказок выходило ноль, и падало на «нечего принимать».
+            // И запас по срокам. `generateConnectedGlossarySuggestions` берёт их
+            // из статических полей службы — двенадцать секунд на источники и
+            // двадцать на модель, настоящих. Под полной нагрузкой источники в
+            // них не укладывались, служба отвечала таймаутом, и тест падал на
+            // «нечего принимать»: сообщение про приём, причина про часы.
+            try await ConnectedGlossarySuggestionService.$sourceDeadline.withValue(600) {
+            try await ConnectedGlossarySuggestionService.$modelDeadline.withValue(600) {
+            try await SharedDefaults.withExclusiveAccess {
+                Config.transcriptionGlossary = "Falcon"
+                let state = AppState(
+                    llm: ConnectedGlossaryGateway(response: "unused"),
+                    connectedGlossarySourceProvider: { self.snippets },
+                    connectedGlossaryGroundedCycleConsumer: { _ in true })
+                state.useConnectedAppsInPrompts = true
+                let active = RecordingSettingsSnapshot(
+                    engine: .local, language: "en", localModel: "base",
+                    microphoneNoiseSuppression: false, glossary: "Falcon",
+                    assemblyDiarization: false)
+                state.applyTestActiveRecordingSettings(active)
+                state.applyTestWorkspace(recording: true)
+                await state.generateConnectedGlossarySuggestions(useFastModel: false)
+                // `if let` here let the whole setup no-op silently: with no
+                // suggestion there is nothing to accept, so the two assertions
+                // below failed instead — reporting "the glossary was not written"
+                // when the truth was "nothing was ever suggested". Under a heavily
+                // loaded run that is what happened, and the message sent the reader
+                // to the wrong end of the feature. Require the precondition.
+                let candidate = try #require(state.connectedGlossarySuggestions.first,
+                                             "no suggestion to accept — the generate step produced none")
+                #expect(state.acceptConnectedGlossarySuggestion(id: candidate.id))
+                #expect(state.liveTranscriptionConfiguration().active?.glossary == "Falcon")
                 #expect(RecordingSettingsSnapshot.configured().glossary != "Falcon")
+                #expect(state.connectedGlossarySuggestionMessage?.contains("next recording") == true)
             }
-            #expect(state.connectedGlossarySuggestionMessage?.contains("next recording") == true)
+            }
+            }
         }
     }
 

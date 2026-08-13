@@ -46,43 +46,43 @@ struct TranscriptionEngineTests {
         }
     }
 
-    @Test("label carries the vendor + trade-off summary for each engine")
+    @Test("в подписи движка видно и поставщика, и суть выбора")
     func labels() {
-        #expect(TranscriptionEngine.local.label == "Local · on-device Whisper")
-        #expect(TranscriptionEngine.server.label == "Cruxwing · large-v3")
-        #expect(TranscriptionEngine.deepgram.label == "Deepgram · live + speakers")
-        #expect(TranscriptionEngine.whisper.label == "Whisper · OpenAI chunks")
+        #expect(TranscriptionEngine.local.label == "На устройстве · Whisper")
+        #expect(TranscriptionEngine.server.label == "На сервере · large-v3")
+        #expect(TranscriptionEngine.deepgram.label == "Deepgram · вживую, с говорящими")
+        #expect(TranscriptionEngine.whisper.label == "Whisper · кусками через OpenAI")
     }
 
-    @Test("advantageTitle leads with the trade-off, not the vendor")
+    @Test("заголовок называет выбор, а не поставщика")
     func advantageTitles() {
-        #expect(TranscriptionEngine.local.advantageTitle == "Private — runs on this Mac")
-        #expect(TranscriptionEngine.server.advantageTitle == "Accurate — large-v3 on Cruxwing")
-        #expect(TranscriptionEngine.deepgram.advantageTitle == "Instant — word-by-word captions & speaker names")
-        // The vendor name is gone: the row states the trade-off (who pays),
-        // which is what actually distinguishes it from the Cruxwing row.
-        #expect(TranscriptionEngine.whisper.advantageTitle == "Accurate — billed to your own API key")
+        #expect(TranscriptionEngine.local.advantageTitle == "Приватно — считается на этом компьютере")
+        #expect(TranscriptionEngine.server.advantageTitle == "Точно — large-v3 на сервере")
+        #expect(TranscriptionEngine.deepgram.advantageTitle == "Мгновенно — пословно и с именами говорящих")
+        // Имя поставщика убрано: строка называет размен (кто платит) — это и
+        // отличает её от серверной.
+        #expect(TranscriptionEngine.whisper.advantageTitle == "Точно — по вашему ключу")
         #expect(!TranscriptionEngine.whisper.advantageTitle.contains("OpenAI"))
     }
 
-    @Test("advantageCaption answers the four business concerns: privacy, accuracy, speed, price")
+    @Test("описание движка отвечает про приватность, точность и скорость — и молчит про кредиты")
     func advantageCaptions() {
-        // The D35 frame: each option states where audio goes, how good the
-        // words are, how fast captions land, and what it draws from credits.
+        // Раньше здесь была четвёртая тема — цена в кредитах, и тест её
+        // требовал: «Free — no credits», «≈4 min per credit». Кредитов в orakul
+        // нет, и это был последний счёт, оставшийся на экране.
         #expect(TranscriptionEngine.local.advantageCaption
-            == "Audio never leaves your Mac; works offline. Solid accuracy, sized to your chip. Live captions a few seconds behind. Free — no credits.")
-        #expect(TranscriptionEngine.server.advantageCaption
-            == "Best accuracy — large-v3 + per-language models on Cruxwing servers only; audio is discarded after transcription. Live captions a few seconds behind; requires sign-in. ≈10 min per credit.")
+            == "Звук не уходит с компьютера, работает без сети. Точность приличная, по силам вашего процессора. Титры отстают на пару секунд. Бесплатно.")
         #expect(TranscriptionEngine.deepgram.advantageCaption
-            == "Fastest live transcript with who-said-what, streamed to Deepgram's cloud. ≈4 min of streamed audio per credit; your own key bills Deepgram instead.")
-        #expect(TranscriptionEngine.whisper.advantageCaption
-            == "Bring your own OpenAI key; usage bills to your account, not your credits. Live captions a few seconds behind.")
-        // Every caption covers privacy (where audio goes) and price.
+            == "Самый быстрый транскрипт, сразу видно кто говорит; звук идёт в облако Deepgram. Платите Deepgram по своему ключу.")
+
         for engine in TranscriptionEngine.allCases {
             let caption = engine.advantageCaption.lowercased()
-            #expect(caption.contains("mac") || caption.contains("cloud")
-                    || caption.contains("servers") || caption.contains("your account"))
-            #expect(caption.contains("credit") || caption.contains("free") || caption.contains("billed"))
+            // Куда уходит звук — сказано в каждой строке.
+            #expect(caption.contains("компьютер") || caption.contains("облако")
+                    || caption.contains("сервер") || caption.contains("ключ"),
+                    "не сказано, куда уходит звук: \(engine)")
+            // А про кредиты — ни в одной.
+            #expect(!caption.contains("кредит"), "вернулся счёт в кредитах: \(engine)")
         }
     }
 
@@ -168,22 +168,41 @@ struct ConfigGetterTests {
         #expect(seconds == expected)
     }
 
-    @Test("backendBaseURL resolves http as-is, off/none/direct to empty, else the product default")
-    func backendDefault() {
-        // `.ai`, not `.com` — the .com host is NXDOMAIN, so the old default
-        // could only ever fail to connect.
-        #expect(Config.defaultBackendBaseURL == "https://api.cruxwing.ai")
+    @Test("без адреса в сборке приложение не подставляет чужой сервер")
+    func emptyBackendStaysEmpty() {
+        // Прошлая версия этого теста повторяла реализацию ветка в ветку и
+        // потому проходила при любом поведении. Она пропустила ровно то, ради
+        // чего была написана: DIST-сборка orakul не бакает адрес, пустое
+        // значение проваливалось в подстановку `https://api.cruxwing.ai`, и в
+        // установщике оживали вход и счёт на сервере другого продукта.
+        // Проверяется результат, а не ветвление.
         let raw = Secrets.backendBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
         if raw.hasPrefix("http://") || raw.hasPrefix("https://") {
-            #expect(Config.backendBaseURL == raw)
-            #expect(Config.backendBaseURL.hasPrefix("http"))
-        } else if ["off", "none", "direct", "local"].contains(raw.lowercased()) {
-            // Explicit no-backend opt-out (dev build with baked keys).
-            #expect(Config.backendBaseURL == "")
+            #expect(Config.backendBaseURL == raw, "адрес из сборки подменяется")
         } else {
-            #expect(Config.backendBaseURL == Config.defaultBackendBaseURL)
-            #expect(Config.backendBaseURL.hasPrefix("http"))
+            #expect(Config.backendBaseURL.isEmpty,
+                    "подставился адрес, которого в сборке не было: \(Config.backendBaseURL)")
         }
+        #expect(!Config.backendBaseURL.contains("cruxwing"),
+                "orakul обращается к серверу другого продукта")
+    }
+
+    @Test("пустое значение остаётся пустым, чем бы ни была собрана эта машина",
+          arguments: ["", "   ", "\n", "off", "none", "direct", "local", "не адрес", "api.orakul.ai"])
+    func nothingSubstitutesAHostThatWasNotThere(value: String) {
+        // Именно эта ветка уходит в установщик, и именно её прошлый тест не
+        // выполнял: сборка на этой машине идёт с `http://localhost:8787`, и
+        // проверка каждый раз попадала в другую ветку.
+        // `api.orakul.ai` без схемы — тоже не адрес: домен не резолвится, и
+        // подставлять его было бы тем же самым.
+        #expect(Config.resolveBackendBaseURL(value).isEmpty,
+                "из «\(value)» получился адрес: \(Config.resolveBackendBaseURL(value))")
+    }
+
+    @Test("настоящий адрес проходит как есть")
+    func realURLSurvives() {
+        #expect(Config.resolveBackendBaseURL("https://example.test") == "https://example.test")
+        #expect(Config.resolveBackendBaseURL("  http://localhost:8787 ") == "http://localhost:8787")
     }
     // Config.userCustomRole get/set is covered by RoleSkillMatrixTests
     // (customRoleGuidance) — kept there to avoid a cross-suite race on the

@@ -40,7 +40,7 @@ struct TasksArtifact: Codable, Equatable {
     var markdown: String {
         var lines: [String] = []
         if let dacis, !dacis.isEmpty {
-            lines.append("## Decisions (DACI)")
+            lines.append("## Решения (DACI)")
             for daci in dacis {
                 lines.append("- **\(daci.decision)**")
                 if let v = daci.driver { lines.append("  - Driver: \(v)") }
@@ -50,7 +50,7 @@ struct TasksArtifact: Codable, Equatable {
             }
             lines.append("")
         }
-        lines.append("## Action items")
+        lines.append("## Задачи")
         for item in items {
             var parts = ["**\(item.task)**"]
             parts.append("— \(item.owner ?? "[OWNER?]")")
@@ -63,7 +63,7 @@ struct TasksArtifact: Codable, Equatable {
         }
         if let slack = slackSummary, !slack.isEmpty {
             lines.append("")
-            lines.append("## Slack-ready summary")
+            lines.append("## Короткая сводка для чата")
             lines.append("> " + slack.replacingOccurrences(of: "\n", with: "\n> "))
         }
         return lines.joined(separator: "\n")
@@ -75,7 +75,7 @@ struct TasksArtifact: Codable, Equatable {
         // guard added to one would silently have missed this exporter — and
         // this is the one behind the Tasks button, the CSV users actually hand
         // to a colleague.
-        var lines = ["Task,Owner,Due,Done check,Dependency,Source,Tracked"]
+        var lines = ["Задача,Владелец,Срок,Проверка,Зависимость,Источник,Заведено"]
         for item in items {
             lines.append([item.task, item.owner ?? "[OWNER?]", item.due ?? "[DUE?]",
                           item.doneCheck ?? "", item.dependency ?? "", item.sourceRef ?? "",
@@ -140,7 +140,7 @@ struct SummaryArtifact: Codable, Equatable {
         quoted(decisions, header: "Decisions")
 
         if let actions, !actions.isEmpty {
-            lines.append("\n## Action items")
+            lines.append("\n## Задачи")
             for action in actions {
                 let owner = action.owner ?? "НЕ УКАЗАНО"
                 let due = action.due ?? "НЕ УКАЗАНО"
@@ -149,7 +149,7 @@ struct SummaryArtifact: Codable, Equatable {
             }
         }
         if let questions = openQuestions, !questions.isEmpty {
-            lines.append("\n## Open questions")
+            lines.append("\n## Открытые вопросы")
             lines += questions.map { "- \($0)" }
         }
         quoted(risks, header: "Risks")
@@ -158,11 +158,11 @@ struct SummaryArtifact: Codable, Equatable {
             lines += continuity.map { "- [\($0.status)] \($0.commitment)" }
         }
         if let parking = parkingLot, !parking.isEmpty {
-            lines.append("\n## Parking lot")
+            lines.append("\n## Отложено")
             lines += parking.map { "- \($0)" }
         }
         if let next = nextMeeting, !next.isEmpty {
-            lines.append("\n## Next meeting")
+            lines.append("\n## Следующий звонок")
             lines.append(next)
         }
         return lines.joined(separator: "\n")

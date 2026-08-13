@@ -539,7 +539,11 @@ final class DeepgramStreamer {
 
     /// A live socket delivered a message — reset backoff. Ignored for a stale
     /// chain whose socket has already been replaced.
-    private func markHealthy(_ socket: URLSessionWebSocketTask) {
+    /// Returns whether THIS call made the socket ready — that is, whether it is
+    /// the one that fired `onReady`. Marking an already-healthy socket is a
+    /// no-op and says so.
+    @discardableResult
+    private func markHealthy(_ socket: URLSessionWebSocketTask) -> Bool {
         var becameReady = false
         lock.lock()
         if task === socket, !healthySinceConnect {
@@ -549,11 +553,18 @@ final class DeepgramStreamer {
         }
         lock.unlock()
         if becameReady { onReady?() }
+        return becameReady
     }
 
     /// Route a deterministic test signal through the same readiness method as
     /// a real first server frame. The test-only process guard prevents a debug
     /// app or dev hook from manufacturing socket health.
+    ///
+    /// Returns whether readiness actually fired. It used to return `true` for
+    /// merely having a socket, which made `#expect(markCurrent…())` pass while
+    /// `onReady` never ran — so the buffered results were never flushed and the
+    /// failure surfaced several lines later as an empty transcript, looking for
+    /// all the world like a timing flake.
 #if DEBUG
     @discardableResult
     func markCurrentSocketHealthyForTesting() -> Bool {
@@ -562,8 +573,7 @@ final class DeepgramStreamer {
         let socket = task
         lock.unlock()
         guard let socket else { return false }
-        markHealthy(socket)
-        return true
+        return markHealthy(socket)
     }
 #endif
 

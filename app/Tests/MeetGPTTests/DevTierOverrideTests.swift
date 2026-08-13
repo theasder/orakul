@@ -126,13 +126,17 @@ struct DevTierOverrideTests {
             if let saved { UserDefaults.standard.set(saved, forKey: key) }
             else { UserDefaults.standard.removeObject(forKey: key) }
         }
+        // Что именно тут проверяется, изменилось вместе с продуктом. У Cruxwing
+        // вопрос был «нельзя ли подложенным ключом открыть платное»; в orakul
+        // платного нет, и остаётся вопрос «меняет ли подложенный ключ хоть
+        // что-нибудь». Правильный ответ прежний: нет.
+        let before = Config.currentTier
         UserDefaults.standard.set("ultra", forKey: key)
         if Config.isDevBuild {
             #expect(Config.devTierOverride == .ultra)
         } else {
             #expect(Config.devTierOverride == nil)
-            #expect(Config.currentTier != .ultra || Config.baselineTier == .ultra
-                    || Config.purchasedTier == .ultra)
+            #expect(Config.currentTier == before, "подложенный ключ сдвинул план")
         }
     }
 }

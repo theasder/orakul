@@ -155,20 +155,26 @@ struct FactClaimVerdictTests {
 
     @Test("Status label maps each verdict")
     func statusLabels() {
-        #expect(FactClaim.Status.verified.label == "Verified")
-        #expect(FactClaim.Status.contradicted.label == "Contradicted")
-        #expect(FactClaim.Status.needsContext.label == "Needs source")
-        #expect(FactClaim.Status.unverifiable.label == "Not checkable")
-        // Internal numeric conflict: the call disagreeing with itself, which is a
-        // different finding from the attached context disagreeing with the call.
-        #expect(FactClaim.Status.inconsistent.label == "Doesn't add up")
+        #expect(FactClaim.Status.verified.label == "Подтверждено")
+        #expect(FactClaim.Status.contradicted.label == "Опровергнуто")
+        #expect(FactClaim.Status.needsContext.label == "Нужен источник")
+        #expect(FactClaim.Status.unverifiable.label == "Не проверяется")
+        // Расхождение внутри самого звонка: звонок спорит сам с собой — это не
+        // то же, что приложенный контекст, который спорит со звонком.
+        #expect(FactClaim.Status.inconsistent.label == "Не сходится")
+
+        // Хранение не должно поехать вслед за подписью: сохранённый звонок
+        // читается по `rawValue`, и переводить его нельзя.
+        #expect(FactClaim.Status.needsContext.rawValue == "needs_context")
     }
 
-    @Test("Confidence label capitalizes its raw value")
+    @Test("подпись уверенности переведена, а хранение осталось прежним")
     func confidenceLabels() {
-        #expect(FactClaim.Confidence.high.label == "High")
-        #expect(FactClaim.Confidence.medium.label == "Medium")
-        #expect(FactClaim.Confidence.low.label == "Low")
+        // Подпись была `rawValue.capitalized` — то есть «High» на экране.
+        // Отсюда и правило: подпись отдельно, `rawValue` отдельно.
+        #expect(FactClaim.Confidence.high.label == "Высокая")
+        #expect(FactClaim.Confidence.medium.label == "Средняя")
+        #expect(FactClaim.Confidence.low.label == "Низкая")
         #expect(FactClaim.Confidence.high.rawValue == "high")
     }
 }

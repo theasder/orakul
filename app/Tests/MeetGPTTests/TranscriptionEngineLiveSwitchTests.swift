@@ -54,7 +54,9 @@ struct TranscriptionEngineLiveSwitchTests {
         #expect(state.selectedTranscriptionEngine == .local)
         #expect(state.pendingEngineChange == nil)
         #expect(Config.transcriptionEngineValue == .local)
-        #expect(state.lastError?.contains("still using Private") == true)
+        // Сообщение собирается из названия движка: «Он продолжается на
+        // «Приватно — считается на этом компьютере»».
+        #expect(state.lastError?.contains("продолжается на «Приватно") == true)
     }
 
     @Test("rapid switches converge for streaming and every chunked engine")

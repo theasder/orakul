@@ -13,14 +13,27 @@ final class SystemAudioCapture: NSObject {
     private var stream: SCStream?
     private let outputQueue = DispatchQueue(label: "meetgpt.systemaudio.output")
     private var onBuffer: BufferHandler?
+    /// Кого позвать, если macOS оборвала поток на середине записи.
+    ///
+    /// Раньше здесь не было ничего: делегат писал строку в лог и возвращался.
+    /// Для этого продукта это худший из возможных отказов — запись
+    /// продолжается, индикатор горит, микрофон пишется, а половина разговора не
+    /// пишется вовсе. Узнать об этом можно было, только открыв расшифровку
+    /// после звонка, когда переписывать уже нечего.
+    ///
+    /// Поток обрывается не только от сбоя: разрешение можно отозвать в
+    /// «Системных настройках» прямо во время звонка, дисплей — отключить.
+    private var onStopped: (@Sendable (Error) -> Void)?
     // Capture-layer diagnostics — only touched on outputQueue (serial).
     private var diagCount = 0
     private var diagMaxRMS: CGFloat = 0
     private var copyFailures = 0
     var sourceLayoutLogged = false
 
-    func start(onBuffer: @escaping BufferHandler) async throws {
+    func start(onBuffer: @escaping BufferHandler,
+               onStopped: (@Sendable (Error) -> Void)? = nil) async throws {
         self.onBuffer = onBuffer
+        self.onStopped = onStopped
         // Fresh diagnostics per session (no buffers can be in flight yet).
         diagCount = 0
         diagMaxRMS = 0
@@ -68,8 +81,45 @@ final class SystemAudioCapture: NSObject {
         return config
     }
 
+    /// Что делать, когда поток оборвался. Отдельно от делегата, потому что
+    /// делегату нужен настоящий `SCStream`, а его в тесте не создать без
+    /// разрешения на запись экрана. Здесь же — сама связь: раньше делегат
+    /// писал в лог и возвращался, и именно этой строки не хватало.
+    ///
+    /// Своя остановка сюда не доходит: `stop()` снимает `onStopped` до того,
+    /// как ScreenCaptureKit позовёт делегата.
+    func handleStreamStopped(_ error: Error) {
+        Log.audio.error("capture stopped: \(String(describing: error))")
+        // Сообщить наверх, а не только в лог: лог читает разработчик после
+        // жалобы, а знать нужно тому, кто прямо сейчас на звонке и думает, что
+        // пишутся оба голоса.
+        onStopped?(error)
+    }
+
+#if DEBUG
+    /// Поставить обработчик обрыва без похода в ScreenCaptureKit. Только для
+    /// тестов: `start()` требует разрешения на запись экрана, которого в
+    /// прогоне нет, а проверить нужно именно проводку.
+    func setStoppedHandlerForTesting(_ handler: @escaping @Sendable (Error) -> Void) {
+        onStopped = handler
+    }
+#endif
+
     func stop() async {
-        guard let stream else { return }
+        // Снимается ПЕРВЫМ и до всякой проверки на поток: ScreenCaptureKit
+        // зовёт делегата и на обычном завершении, и без этой строки каждая
+        // нормальная остановка записи приходила бы наверх как «связь
+        // оборвалась». Предупреждение, которое показывают после каждого
+        // звонка, перестают читать за день.
+        //
+        // Раньше строка стояла после `guard let stream`, то есть снятие
+        // зависело от того, дошёл ли `start()` до создания потока, — и в
+        // тесте её нельзя было проверить вовсе.
+        onStopped = nil
+        guard let stream else {
+            onBuffer = nil
+            return
+        }
         try? await stream.stopCapture()
         self.stream = nil
         self.onBuffer = nil
@@ -88,7 +138,7 @@ extension SystemAudioCapture: SCStreamDelegate, SCStreamOutput {
     }
 
     func stream(_ stream: SCStream, didStopWithError error: Error) {
-        Log.audio.error("capture stopped: \(String(describing: error))")
+        handleStreamStopped(error)
     }
 
     private func pcmBuffer(from sampleBuffer: CMSampleBuffer) -> AVAudioPCMBuffer? {

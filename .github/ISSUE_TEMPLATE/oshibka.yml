@@ -1,0 +1,79 @@
+# Форма, а не пустое поле: почти каждый отчёт по свободной форме приходит без
+# версии и без процессора, и первый ответ сопровождающего уходит на то, чтобы их
+# спросить. Здесь спрашивает форма.
+#
+# Версию просим не «из меню О программе», а хешем исходников: сборок с одним и
+# тем же номером коммита выходило по девять штук за день, и по номеру нельзя
+# отличить вчерашнюю от сегодняшней. `OrakulSourceHash` считается по содержимому
+# `Sources/MeetGPT` и различает их.
+name: Ошибка
+description: Что-то работает не так, как написано
+labels: ["ошибка"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Если это уязвимость — не сюда. «Security → Report a vulnerability»,
+        подробности в [SECURITY.md](../blob/main/SECURITY.md).
+
+  - type: textarea
+    id: chto
+    attributes:
+      label: Что происходит
+      description: И что вы ожидали вместо этого.
+      placeholder: |
+        Проверка захвата говорит «нет звука собеседников», хотя видео играет.
+    validations:
+      required: true
+
+  - type: textarea
+    id: kak-povtorit
+    attributes:
+      label: Как повторить
+      description: По шагам. Если повторяется не всегда — так и напишите, это тоже важно.
+      placeholder: |
+        1. Открыть orakul, дойти до проверки захвата
+        2. Включить видео на YouTube
+        3. Нажать «Проверить»
+    validations:
+      required: true
+
+  - type: input
+    id: versiya
+    attributes:
+      label: Версия
+      description: >
+        `OrakulSourceHash` и `OrakulCommit` из
+        `orakul.app/Contents/Info.plist`. Одной командой:
+        `defaults read /Applications/orakul.app/Contents/Info.plist | grep Orakul`
+      placeholder: "OrakulSourceHash = c8d17edbe3f4, OrakulCommit = 04bf887"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: processor
+    attributes:
+      label: Процессор
+      options:
+        - Apple Silicon (M1 и новее)
+        - Intel
+    validations:
+      required: true
+
+  - type: input
+    id: macos
+    attributes:
+      label: Версия macOS
+      placeholder: "14.6"
+    validations:
+      required: true
+
+  - type: textarea
+    id: otkuda-zapushcheno
+    attributes:
+      label: Откуда запущено приложение
+      description: >
+        Полный путь. macOS привязывает разрешения к месту программы на диске, и
+        запуск из «Загрузок» или прямо из образа — отдельная причина половины
+        сообщений про разрешения.
+      placeholder: "/Applications/orakul.app"

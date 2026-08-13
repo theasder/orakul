@@ -125,7 +125,7 @@ struct ClarificationCard: View {
             Image(systemName: "pencil")
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(Theme.inkTertiary)
-            TextField("Something else…", text: otherBinding(for: question))
+            TextField("Свой вариант…", text: otherBinding(for: question))
                 .textFieldStyle(.plain)
                 .font(Typo.body)
                 .foregroundStyle(Theme.ink)
@@ -145,7 +145,7 @@ struct ClarificationCard: View {
         HStack(spacing: Space.s) {
             Button("Всё равно ответить", action: onSkip)
                 .buttonStyle(QuietButtonStyle())
-                .help("Skip the questions and answer the original request as written.")
+                .help("Пропустить вопросы и ответить на исходный запрос как есть.")
             Spacer(minLength: 0)
             Button(anyAnswered ? "Продолжить" : "Продолжить без ответа", action: submit)
                 .buttonStyle(PrimaryButtonStyle())

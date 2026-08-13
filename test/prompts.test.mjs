@@ -123,3 +123,36 @@ describe('orakul quick-action buttons (ru)', () => {
     }
   });
 });
+
+describe('QuickPrompt titles', () => {
+  // Проверка, которой не хватало: старый набор тестов следил за словарём
+  // подсказок, но не за названиями кнопок — и все шестнадцать доехали до
+  // собранного приложения по-английски. Увидели это, только запустив его.
+  const swift = readFileSync(
+    resolve(here, '..', 'app', 'Sources', 'MeetGPT', 'Models', 'QuickPrompt.swift'), 'utf8');
+
+  test('ни одна кнопка не осталась по-английски', () => {
+    const english = [...swift.matchAll(/title: "([^"]+)"/g)]
+      .map(([, title]) => title)
+      .filter((title) => !/[а-яё]/i.test(title));
+    assert.deepEqual(english, [],
+      `эти кнопки видно на главном экране, и они не переведены: ${english.join(', ')}`);
+  });
+
+  test('названия совпадают со словарём демо-фильма', () => {
+    // Фильм — источник продуктового словаря (инструкция владельца). Если
+    // название разошлось с ним, разошлись и продукт с тем, что показано людям.
+    const film = readFileSync(
+      resolve(here, '..', '..', 'cruxwing-marketing', 'public', 'demo-film', 'scene.ru.js'), 'utf8');
+    const block = film.slice(film.indexOf('PROMPT_TITLES'));
+    const filmTitles = [...block.slice(0, block.indexOf('};')).matchAll(/'([^']+)'\s*[,}]/g)]
+      .map(([, value]) => value)
+      .filter((value) => /[а-яё]/i.test(value));
+    assert.ok(filmTitles.length >= 12, 'словарь фильма не прочитался');
+
+    const appTitles = [...swift.matchAll(/title: "([^"]+)"/g)].map(([, title]) => title);
+    const missing = filmTitles.filter((title) => !appTitles.includes(title));
+    assert.deepEqual(missing, [],
+      `в приложении нет названий из фильма: ${missing.join(', ')}`);
+  });
+});

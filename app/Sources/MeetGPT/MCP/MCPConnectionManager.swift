@@ -1,5 +1,6 @@
 import Foundation
 import MCP
+import OrakulCore
 
 /// Presents the OAuth authorization URL for an MCP server: opens the system
 /// browser and catches the loopback redirect. Called by the SDK only when no
@@ -245,16 +246,44 @@ final class MCPConnectionManager: ObservableObject {
     /// Consecutive failed connection attempts, surfaced as the retry ordinal.
     private var connectionRetryCounts: [String: Int] = [:]
 
+    /// Российские трекеры: те же токены, то же хранилище. Строится из
+    /// внедрённого `tokenStore`, поэтому тест с фальшивой Связкой ключей не
+    /// достаёт настоящие токены пользователя.
+    let trackerStore: RussianTrackerStore
+    /// Ключи провайдеров — на том же внедрённом хранилище, что и токены.
+    /// Иначе проверка настроек лезла бы в настоящую Связку ключей и читала
+    /// ключи пользователя.
+    let providerKeys: ProviderKeyStore
+    /// Сеть для трекеров. Тест подставляет своё замыкание — иначе он ходил бы
+    /// в чужой сервис; `toolCallOverride` рядом существует ровно поэтому.
+    let trackerHTTP: RussianTrackers.HTTP
+    /// Сеть для мессенджеров — по той же причине и на тех же условиях.
+    let messengerHTTP: WorkMessengers.HTTP
+    /// Сеть для открытых трекеров на своём сервере.
+    let selfHostedHTTP: SelfHostedTrackers.HTTP
+    /// Сеть для базы знаний.
+    let notesHTTP: TeamNotes.HTTP
+
     init(tokenStore: KeychainStore = SystemKeychain.shared,
          deferTokenStoreAccess: Bool? = nil,
          notificationCenter: NotificationCenter = .default,
          connectionAttemptOverride: ConnectionAttemptOverride? = nil,
          toolCallOverride: ToolCallOverride? = nil,
          disconnectAttemptOverride: DisconnectAttemptOverride? = nil,
-         connectorTelemetry: ConnectorTelemetry? = nil) {
+         connectorTelemetry: ConnectorTelemetry? = nil,
+         trackerHTTP: RussianTrackers.HTTP? = nil,
+         messengerHTTP: WorkMessengers.HTTP? = nil,
+         selfHostedHTTP: SelfHostedTrackers.HTTP? = nil,
+         notesHTTP: TeamNotes.HTTP? = nil) {
         let customServers = Self.loadCustomServers()
         self.customServers = customServers
         self.tokenStore = tokenStore
+        self.trackerStore = RussianTrackerStore(store: tokenStore)
+        self.providerKeys = ProviderKeyStore(store: tokenStore)
+        self.trackerHTTP = trackerHTTP ?? RussianTrackers.live
+        self.messengerHTTP = messengerHTTP ?? WorkMessengers.live
+        self.selfHostedHTTP = selfHostedHTTP ?? SelfHostedTrackers.live
+        self.notesHTTP = notesHTTP ?? TeamNotes.live
         self.defersTokenStoreAccess = deferTokenStoreAccess ?? (tokenStore is SystemKeychain)
         self.notificationCenter = notificationCenter
         self.connectionAttemptOverride = connectionAttemptOverride

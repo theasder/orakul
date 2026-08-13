@@ -29,6 +29,12 @@ struct ResponseView: View {
             && state.pendingClarification == nil && !state.clarifying {
             empty
         } else {
+            // Ширина берётся у панели, как в боковой колонке и по той же
+            // причине: вертикальный ScrollView не навязывает содержимому свою
+            // ширину, и `maxWidth: .infinity` тут не ограничение — оно значит
+            // «сколько хочешь». В боковой панели это резало текст, а здесь
+            // панель ещё уже (340–460) и текста больше: ответ модели.
+            GeometryReader { geometry in
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
@@ -91,7 +97,8 @@ struct ResponseView: View {
                             .frame(height: Space.l)
                             .id(Self.bottomID)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(width: max(0, geometry.size.width - 2 * Space.l),
+                           alignment: .leading)
                     .padding(.horizontal, Space.l)
                     .padding(.top, Space.l)
                     .background(
@@ -138,7 +145,7 @@ struct ResponseView: View {
                 }
                 .overlay(alignment: .bottomTrailing) {
                     if !followsLatest {
-                        JumpToLatestButton(accessibilityLabel: "Jump to latest answer") {
+                        JumpToLatestButton(accessibilityLabel: "К последнему ответу") {
                             pendingAutomaticScroll?.cancel()
                             followsLatest = true
                             lastAutomaticScrollAt = nil
@@ -148,6 +155,7 @@ struct ResponseView: View {
                         .transition(.opacity)
                     }
                 }
+            }
             }
         }
     }
@@ -198,7 +206,7 @@ struct ResponseView: View {
                 Text("Спросить ассистента")
                     .font(Typo.headline)
                     .foregroundStyle(Theme.ink)
-                Text("Pick a prompt above to turn the live conversation into agendas, action items, answers, and more.")
+                Text("Выберите подсказку выше — разговор превратится в повестку, задачи, ответы и прочее.")
                     .font(Typo.callout)
                     .foregroundStyle(Theme.inkSecondary)
                     .multilineTextAlignment(.center)
@@ -379,7 +387,7 @@ private struct AssistantPromptBlock: View {
             style: .continuous
         ))
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("You asked: \(prompt)")
+        .accessibilityLabel("Вы спросили: \(prompt)")
     }
 }
 
@@ -581,7 +589,7 @@ struct WorkflowTracePanel: View {
     }
 
     private static let localApp = WorkflowApp(
-        id: "cruxwing",
+        id: "orakul",
         name: "orakul",
         symbol: "sparkles",
         kind: .local
@@ -613,7 +621,7 @@ struct WorkflowTracePanel: View {
             return [
                 WorkflowStep(
                     id: 0,
-                    label: "Preparing workflow",
+                    label: "Готовлю ход работы",
                     status: .running,
                     app: Self.localApp
                 )
@@ -633,7 +641,7 @@ struct WorkflowTracePanel: View {
             HStack(spacing: Space.xs) {
                 Image(systemName: expanded ? "chevron.down" : "chevron.right")
                     .font(.system(size: 9, weight: .bold))
-                Text(streaming ? "Workflow" : "How this answer was made")
+                Text(streaming ? "Workflow" : "Как получился этот ответ")
                     .font(Typo.caption.weight(.semibold))
                 Spacer(minLength: 0)
                 Text("\(completedCount)/\(displaySteps.count) complete")
@@ -644,7 +652,7 @@ struct WorkflowTracePanel: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(expanded ? "Collapse workflow" : "Expand workflow")
+        .accessibilityLabel(expanded ? "Свернуть ход работы" : "Развернуть ход работы")
         .accessibilityValue("\(completedCount) of \(displaySteps.count) steps complete")
     }
 
@@ -768,7 +776,7 @@ private struct AnswerFeedbackRow: View {
                 ratingButton(.unhelpful, filled: "hand.thumbsdown.fill", hollow: "hand.thumbsdown")
 
                 if current != nil {
-                    Button(exchange.feedback?.note == nil ? "Add a note" : "Edit note") {
+                    Button(exchange.feedback?.note == nil ? "Добавить заметку" : "Изменить заметку") {
                         note = exchange.feedback?.note ?? ""
                         writingNote.toggle()
                     }
@@ -788,7 +796,7 @@ private struct AnswerFeedbackRow: View {
 
             if writingNote {
                 HStack(spacing: Space.xs) {
-                    TextField("What was wrong, or what helped?", text: $note, axis: .vertical)
+                    TextField("Что было не так — или что помогло?", text: $note, axis: .vertical)
                         .textFieldStyle(.roundedBorder)
                         .font(.system(size: 11))
                         .lineLimit(1...4)
@@ -815,8 +823,8 @@ private struct AnswerFeedbackRow: View {
                 .foregroundStyle(selected ? Theme.accentText : Theme.inkTertiary)
         }
         .buttonStyle(.plain)
-        .help(rating == .helpful ? "This answer helped" : "This answer missed")
-        .accessibilityLabel(rating == .helpful ? "Mark answer helpful" : "Mark answer unhelpful")
+        .help(rating == .helpful ? "Этот ответ помог" : "Этот ответ мимо")
+        .accessibilityLabel(rating == .helpful ? "Отметить ответ полезным" : "Отметить ответ бесполезным")
     }
 
     private func saveNote() {

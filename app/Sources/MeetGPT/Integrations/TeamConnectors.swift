@@ -31,10 +31,12 @@ enum TeamService: String, CaseIterable, Identifiable {
         }
     }
 
+    /// Имена переменных — как есть: человек копирует их в `.env`, и перевод
+    /// сделал бы подсказку неверной. Переводится только то, что вокруг них.
     var configHint: String {
         switch self {
-        case .slack:      return "SLACK_BOT_TOKEN (+ SLACK_CHANNEL_IDS)"
-        case .confluence: return "CONFLUENCE_SITE + CONFLUENCE_EMAIL + CONFLUENCE_TOKEN — or use Atlassian in Connected apps"
+        case .slack:      return "SLACK_BOT_TOKEN (и SLACK_CHANNEL_IDS)"
+        case .confluence: return "CONFLUENCE_SITE + CONFLUENCE_EMAIL + CONFLUENCE_TOKEN — или подключите Atlassian в «Подключённых приложениях»"
         }
     }
 }

@@ -236,7 +236,9 @@ struct RecordingContextLifecycleTests {
         #expect(state.currentSessionID == sessionID)
         #expect(state.recordingContextSelection.mode == .tutorial)
         #expect(state.detectedRecordingContext == .lecture)
-        #expect(state.effectiveRecordingContextLabel == "Tutorial")
+        // Подпись на экране — русская; в промпт уходит английский `label`,
+        // и его проверяют отдельные тесты ниже.
+        #expect(state.effectiveRecordingContextLabel == "Разбор")
         let summary = state.promptForCurrentRecording(
             QuickPrompts.all.first { $0.id == "summary" }!)
         #expect(summary.title == "Summarize Tutorial")
@@ -296,7 +298,9 @@ struct RecordingContextLifecycleTests {
         state.restoreSession(try #require(store.load(id: saved.id)))
 
         #expect(state.recordingContextSelection.mode == .tutorial)
-        #expect(state.effectiveRecordingContextLabel == "Tutorial")
+        // Подпись на экране — русская; в промпт уходит английский `label`,
+        // и его проверяют отдельные тесты ниже.
+        #expect(state.effectiveRecordingContextLabel == "Разбор")
     }
     // MARK: - The retired catch-all
 

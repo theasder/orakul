@@ -91,8 +91,11 @@ struct SampleCallTests {
 
     @Test("prepared output always says it was prepared, and what the real thing does")
     func preparedOutputIsLabelled() {
-        #expect(SampleCall.preparedLabel.lowercased().contains("prepared"))
-        #expect(SampleCall.preparedLabel.lowercased().contains("live"))
+        // Две вещи, которые подпись обязана сказать: что это заготовка и что
+        // настоящие звонки разбираются вживую. Проверяются оба слова, а не
+        // строка целиком, — иначе тест ломается от любой правки формулировки.
+        #expect(SampleCall.preparedLabel.lowercased().contains("подготовлено"))
+        #expect(SampleCall.preparedLabel.lowercased().contains("вживую"))
     }
 
     @Test("transcript entries carry the sample's own speakers")
@@ -125,17 +128,150 @@ struct CaptureProbeTests {
         #expect(CaptureProbe.verdict(micPeak: edge, systemPeak: edge) == .pass)
     }
 
-    @Test("granted-but-silent system audio is the relaunch fingerprint")
+    @Test("a refused stream is the relaunch fingerprint — a quiet one is not")
     func relaunchIsOfferedOnlyWhenItIsTheAnswer() {
-        // The quirk: macOS reports Screen Recording as granted while the capture
-        // stays silent until the app is relaunched. Nothing else looks like it.
-        #expect(CaptureProbe.needsRelaunch(verdict: .micOnly, screenRecordingGranted: true))
-        #expect(!CaptureProbe.needsRelaunch(verdict: .micOnly, screenRecordingGranted: false))
-        #expect(!CaptureProbe.needsRelaunch(verdict: .pass, screenRecordingGranted: true))
-        #expect(!CaptureProbe.needsRelaunch(verdict: .systemOnly, screenRecordingGranted: true))
-        // Silent on both is also a microphone problem, and telling the user to
-        // relaunch sends them round a loop that cannot fix it.
-        #expect(!CaptureProbe.needsRelaunch(verdict: .silent, screenRecordingGranted: true))
+        // The quirk: macOS reports Screen Recording as granted while
+        // ScreenCaptureKit refuses to start until the app is relaunched. THAT
+        // refusal is the fingerprint. A stream that starts and hears nothing is
+        // a different thing entirely and used to be confused with it.
+        #expect(CaptureProbe.advice(verdict: .micOnly, systemAudioStarted: false,
+                                    screenRecordingGranted: true,
+                                    relaunchAlreadyTried: false) == .relaunch)
+        #expect(CaptureProbe.advice(verdict: .micOnly, systemAudioStarted: false,
+                                    screenRecordingGranted: false,
+                                    relaunchAlreadyTried: false) == .none)
+        #expect(CaptureProbe.advice(verdict: .pass, systemAudioStarted: true,
+                                    screenRecordingGranted: true,
+                                    relaunchAlreadyTried: false) == .none)
+        #expect(CaptureProbe.advice(verdict: .systemOnly, systemAudioStarted: true,
+                                    screenRecordingGranted: true,
+                                    relaunchAlreadyTried: false) == .none)
+        // Silent on both, but the stream started: the microphone is the problem
+        // and there is nothing to relaunch.
+        #expect(CaptureProbe.advice(verdict: .silent, systemAudioStarted: true,
+                                    screenRecordingGranted: true,
+                                    relaunchAlreadyTried: false) == .noSoundPlaying)
+        // Silent on both AND refused: the refusal is direct evidence, and it
+        // holds whether or not the user happened to say anything.
+        #expect(CaptureProbe.advice(verdict: .silent, systemAudioStarted: false,
+                                    screenRecordingGranted: true,
+                                    relaunchAlreadyTried: false) == .relaunch)
+    }
+
+    /// The reported bug, as a scenario: «even though i quited and reopened
+    /// orakul told me i am supposed to quit and reopen».
+    @Test("the relaunch is never advised twice for the same failure")
+    func relaunchAdviceDoesNotRepeatAfterARelaunch() {
+        // Run 1 — granted, stream refused, no relaunch yet.
+        #expect(CaptureProbe.advice(verdict: .micOnly, systemAudioStarted: false,
+                                    screenRecordingGranted: true,
+                                    relaunchAlreadyTried: false) == .relaunch)
+        // The user quits and reopens. Nothing else changed: same grant, same
+        // refusal. Repeating the advice here is the loop with no exit.
+        #expect(CaptureProbe.advice(verdict: .micOnly, systemAudioStarted: false,
+                                    screenRecordingGranted: true,
+                                    relaunchAlreadyTried: true) == .regrant)
+    }
+
+    /// The far more common reading of the same verdict, and the one the old
+    /// code mistook for the quirk: nothing was playing.
+    @Test("a healthy but silent stream is never blamed on the permission")
+    func silentSystemAudioIsNotBlamedOnThePermission() {
+        for tried in [false, true] {
+            #expect(CaptureProbe.advice(verdict: .micOnly, systemAudioStarted: true,
+                                        screenRecordingGranted: true,
+                                        relaunchAlreadyTried: tried) == .noSoundPlaying,
+                    "a stream that started fine cannot be a permission problem")
+        }
+    }
+
+    /// The likeliest real answer to the report, and the one no relaunch can
+    /// reach: macOS runs an app launched from a DMG or from Downloads out of a
+    /// randomized read-only copy, so yesterday's grant belongs to a path that
+    /// no longer exists.
+    @Test("running from a place macOS cannot remember is never a relaunch problem")
+    func translocationIsNotARelaunchProblem() {
+        for location in [CaptureProbe.InstallLocation.translocated, .diskImage] {
+            for tried in [false, true] {
+                #expect(CaptureProbe.advice(verdict: .micOnly, systemAudioStarted: false,
+                                            screenRecordingGranted: true,
+                                            relaunchAlreadyTried: tried,
+                                            installLocation: location) == .moveToApplications,
+                        "\(location) must never be answered with a relaunch")
+            }
+        }
+        // From a normal location the relaunch is still the right first answer.
+        #expect(CaptureProbe.advice(verdict: .micOnly, systemAudioStarted: false,
+                                    screenRecordingGranted: true,
+                                    relaunchAlreadyTried: false,
+                                    installLocation: .normal) == .relaunch)
+        // And a working stream is not a location problem either.
+        #expect(CaptureProbe.advice(verdict: .micOnly, systemAudioStarted: true,
+                                    screenRecordingGranted: true,
+                                    relaunchAlreadyTried: false,
+                                    installLocation: .translocated) == .noSoundPlaying)
+    }
+
+    @Test("the location is read off the path macOS actually gives us",
+          arguments: [
+            ("/Applications/orakul.app", CaptureProbe.InstallLocation.normal),
+            ("/Users/me/Applications/orakul.app", .normal),
+            ("/private/var/folders/x9/T/AppTranslocation/9F2-A1/d/orakul.app", .translocated),
+            ("/Volumes/orakul/orakul.app", .diskImage),
+            // Не путать с томом: путь пользователя может содержать слово, но
+            // начинается не с /Volumes.
+            ("/Users/me/Volumes-backup/orakul.app", .normal),
+          ])
+    func locationIsClassifiedFromTheBundlePath(path: String,
+                                               expected: CaptureProbe.InstallLocation) {
+        #expect(CaptureProbe.installLocation(bundlePath: path) == expected)
+    }
+
+    @Suite("Relaunch memory")
+    struct RelaunchMemoryTests {
+        /// A suite-unique domain: `.standard` is shared with every other test in
+        /// the process, and a flag left behind there would surface as an
+        /// unrelated failure somewhere else.
+        private func freshDefaults(_ name: String) -> UserDefaults {
+            let defaults = UserDefaults(suiteName: "orakul.tests.\(name)")!
+            defaults.removePersistentDomain(forName: "orakul.tests.\(name)")
+            return defaults
+        }
+
+        @Test("nothing is remembered until the advice is actually shown")
+        func emptyByDefault() {
+            let memory = RelaunchMemory(defaults: freshDefaults("empty"), launchUptime: 100)
+            #expect(!memory.relaunchAlreadyTried)
+        }
+
+        @Test("advice given in this run does not read as a relaunch")
+        func sameSessionIsNotARelaunch() {
+            // The advice is always stamped LATER than the launch that gave it.
+            // Without this, a second probe in the same session would already
+            // claim the relaunch had been tried and skip straight to «it did
+            // not help» — before the user had a chance to quit anything.
+            let defaults = freshDefaults("same-session")
+            RelaunchMemory(defaults: defaults, launchUptime: 100).noteAdvised(atUptime: 106)
+            #expect(!RelaunchMemory(defaults: defaults, launchUptime: 100).relaunchAlreadyTried)
+        }
+
+        @Test("a launch after the advice reads as the relaunch it asked for")
+        func laterLaunchIsARelaunch() {
+            let defaults = freshDefaults("relaunched")
+            RelaunchMemory(defaults: defaults, launchUptime: 100).noteAdvised(atUptime: 106)
+            // Next process: launched at 200 s of uptime, after the 106 s stamp.
+            #expect(RelaunchMemory(defaults: defaults, launchUptime: 200).relaunchAlreadyTried)
+        }
+
+        @Test("working capture forgets the advice")
+        func successClears() {
+            // Otherwise a user whose problem was solved months ago meets
+            // «relaunching did not help» the first time anything goes quiet.
+            let defaults = freshDefaults("cleared")
+            RelaunchMemory(defaults: defaults, launchUptime: 100).noteAdvised(atUptime: 106)
+            RelaunchMemory(defaults: defaults, launchUptime: 200).clear()
+            #expect(!RelaunchMemory(defaults: defaults, launchUptime: 300).relaunchAlreadyTried)
+        }
     }
 }
 
@@ -364,8 +500,13 @@ struct CaptureProbeRunnerTests {
         await runner.run()
 
         #expect(runner.verdict == .micOnly)
-        #expect(CaptureProbe.needsRelaunch(verdict: .micOnly,
-                                           screenRecordingGranted: true))
+        // Both sources started, so this is «nothing was playing», not the
+        // permission quirk — the distinction the advice now turns on.
+        #expect(runner.systemAudioStarted)
+        #expect(CaptureProbe.advice(verdict: .micOnly,
+                                    systemAudioStarted: runner.systemAudioStarted,
+                                    screenRecordingGranted: true,
+                                    relaunchAlreadyTried: false) == .noSoundPlaying)
     }
 
     @Test("a source that refuses to start still yields a verdict, and says why")
@@ -381,6 +522,14 @@ struct CaptureProbeRunnerTests {
         #expect(runner.verdict == .micOnly)
         #expect(runner.startFailure?.contains("device busy") == true)
         #expect(!system.started)
+        // The flag the advice reads. A refused stream is the ONLY thing that
+        // justifies sending the user to relaunch, so the runner has to report
+        // the refusal itself rather than let the verdict stand in for it.
+        #expect(!runner.systemAudioStarted)
+        #expect(CaptureProbe.advice(verdict: runner.verdict ?? .silent,
+                                    systemAudioStarted: runner.systemAudioStarted,
+                                    screenRecordingGranted: true,
+                                    relaunchAlreadyTried: false) == .relaunch)
         // Stopped anyway — a half-started capture is still worth tearing down.
         #expect(system.stopped)
     }
@@ -809,32 +958,31 @@ struct OnboardingPromptsTests {
     @Test("the setup card counts only what is genuinely outstanding")
     func setupCounts() {
         #expect(OnboardingPrompts.setupRemaining(
-            captureVerified: true, signedIn: true, appsConnected: true) == 0)
+            captureVerified: true, keyReady: true, appsConnected: true) == 0)
         #expect(OnboardingPrompts.setupRemaining(
-            captureVerified: true, signedIn: false, appsConnected: false) == 2)
+            captureVerified: true, keyReady: false, appsConnected: false) == 2)
         #expect(OnboardingPrompts.setupRemaining(
-            captureVerified: false, signedIn: false, appsConnected: false) == 3)
+            captureVerified: false, keyReady: false, appsConnected: false) == 3)
     }
 
-    @Test("the sign-in row can be put off without hiding the whole card")
-    func signInRowIsIndividuallyDismissible() {
-        // Signing in is genuinely optional — recording works without it — so the
-        // row needs its own dismiss. Hiding the entire setup card to get rid of
-        // one line also throws away the connected-apps step.
-        #expect(OnboardingPrompts.showsSignInRow(signedIn: false, dismissed: false))
-        #expect(!OnboardingPrompts.showsSignInRow(signedIn: false, dismissed: true))
-        #expect(!OnboardingPrompts.showsSignInRow(signedIn: true, dismissed: false))
+    @Test("строку про ключ можно отложить, не пряча всю карточку")
+    func providerKeyRowIsIndividuallyDismissible() {
+        // Ключ необязателен — запись, расшифровка и поиск по звонкам работают
+        // без него, — поэтому у строки свой крестик. Скрыть всю карточку ради
+        // одной строки значит выбросить заодно и шаг про подключения.
+        #expect(OnboardingPrompts.showsProviderKeyRow(hasKey: false, dismissed: false))
+        #expect(!OnboardingPrompts.showsProviderKeyRow(hasKey: false, dismissed: true))
+        #expect(!OnboardingPrompts.showsProviderKeyRow(hasKey: true, dismissed: false))
     }
 
-    @Test("a dismissed sign-in row stops being counted as outstanding")
+    @Test("отложенная строка перестаёт считаться невыполненной")
     func dismissedRowLeavesTheCount() {
-        // Otherwise the card advertises "1 left" forever with nothing visible
-        // under it to do.
-        let signedInOrPutOff = OnboardingPrompts.showsSignInRow(
-            signedIn: false, dismissed: true) == false
+        // Иначе карточка навсегда обещает «осталось 1», а под ней ничего нет.
+        let readyOrPutOff = OnboardingPrompts.showsProviderKeyRow(
+            hasKey: false, dismissed: true) == false
         #expect(OnboardingPrompts.setupRemaining(
             captureVerified: true,
-            signedIn: signedInOrPutOff,
+            keyReady: readyOrPutOff,
             appsConnected: true) == 0)
     }
 
@@ -1004,6 +1152,50 @@ struct CaptureCheckStepTests {
             .inspect()
     }
 
+    /// The reported bug, at the level the user actually meets it: what the
+    /// screen SAYS. The pure function can return `.regrant` while the view
+    /// still renders the relaunch button, and then nothing has been fixed.
+    @Test("only the relaunch advice offers the relaunch button",
+          arguments: [CaptureProbe.Advice.relaunch,
+                      .regrant,
+                      .noSoundPlaying,
+                      .moveToApplications])
+    func onlyRelaunchAdviceOffersRelaunch(advice: CaptureProbe.Advice) throws {
+        let rendered = try AdviceRow(advice: advice).inspect()
+        let offersRelaunch = (try? rendered.find(button: "Выйти и открыть заново")) != nil
+        #expect(offersRelaunch == (advice == .relaunch),
+                "«\(advice)» must \(advice == .relaunch ? "" : "not ")offer a relaunch")
+    }
+
+    @Test("each advice says something different about why")
+    func adviceTextsAreDistinct() throws {
+        // Three causes wearing one message is how the loop happened. If two of
+        // these ever render the same words again, they are one message again.
+        let texts = try [CaptureProbe.Advice.relaunch, .regrant,
+                         .noSoundPlaying, .moveToApplications].map {
+            try AdviceRow(advice: $0).inspect()
+                .findAll(ViewType.Text.self)
+                .compactMap { try? $0.string() }
+                .joined(separator: " ")
+        }
+        for text in texts { #expect(!text.isEmpty, "an advice rendered no words at all") }
+        #expect(Set(texts).count == texts.count, "two different causes render the same message")
+
+        // The one that is not a permission problem must not talk like one.
+        let noSound = texts[2]
+        #expect(!noSound.contains("перезапуск") && !noSound.contains("Перезапуск"),
+                "a stream that started fine is not solved by restarting anything")
+        #expect(noSound.contains("Ещё раз"), "it must name the button that retries")
+    }
+
+    @Test("nothing is advised before the check has run")
+    func noAdviceBeforeAProbe() throws {
+        // `.none` renders EmptyView. A row of blank chrome appearing before the
+        // user has pressed anything reads as a failure that has not happened.
+        let rendered = try AdviceRow(advice: .none).inspect()
+        #expect(rendered.findAll(ViewType.Text.self).isEmpty)
+    }
+
     @Test("Continue is pinned outside the scrolling rows")
     func continueIsAlwaysReachable() throws {
         // The regression: the sheet fixes its width and never bounded its
@@ -1032,11 +1224,13 @@ struct CaptureCheckStepTests {
         // capture row, two lines apart, read as a rendering fault.
         let text = try inspected().findAll(ViewType.Text.self)
             .compactMap { try? $0.string() }
+        // Текст переведён; правило прежнее — длительность названа один раз и
+        // ровно там, где на неё нажимают.
         let mentions = text.filter {
-            $0.lowercased().contains("six second") || $0.lowercased().contains("six-second")
+            $0.lowercased().contains("шесть секунд") || $0.lowercased().contains("шестисекунд")
         }
         #expect(mentions.count == 1, "duration mentioned \(mentions.count)×: \(mentions)")
-        #expect(mentions.first?.hasPrefix("Six seconds") == true,
-                "the surviving mention should be the capture row's, beside Run test")
+        #expect(mentions.first?.hasPrefix("Шесть секунд") == true,
+                "the surviving mention should be the capture row's, beside «Проверить»")
     }
 }

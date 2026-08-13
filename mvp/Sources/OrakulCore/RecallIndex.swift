@@ -81,18 +81,65 @@ public struct RecallIndex: Sendable {
 
     public let sessions: [Session]
 
+    /// Слова каждой встречи, разобранные ОДИН раз при создании индекса.
+    ///
+    /// Раньше это считалось внутри `search`, то есть заново на каждый вопрос —
+    /// а название вдобавок разбиралось дважды: один раз в общем наборе, второй
+    /// отдельно для веса заголовка. На месяце часовых звонков (450 тыс. слов)
+    /// один поиск стоил секунды, и каждый следующий столько же.
+    private let sessionTokens: [Set<String>]
+    private let titleTokens: [Set<String>]
+
     public init(sessions: [Session]) {
         self.sessions = sessions
+        let titles = sessions.map { Set(Self.tokens($0.title)) }
+        self.titleTokens = titles
+        self.sessionTokens = sessions.enumerated().map { index, session in
+            Set(Self.tokens(session.digest)).union(titles[index])
+        }
     }
 
     // MARK: - Разбор
 
+    /// Слово → общий токен для запроса и расшифровки.
+    ///
+    /// Три ступени, и порядок важен:
+    ///
+    /// 1. **Термин словаря** отдаётся каноном и НЕ обрезается. Обрезать нельзя:
+    ///    у «коммит» на конце «ит» — обычное глагольное окончание, и обрезка
+    ///    превращает термин в «комм». Это выяснилось мутацией: попытка
+    ///    «причесать обе стороны одной обрезкой» починила «деплою» и сломала
+    ///    «коммита», который работал.
+    /// 2. **Падеж термина** ищется в таблице форм. «коммита», «деплою»,
+    ///    «фичи» — не термины, но приводятся к своему термину.
+    /// 3. Всё остальное — обычная обрезка окончаний.
     static func stem(_ word: String) -> String {
-        let word = RussianLexicon.normalized(word)
-        // Термин словаря уже канон, окончаний у него нет.
-        guard RussianLexicon.canonicalForms()[word] == nil else { return word }
-        for ending in endings where word.count > minimumStem && word.hasSuffix(ending) {
-            let stripped = String(word.dropLast(ending.count))
+        if let canonical = RussianLexicon.canonicalToken(for: word) { return canonical }
+        return stripEnding(RussianLexicon.normalized(word))
+    }
+
+    /// Окончания, разобранные по длине. Строится один раз.
+    ///
+    /// Список идёт строго от длинных к коротким, и цикл возвращал ПЕРВОЕ
+    /// совпадение — то есть самое длинное. Три множества дают тот же ответ, но
+    /// тремя хешами вместо сорока четырёх сравнений суффикса.
+    ///
+    /// Разница не косметическая: поиск по 30 часовым звонкам (~450 тыс. слов)
+    /// занимал 4.1 с, и почти всё это — двадцать миллионов сравнений строк.
+    private static let endingsByLength: [Int: Set<String>] = {
+        var table: [Int: Set<String>] = [:]
+        for ending in endings { table[ending.count, default: []].insert(ending) }
+        return table
+    }()
+
+    private static func stripEnding(_ word: String) -> String {
+        guard word.count > minimumStem else { return word }
+        // От длинного к короткому — тот же порядок, что был у списка.
+        for length in stride(from: 3, through: 1, by: -1) {
+            guard let candidates = endingsByLength[length], word.count > length else { continue }
+            let suffix = String(word.suffix(length))
+            guard candidates.contains(suffix) else { continue }
+            let stripped = String(word.dropLast(length))
             if stripped.count >= minimumStem { return stripped }
         }
         return word
@@ -119,10 +166,8 @@ public struct RecallIndex: Sendable {
         guard !queryTokens.isEmpty, !sessions.isEmpty else { return [] }
 
         // Сколько встреч содержит слово — считаем один раз на запрос.
+        // Сами слова встреч уже разобраны в `init`.
         var documentFrequency: [String: Int] = [:]
-        let sessionTokens = sessions.map { session in
-            Set(Self.tokens(session.title) + Self.tokens(session.digest))
-        }
         for tokens in sessionTokens {
             for token in tokens where queryTokens.contains(token) {
                 documentFrequency[token, default: 0] += 1
@@ -131,51 +176,92 @@ public struct RecallIndex: Sendable {
 
         var hits: [Hit] = []
         for (index, session) in sessions.enumerated() {
-            let titleTokens = Set(Self.tokens(session.title))
             var score = 0.0
             for token in queryTokens where sessionTokens[index].contains(token) {
                 let frequency = Double(documentFrequency[token] ?? 1)
                 let rarity = log(Double(sessions.count + 1) / frequency)
-                score += rarity * (titleTokens.contains(token) ? 2 : 1)
+                score += rarity * (titleTokens[index].contains(token) ? 2 : 1)
             }
             guard score > 0 else { continue }
-            hits.append(Hit(session: session, score: score,
-                            excerpt: Self.excerpt(for: queryTokens, in: session.digest)))
+            // Цитата — самая дорогая часть: она заново разбирает расшифровку по
+            // строкам и предложениям. Считать её для КАЖДОГО совпадения, а
+            // потом выбросить всё, кроме пяти, — основная работа впустую.
+            // Замерено: повторный поиск стоил столько же, сколько первый,
+            // несмотря на разобранный заранее индекс.
+            hits.append(Hit(session: session, score: score, excerpt: ""))
         }
 
-        return Array(hits.sorted {
+        let best = hits.sorted {
             $0.score != $1.score ? $0.score > $1.score : $0.session.id < $1.session.id
-        }.prefix(limit))
+        }.prefix(limit)
+        // Цитаты — только для тех, кто действительно попал в выдачу.
+        return best.map { hit in
+            Hit(session: hit.session, score: hit.score,
+                excerpt: Self.excerpt(for: queryTokens, in: hit.session.digest))
+        }
     }
 
     /// Предложение с наибольшим числом слов вопроса.
     ///
     /// Не первое предложение и не начало текста: цитата должна показывать, ЗА
     /// ЧТО встреча найдена, иначе читатель не может проверить ответ.
+    /// Реплика, отвечающая на вопрос, — вместе с тем, кто её сказал.
+    ///
+    /// Разбор идёт по строкам, а не по всей расшифровке сразу. Раньше цитата
+    /// резалась по «.!?\n» на всём тексте, и говорящий оставался только у
+    /// ПЕРВОГО предложения строки: на запрос «пятницу» выдача была
+    /// «Выкатываем в пятницу, откат готовим заранее» — без имени. Для
+    /// продукта, который обещает ответ цитатой из звонка, цитата без
+    /// говорящего наполовину бесполезна: непонятно, кого переспрашивать.
     static func excerpt(for queryTokens: Set<String>, in digest: String) -> String {
-        let sentences = digest.split(whereSeparator: { ".!?\n".contains($0) })
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty }
-        guard !sentences.isEmpty else { return "" }
-
         var best = ""
         var bestOverlap = 0
-        for sentence in sentences {
-            let overlap = Set(tokens(sentence)).intersection(queryTokens).count
-            guard overlap > 0 else { continue }
-            // При равном совпадении берётся более содержательное предложение.
-            // Найдено на живом прогоне: на вопрос «что решили по тарифам»
-            // обе фразы — «Обсудили тарифы» и «Решили перейти на оплату за
-            // использование, две копейки за кредит» — совпадают одним словом,
-            // и по порядку побеждала первая. Пользователь получал цитату,
-            // которая подтверждает, что тема была, но не отвечает, что решили.
-            let better = overlap > bestOverlap
-                || (overlap == bestOverlap && sentence.count > best.count)
-            if better {
+        var bestLength = 0
+
+        for line in digest.split(separator: "\n") {
+            let (speaker, body) = splitSpeaker(String(line))
+            let sentences = body.split(whereSeparator: { ".!?".contains($0) })
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty }
+
+            for sentence in sentences {
+                let overlap = Set(tokens(sentence)).intersection(queryTokens).count
+                guard overlap > 0 else { continue }
+                // При равном совпадении берётся более содержательное
+                // предложение. Найдено на живом прогоне: на вопрос «что решили
+                // по тарифам» обе фразы — «Обсудили тарифы» и «Решили перейти
+                // на оплату за использование» — совпадают одним словом, и по
+                // порядку побеждала первая. Пользователь получал цитату,
+                // которая подтверждает, что тема была, но не отвечает, что
+                // решили.
+                //
+                // Сравнивается длина САМОГО предложения, не считая имени:
+                // иначе выбор зависел бы от того, насколько длинное имя у
+                // говорящего.
+                let better = overlap > bestOverlap
+                    || (overlap == bestOverlap && sentence.count > bestLength)
+                guard better else { continue }
                 bestOverlap = overlap
-                best = sentence
+                bestLength = sentence.count
+                best = speaker.map { "\($0): \(sentence)" } ?? sentence
             }
         }
         return best
+    }
+
+    /// «Борис: Обсудили деплой» → («Борис», «Обсудили деплой»).
+    ///
+    /// Двоеточие внутри фразы говорящим не считается: подпись — это короткое
+    /// начало строки без знаков конца предложения. Иначе «Про тарифы вскользь:
+    /// клиенты жалуются» превратилось бы в реплику «Про тарифы вскользь».
+    static func splitSpeaker(_ line: String) -> (String?, String) {
+        guard let colon = line.firstIndex(of: ":") else { return (nil, line) }
+        let name = line[line.startIndex..<colon].trimmingCharacters(in: .whitespaces)
+        let rest = line[line.index(after: colon)...].trimmingCharacters(in: .whitespaces)
+        guard !name.isEmpty, name.count <= 40, !rest.isEmpty,
+              !name.contains(where: { ".!?,;".contains($0) }) else {
+            return (nil, line)
+        }
+        return (name, rest)
     }
 }

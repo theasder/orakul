@@ -151,3 +151,30 @@ func waitUntil(timeoutMs: Int = 3000, _ condition: @escaping @MainActor @Sendabl
 func testError(_ message: String, code: Int = 1) -> NSError {
     NSError(domain: "MeetGPTTests", code: code, userInfo: [NSLocalizedDescriptionKey: message])
 }
+
+/// Выполняет тело так, будто у всех провайдеров есть ключ.
+///
+/// Нужно там, где проверяется маршрутизация: она отбирает модели по
+/// `isConfigured`, а это зависит от ключа. Раньше вопрос не стоял — серверный
+/// шлюз объявлял настроенными сразу всех, и тесты ранжирования проходили,
+/// ничего про ключи не зная. В прямом режиме пул пуст, пока ключа нет, и такой
+/// тест проверял бы пустоту вместо ранжирования.
+///
+/// Область действия ограничена телом: подмена снимается в `defer`. Ставить её
+/// на весь набор нельзя — наборы идут параллельно, и «у всех есть ключ»
+/// протекло бы в чужие проверки, воссоздав ровно ту иллюзию, которую здесь
+/// убирают.
+func withSeededProviderKeys<T>(_ body: () throws -> T) rethrows -> T {
+    let store = ProviderKeyStore(store: InMemoryKeychain())
+    for provider in LLMProvider.allCases { store.setKey("sk-test", for: provider) }
+    // `withValue`, а не присваивание: подмена должна жить в этой задаче и не
+    // просачиваться в наборы, идущие параллельно. См. `overrideForTesting`.
+    return try ProviderKeyStore.$overrideForTesting.withValue(store) { try body() }
+}
+
+/// То же самое для асинхронного тела.
+func withSeededProviderKeys<T>(_ body: () async throws -> T) async rethrows -> T {
+    let store = ProviderKeyStore(store: InMemoryKeychain())
+    for provider in LLMProvider.allCases { store.setKey("sk-test", for: provider) }
+    return try await ProviderKeyStore.$overrideForTesting.withValue(store) { try await body() }
+}

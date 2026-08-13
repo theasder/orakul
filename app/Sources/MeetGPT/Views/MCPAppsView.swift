@@ -49,7 +49,7 @@ struct MCPAppsSection: View {
             if visibleServers.isEmpty {
                 // A dead end is worse than a suggestion: every MCP server is
                 // connectable here whether or not it is in the catalog.
-                Text("No app matches “\(search)”. If it hosts an MCP server, add it below.")
+                Text("По запросу «\(search)» ничего нет. Если у сервиса есть MCP-сервер, добавьте его ниже.")
                     .font(Typo.callout)
                     .foregroundStyle(Theme.inkTertiary)
                     .padding(.vertical, Space.s)
@@ -84,7 +84,7 @@ private struct MCPServerRow: View {
                 ? "\(count) tools · \(workflows) prompt workflow\(workflows == 1 ? "" : "s") ready"
                 : "\(count) tools · no relevant prompt workflows"
         case .connecting:           return nil
-        case .disconnecting:        return "Finishing disconnect…"
+        case .disconnecting:        return "Завершаю отключение…"
         case .failed(let message):  return message
         case .disconnected:         return mcp.isAuthorized(server.id) ? "authorized" : nil
         }
@@ -94,7 +94,7 @@ private struct MCPServerRow: View {
         VStack(alignment: .leading, spacing: Space.xxs) {
             HStack(spacing: Space.s) {
                 Label(server.name, systemImage: mcp.isConnected(server.id) ? "checkmark.seal.fill" : server.symbol)
-                    .labelStyle(MCPRowLabelStyle())
+                    .labelStyle(ConnectedRowLabelStyle())
                     .lineLimit(1)
                     .truncationMode(.middle)
                 Spacer()
@@ -102,7 +102,7 @@ private struct MCPServerRow: View {
                 case .connecting:
                     ProgressView()
                         .controlSize(.small).scaleEffect(0.7)
-                        .accessibilityLabel("Connecting \(server.name)")
+                        .accessibilityLabel("Подключаю \(server.name)")
                         .accessibilityIdentifier("settings.connected.provider.\(server.id).progress")
                     // Reconnect already has a persisted grant. The only
                     // race-safe stop available today is a real disconnect,
@@ -117,7 +117,7 @@ private struct MCPServerRow: View {
                 case .disconnecting:
                     ProgressView()
                         .controlSize(.small).scaleEffect(0.7)
-                        .accessibilityLabel("Disconnecting \(server.name)")
+                        .accessibilityLabel("Отключаю \(server.name)")
                         .accessibilityIdentifier(
                             "settings.connected.provider.\(server.id).disconnecting")
                 case .connected:
@@ -125,7 +125,7 @@ private struct MCPServerRow: View {
                         .buttonStyle(QuietButtonStyle())
                         .accessibilityIdentifier("settings.connected.provider.\(server.id).disconnect")
                 default:
-                    Button(mcp.isAuthorized(server.id) ? "Reconnect" : "Подключить") {
+                    Button(mcp.isAuthorized(server.id) ? "Переподключить" : "Подключить") {
                         Task { await mcp.connect(server) }
                     }
                     .buttonStyle(QuietButtonStyle(prominent: true))
@@ -167,7 +167,9 @@ private struct MCPServerRow: View {
 }
 
 /// Mirrors SettingsView's row label look (that style is file-private there).
-private struct MCPRowLabelStyle: LabelStyle {
+/// Общий стиль строки в «Подключённых приложениях»: и MCP-серверы, и
+/// российские трекеры стоят в одном списке и обязаны выглядеть одинаково.
+struct ConnectedRowLabelStyle: LabelStyle {
     func makeBody(configuration: Configuration) -> some View {
         HStack(spacing: Space.s) {
             configuration.icon
@@ -192,7 +194,7 @@ private struct MCPAddServerSheet: View {
         VStack(alignment: .leading, spacing: Space.l) {
             Label("Добавить MCP-сервер", systemImage: "puzzlepiece.extension")
                 .font(Typo.title).foregroundStyle(Theme.ink)
-            Text("Paste the Streamable HTTP endpoint of any MCP server (https). Cruxwing connects with standard OAuth — no keys needed if the server supports dynamic client registration.")
+            Text("Вставьте адрес Streamable HTTP любого MCP-сервера (https). orakul подключается обычным OAuth — ключи не нужны, если сервер поддерживает dynamic client registration.")
                 .font(Typo.callout).foregroundStyle(Theme.inkSecondary)
             TextField("", text: $name, prompt: Text("Название — например HubSpot"))
                 .textFieldStyle(.plain).padding(Space.m)
@@ -299,7 +301,7 @@ struct MCPImportSheet: View {
                 } else if case .connecting = mcp.state(of: server.id) {
                     HStack(spacing: Space.s) {
                         ProgressView().controlSize(.small)
-                        Text("Connecting to \(server.name)… (your browser may open)")
+                        Text("Подключаюсь к \(server.name)… (может открыться браузер)")
                             .font(Typo.callout).foregroundStyle(Theme.inkSecondary)
                     }
                 } else if case .failed(let message) = mcp.state(of: server.id) {

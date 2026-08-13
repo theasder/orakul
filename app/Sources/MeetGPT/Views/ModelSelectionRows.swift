@@ -22,16 +22,16 @@ struct ModelSelectionRows: View {
     /// premium Auto path can convene the mixed US+international council.
     private var councilNote: String? {
         if let level = OrchestrationLevel.from(selection: provider) {
-            return "Council · \(level.label) asks \(level.memberModelIDs.count) frontier models in parallel — \(level.blurb) — then synthesizes one reply. Starts at \(level.computeCredits) credits; long prompts cost more."
+            return "Совет моделей · \(level.label): \(level.memberModelIDs.count) моделей отвечают параллельно — \(level.blurb) — потом ответы сводятся в один. Длинный запрос стоит дороже у провайдера."
         }
         switch provider {
         case LLMCatalog.councilUS:
-            return "Council · US asks your configured US providers (e.g. OpenAI, Anthropic, Google) in parallel, then synthesizes one reply — content stays with US-jurisdiction vendors."
+            return "Совет моделей · США: параллельно спрашиваются настроенные американские провайдеры (OpenAI, Anthropic, Google), ответы сводятся в один. Данные остаются у американских компаний."
         case LLMCatalog.councilCN:
-            return "Council · China asks your configured China-jurisdiction providers (DeepSeek, Qwen, Zhipu, Moonshot) in parallel — your meeting content goes to those vendors."
+            return "Совет моделей · Китай: параллельно спрашиваются настроенные китайские провайдеры (DeepSeek, Qwen, Zhipu, Moonshot). Содержимое звонка уходит к ним."
         default:
             if provider == LLMCatalog.autoID, tier == .premium {
-                return "On the hardest requests, Auto may convene a multi-model council spanning US and international providers (including China). Choose “Council · US” to keep content with US providers only."
+                return "На самых сложных запросах «Авто» может собрать совет из моделей США и Китая. Выберите «Совет моделей · США», чтобы данные уходили только американским провайдерам."
             }
             return nil
         }
@@ -49,7 +49,7 @@ struct ModelSelectionRows: View {
                     if !levels.isEmpty {
                         Divider()
                         ForEach(levels.reversed()) { level in
-                            Text("Council · \(level.label) · from \(level.computeCredits) credits — \(level.blurb)")
+                            Text("Совет моделей · \(level.label) — \(level.blurb)")
                                 .tag(level.selectionID)
                         }
                     }
@@ -99,7 +99,7 @@ struct ModelSelectionRows: View {
         }
 
         if providers.isEmpty {
-            Text("No AI models are available in this build — sign in to use managed models.")
+            Text("Пока не вставлен ни один ключ. Добавьте его выше — «Ключи провайдеров» — и модели этого провайдера появятся здесь.")
                 .font(Typo.caption)
                 .foregroundStyle(Theme.accentText)
         }

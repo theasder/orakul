@@ -37,9 +37,10 @@ enum Tier: String, CaseIterable, Codable, Identifiable {
 /// chat-completions dialect) exist for the ensemble/council mode: mixing US
 /// frontier and Chinese models diversifies training corpora and worldviews in
 /// the panel, so the synthesis isn't a monoculture.
-enum LLMProvider: String, Codable {
+enum LLMProvider: String, Codable, CaseIterable {
     case openAI, anthropic, google
     case deepSeek, qwen, zhipu, moonshot
+    case yandexGPT
 
     var label: String {
         switch self {
@@ -50,16 +51,34 @@ enum LLMProvider: String, Codable {
         case .qwen:      return "Qwen"
         case .zhipu:     return "Zhipu GLM"
         case .moonshot:  return "Moonshot"
+        case .yandexGPT: return "YandexGPT"
         }
     }
 
     /// Where the provider is based — lets the user pick a single-jurisdiction
     /// council (US-only or China-only) instead of the mixed default panel.
-    enum Jurisdiction { case us, china }
+    /// Второе поле, если ключа мало. Пока только у Яндекса: один ключ
+    /// обслуживает несколько каталогов, и без идентификатора запрос уходит с
+    /// моделью, которой сервис не знает.
+    var secondaryPrompt: String? {
+        switch self {
+        case .yandexGPT: return "идентификатор каталога, например b1g12345678"
+        default:         return nil
+        }
+    }
+
+    var needsSecondary: Bool { secondaryPrompt != nil }
+
+    enum Jurisdiction { case us, china, russia }
     var jurisdiction: Jurisdiction {
         switch self {
         case .openAI, .anthropic, .google:         return .us
         case .deepSeek, .qwen, .zhipu, .moonshot:  return .china
+        // Единственный, у кого данные остаются в России. Ради этого он здесь и
+        // есть: по замерам (docs/RESEARCH-AND-PLAN.md, §3) домашние модели не
+        // выигрывают у зарубежных на практических задачах, и берут их не за
+        // качество, а за то, где лежат данные.
+        case .yandexGPT:                           return .russia
         }
     }
 
@@ -85,22 +104,48 @@ enum LLMProvider: String, Codable {
 
     /// Config for providers served through the shared OpenAI-dialect client
     /// (nil for vendors with native clients). International endpoints.
-    var openAIDialect: (endpoint: URL, key: () -> String)? {
+    struct Dialect {
+        let endpoint: URL
+        let key: () -> String
+        /// Как назвать модель в запросе. По умолчанию — как в каталоге.
+        var modelID: (String) -> String = { $0 }
+        /// Дополнительные заголовки, если провайдер их требует.
+        var headers: () -> [String: String] = { [:] }
+    }
+
+    var openAIDialect: Dialect? {
         switch self {
         case .openAI, .anthropic, .google:
             return nil
         case .deepSeek:
-            return (URL(string: "https://api.deepseek.com/chat/completions")!,
-                    { Config.deepSeekAPIKey })
+            return Dialect(endpoint: URL(string: "https://api.deepseek.com/chat/completions")!,
+                           key: { Config.deepSeekAPIKey })
         case .qwen:
-            return (URL(string: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions")!,
-                    { Config.dashScopeAPIKey })
+            return Dialect(endpoint: URL(string: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions")!,
+                           key: { Config.dashScopeAPIKey })
         case .zhipu:
-            return (URL(string: "https://api.z.ai/api/paas/v4/chat/completions")!,
-                    { Config.zhipuAPIKey })
+            return Dialect(endpoint: URL(string: "https://api.z.ai/api/paas/v4/chat/completions")!,
+                           key: { Config.zhipuAPIKey })
         case .moonshot:
-            return (URL(string: "https://api.moonshot.ai/v1/chat/completions")!,
-                    { Config.moonshotAPIKey })
+            return Dialect(endpoint: URL(string: "https://api.moonshot.ai/v1/chat/completions")!,
+                           key: { Config.moonshotAPIKey })
+        case .yandexGPT:
+            // Совместимый с OpenAI вход Яндекса. Модель называется иначе:
+            // `gpt://<каталог>/<модель>/latest`, и каталог свой у каждого —
+            // поэтому он хранится рядом с ключом и подставляется здесь.
+            // Тот же идентификатор уходит ещё и заголовком.
+            return Dialect(
+                endpoint: URL(string: "https://llm.api.cloud.yandex.net/v1/chat/completions")!,
+                key: { Config.yandexGPTAPIKey },
+                modelID: { model in
+                    let folder = ProviderKeyStore.current.secondary(for: .yandexGPT) ?? ""
+                    return folder.isEmpty ? model : "gpt://\(folder)/\(model)/latest"
+                },
+                headers: {
+                    guard let folder = ProviderKeyStore.current.secondary(for: .yandexGPT),
+                          !folder.isEmpty else { return [:] }
+                    return ["x-folder-id": folder]
+                })
         }
     }
 }
@@ -178,6 +223,11 @@ enum LLMCatalog {
         LLMModel(id: "deepseek-v4-pro",    label: "DeepSeek V4 Pro", provider: .deepSeek, minTier: .premium, supportsVision: false),
         LLMModel(id: "qwen3.7-max",        label: "Qwen 3.7 Max",   provider: .qwen,      minTier: .premium, supportsVision: false),
         LLMModel(id: "glm-5.2",            label: "GLM-5.2",        provider: .zhipu,     minTier: .premium, supportsVision: false),
+        // Российский путь. Идентификаторы — те, что Яндекс принимает в
+        // `gpt://<каталог>/<модель>/latest`; каталог подставляется из настроек.
+        // Здесь он не нужен и не может быть: он свой у каждого пользователя.
+        LLMModel(id: "yandexgpt-lite",     label: "YandexGPT Lite", provider: .yandexGPT, minTier: .free,    supportsVision: false),
+        LLMModel(id: "yandexgpt",          label: "YandexGPT Pro",  provider: .yandexGPT, minTier: .free,    supportsVision: false),
     ]
 
     // M6b — the live catalog: the backend (GET /api/llm/models) is the single
@@ -344,8 +394,16 @@ enum LLMCatalog {
         "gpt-5.4",
         "claude-sonnet-5",
         "kimi-k2.6",
+        // Российские модели стоят здесь не по бенчмарку, а по сравнению на
+        // практических задачах: в замере 2026-07 (docs/RESEARCH-AND-PLAN.md,
+        // §3) GigaChat и YandexGPT не выиграли ни одной из двенадцати, хотя на
+        // MERA GigaChat обходит GPT-5.2. Ставить их выше по одной табличной
+        // победе значило бы повторить ошибку, из-за которой этот список вообще
+        // появился. Выбирают их за то, где остаются данные, а не за силу.
         "gemini-3.5-flash",
         "gpt-5.4-mini",
+        "yandexgpt",
+        "yandexgpt-lite",
     ]
 
     /// The most capable model in `pool`. Unranked models (a newly added id that

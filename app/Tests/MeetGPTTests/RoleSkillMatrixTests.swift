@@ -66,7 +66,11 @@ struct RoleSkillMatrixTests {
             }
         }
         // Guidance for a real role+button carries the role framing and the hint.
+        //
+        // Роль называется по-русски: `label` в role-matrix.json переведён, `id`
+        // остался прежним. Название подставляется в промпт, и русское там
+        // уместно — вся остальная рамка уже по-русски.
         let guidance = RoleSkillMatrix.guidance(roleID: "product-manager", promptID: "brainstorm")
-        #expect(guidance?.contains("Product Manager") == true)
+        #expect(guidance?.contains("Продакт-менеджер") == true)
     }
 }

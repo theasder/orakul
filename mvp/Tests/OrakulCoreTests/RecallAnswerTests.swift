@@ -56,27 +56,50 @@ struct RecallAnswerTests {
         #expect(nothing != ungrounded)
     }
 
-    @Test("больше трёх встреч не вываливается в ответ")
-    func atMostThreeMeetings() {
+    @Test("больше трёх звонков не вываливается в ответ")
+    func atMostThreeCalls() {
         let hits = (1...5).map {
-            hit("s\($0)", "Созвон \($0)", excerpt: "Решили что-то важное \($0)")
+            hit("s\($0)", "Планёрка \($0)", excerpt: "Решили что-то важное \($0)")
         }
         let answer = RecallAnswer.compose(query: "что решили", hits: hits)
 
-        #expect(answer.contains("Созвон 1"))
-        #expect(!answer.contains("Созвон 4"), "ответ превратился в выдачу")
-        #expect(answer.contains("Ещё 2 встречи"), "остальные должны быть посчитаны, а не забыты")
+        #expect(answer.contains("Планёрка 1"))
+        #expect(!answer.contains("Планёрка 4"), "ответ превратился в выдачу")
+        #expect(answer.contains("Ещё 2 звонка"), "остальные должны быть посчитаны, а не забыты")
     }
 
-    @Test("русский счёт встреч не ломается на 1, 2, 5 и 11")
+    @Test("русский счёт звонков не ломается на 1, 2, 5 и 11")
     func pluralsAreRussian() {
-        // «Ещё 1 встреч» — мелочь, по которой сразу видно переведённый продукт.
-        #expect(RecallAnswer.meetingsWord(1) == "встреча")
-        #expect(RecallAnswer.meetingsWord(3) == "встречи")
-        #expect(RecallAnswer.meetingsWord(5) == "встреч")
-        #expect(RecallAnswer.meetingsWord(11) == "встреч")
-        #expect(RecallAnswer.meetingsWord(21) == "встреча")
-        #expect(RecallAnswer.meetingsWord(112) == "встреч")
+        // «Ещё 1 звонков» — мелочь, по которой сразу видно переведённый продукт.
+        //
+        // Слово было «встреча»: в одном файле уживались «созвон», «встреча» и
+        // «звонок» — три названия одной вещи. На странице и в README везде
+        // «звонок», он и остался.
+        #expect(RecallAnswer.callsWord(1) == "звонок")
+        #expect(RecallAnswer.callsWord(3) == "звонка")
+        #expect(RecallAnswer.callsWord(5) == "звонков")
+        #expect(RecallAnswer.callsWord(11) == "звонков")
+        #expect(RecallAnswer.callsWord(21) == "звонок")
+        #expect(RecallAnswer.callsWord(112) == "звонков")
+    }
+
+    @Test("во всех ответах вещь называется одним словом")
+    func oneNameForTheThing() {
+        // Проверка на все ветки сразу, а не на одну строку: «созвон» и
+        // «встреча» возвращались из разных мест, и по отдельному тесту это
+        // было не видно — README цитировал отказ третьим словом и расходился
+        // с тем, что программа печатает.
+        let answers = [RecallAnswer.notFound(hits: []),
+                       RecallAnswer.notFound(hits: [hit("s1", "Планёрка по тарифам",
+                                                        excerpt: "Решили поднять месячный")]),
+                       RecallAnswer.callsWord(1),
+                       RecallAnswer.callsWord(2),
+                       RecallAnswer.callsWord(5)]
+
+        for answer in answers {
+            #expect(!answer.contains("созвон"), "лишнее название: \(answer)")
+            #expect(!answer.contains("встреч"), "лишнее название: \(answer)")
+        }
     }
 
     @Test("дата читается по-русски, а не как в базе")

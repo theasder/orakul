@@ -26,7 +26,7 @@ struct TranscriptExporterTests {
         let lines = out.split(separator: "\n", omittingEmptySubsequences: false)
         #expect(lines[0] == "Weekly sync")
         #expect(lines[1].contains("2026"))
-        #expect(lines.contains("09:00:05  You: Let's start."))
+        #expect(lines.contains("09:00:05  Вы: Let's start."))
         // Diarized name wins over the source fallback.
         #expect(lines.contains("09:00:12  Maria: Sounds good."))
     }
@@ -39,8 +39,8 @@ struct TranscriptExporterTests {
         ]
         let out = TranscriptExporter.plainText(title: "  ", date: at((10, 0, 0)),
                                                entries: entries, timeZone: tz)
-        #expect(out.hasPrefix("Meeting transcript\n"))
-        #expect(out.contains("Them: Remote speaking."))
+        #expect(out.hasPrefix("Транскрипт звонка\n"))
+        #expect(out.contains("Собеседник: Remote speaking."))
         #expect(!out.contains("10:00:03"))   // whitespace-only entry skipped
     }
 

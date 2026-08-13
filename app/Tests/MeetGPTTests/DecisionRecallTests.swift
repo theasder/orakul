@@ -253,3 +253,116 @@ struct DecisionRecallTests {
         #expect(sources.isEmpty)
     }
 }
+
+/// Поиск по своим звонкам через границу алфавита — в приложении.
+///
+/// Тот же разрыв, что нашёлся в командной строке, только здесь он дороже:
+/// приложение — это то, что скачивают. Расшифровку канонизируют при
+/// сохранении («промпт»), а запрос не канонизировали никогда, и человек,
+/// набравший `prompt`, не находил свой же звонок.
+///
+/// Для русского запроса лексическая половина — это весь поиск: вторая половина
+/// считается системной моделью предложений macOS, а она англоязычная.
+@Suite("Кросс-алфавитный поиск в приложении")
+struct DecisionRecallCrossAlphabetTests {
+
+    @Test("обе формы термина дают один токен",
+          arguments: [("prompt", "промпт"), ("prod", "прод"), ("апи", "api")])
+    func spellingsCollapseToOneToken(pair: (String, String)) {
+        let left = DecisionRecallService.tokens(in: pair.0)
+        let right = DecisionRecallService.tokens(in: pair.1)
+        #expect(left == right,
+                "«\(pair.0)» и «\(pair.1)» разошлись: \(left) против \(right)")
+        #expect(!left.isEmpty, "токенов не осталось вовсе — проверка пустая")
+    }
+
+    @Test("запрос латиницей пересекается с расшифровкой на кириллице")
+    func latinQueryOverlapsCyrillicTranscript() {
+        // Ровно тот случай: в архиве канон «промпт», человек ищет `prompt`.
+        let transcript = DecisionRecallService.tokens(in: "Мы поменяли промпт для модели")
+        let query = DecisionRecallService.tokens(in: "что там с prompt")
+        #expect(!transcript.intersection(query).isEmpty,
+                "запрос латиницей не пересёкся с канонической расшифровкой")
+    }
+
+    @Test("падеж термина ищется наравне с самим термином",
+          arguments: [("деплой", "деплою"), ("коммит", "коммита"),
+                      ("фича", "фичи"), ("промпт", "промпты"),
+                      ("промпт", "prompts")])
+    func inflectionsFindTheTerm(pair: (String, String)) {
+        // То же, что в командной строке, но здесь это то, что скачивают.
+        // Страница обещает падежи; для терминов их не понимал никто.
+        let left = DecisionRecallService.tokens(in: pair.0)
+        let right = DecisionRecallService.tokens(in: pair.1)
+        #expect(left == right, "«\(pair.0)» и «\(pair.1)» разошлись: \(left) / \(right)")
+    }
+
+    @Test("термин не обрезается сам по себе")
+    func termsAreNotStripped() {
+        // Обрезка канона превращает «коммит» в «комм»: у термина на конце
+        // обычное русское окончание. Регрессию поймала мутация.
+        #expect(DecisionRecallService.tokens(in: "коммит") == ["коммит"])
+        #expect(DecisionRecallService.tokens(in: "деплой") == ["деплой"])
+    }
+
+    @Test("слово не из словаря между алфавитами не переводится")
+    func unknownWordsAreNotTransliterated() {
+        // Границы: словарь — таблица измеренных терминов, а не транслитератор.
+        // Находить то, чего не говорили, дороже, чем не найти.
+        #expect(DecisionRecallService.tokens(in: "cat") == ["cat"])
+        #expect(DecisionRecallService.tokens(in: "кот") == ["кот"])
+    }
+}
+
+/// Цитата из расшифровки — вместе с говорящим.
+///
+/// `TranscriptEntry` знает `speaker`, а окна поиска строились по
+/// `entries.map(\.text)`: имя выбрасывалось, реплики склеивались через пробел.
+/// Получались две беды сразу — цитату некому приписать, и одно окно могло
+/// накрыть двух человек, так что слова одного читались как слова другого.
+@Suite("Говорящий в цитате приложения")
+struct RecallSpeakerAttributionTests {
+
+    private func session(_ entries: [(String?, String)]) -> SavedSession {
+        let started = Date()
+        return SavedSession(
+            id: UUID(), title: "Планёрка", startedAt: started, savedAt: started,
+            goal: "",
+            entries: entries.map { speaker, text in
+                TranscriptEntry(id: UUID(), source: .system, text: text,
+                                timestamp: started, speaker: speaker)
+            },
+            aiResponse: "", digest: "")
+    }
+
+    @Test("имя говорящего доходит до окна расшифровки")
+    func windowsCarryTheSpeaker() {
+        let units = DecisionRecallService.unitsForTesting(
+            of: session([("Борис", "Выкатываем в пятницу, откат готовим заранее")]))
+        let transcript = units.filter { $0.isTranscript }.map(\.text).joined()
+        #expect(transcript.contains("Борис"),
+                "окно расшифровки потеряло говорящего: \(transcript)")
+    }
+
+    @Test("смена говорящего видна внутри окна")
+    func speakerChangeStaysVisible() {
+        // Худший случай прежнего склеивания: два человека в одном окне без
+        // единой пометки, и ответ выглядит как реплика одного.
+        let units = DecisionRecallService.unitsForTesting(
+            of: session([("Аня", "Кто дежурит"), ("Борис", "Я дежурю все выходные")]))
+        let transcript = units.filter { $0.isTranscript }.map(\.text).joined()
+        #expect(transcript.contains("Аня") && transcript.contains("Борис"),
+                "в окне не различить, кто говорит: \(transcript)")
+    }
+
+    @Test("реплика без имени остаётся как есть")
+    func unnamedEntriesAreLeftAlone() {
+        // Диаризация бывает выключена — тогда имени нет вовсе, и выдумывать
+        // его нельзя.
+        let units = DecisionRecallService.unitsForTesting(
+            of: session([(nil, "Договорились про релиз в среду")]))
+        let transcript = units.filter { $0.isTranscript }.map(\.text).joined()
+        #expect(transcript.contains("Договорились про релиз"))
+        #expect(!transcript.contains(":"), "появилось двоеточие там, где имени нет")
+    }
+}

@@ -1,4 +1,5 @@
 import Foundation
+import OrakulCore
 
 /// Cross-meeting decision recall (roadmap F1, RICE 72).
 ///
@@ -208,12 +209,35 @@ enum DecisionRecallService {
         let cleaned = text.lowercased().map { $0.isLetter || $0.isNumber ? $0 : " " }
         return Set(String(cleaned).split(separator: " ")
             .map(String.init)
-            .filter { $0.count > 2 && !shortlistStopwords.contains($0) })
+            .filter { $0.count > 2 && !shortlistStopwords.contains($0) }
+            // Термин словаря приводится к канону, иначе половины запроса не
+            // сходятся: расшифровку канонизируют при сохранении («промпт»), а
+            // запрос — нет, и человек, ищущий `prompt` (то самое слово, которое
+            // он произнёс, и то, которым его пишет половина движков), не
+            // находит ничего.
+            //
+            // Для русского запроса это и есть весь поиск: вторая половина —
+            // эмбеддинг системной модели macOS, а она англоязычная и на русский
+            // текст отвечает бессмысленным вектором (см. README, «Почему это
+            // устроено именно так»).
+            // Один и тот же шаг, что и в командной строке: сначала термин,
+            // потом его падеж. Раньше он был написан здесь второй раз, и
+            // кросс-алфавитный поиск с падежами чинились в обеих копиях.
+            .map { RussianLexicon.canonicalToken(for: $0) ?? $0 })
     }
 
     /// The recallable units of one session, best-first by information density:
     /// digest paragraphs (the confirmed record), AI exchanges (asked and
     /// answered once already), then transcript windows (the raw floor).
+#if DEBUG
+    /// Куски одного звонка, как их видит поиск. Только для тестов: `units`
+    /// приватна намеренно, а проверять надо именно то, что уходит в поиск —
+    /// в частности, доходит ли до цитаты имя говорящего.
+    static func unitsForTesting(of session: SavedSession) -> [(text: String, isTranscript: Bool)] {
+        units(of: session).map { ($0.text, $0.kind == .transcript) }
+    }
+#endif
+
     private static func units(of session: SavedSession) -> [Unit] {
         var units: [Unit] = []
 
@@ -227,7 +251,16 @@ enum DecisionRecallService {
             units.append(Unit(kind: .exchange, text: String(text.prefix(maxExcerptCharacters))))
         }
 
-        let transcript = session.entries.map(\.text).joined(separator: " ")
+        // Со speaker'ом, а не только текстом. Раньше реплики склеивались через
+        // пробел, и цитата приходила без имени — а хуже того, окно могло
+        // накрыть двух говорящих сразу, и слова одного читались как слова
+        // другого. Продукт обещает ответ цитатой из звонка; цитата, которую
+        // нельзя никому приписать, это обещание не выполняет.
+        let transcript = session.entries
+            .map { entry in
+                entry.speaker.map { "\($0): \(entry.text)" } ?? entry.text
+            }
+            .joined(separator: "\n")
         if !transcript.isEmpty {
             var start = transcript.startIndex
             var produced = 0

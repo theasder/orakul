@@ -33,8 +33,9 @@ private final class RequestSelectionSpyGateway: LLMGateway, @unchecked Sendable 
     }
 }
 
-@Suite("Immutable request-selection snapshots")
+@Suite("Immutable request-selection snapshots", .serialized)
 struct RequestSelectionSnapshotTests {
+
     private func orchestrator(
         gateway: RequestSelectionSpyGateway,
         liveSelection: @escaping () -> String
@@ -59,22 +60,26 @@ struct RequestSelectionSnapshotTests {
 
     @Test("provider-pinned Auto keeps its vendor snapshot and full visible-answer budget")
     func providerPinnedAutoPreservesSelectionAndBudget() async throws {
-        let gateway = RequestSelectionSpyGateway()
-        let sut = orchestrator(gateway: gateway) {
-            "auto:\(LLMProvider.openAI.rawValue)"
+        // Маршрутизация смотрит на наличие ключа: без него пул пуст
+        // и закреплённый провайдер теряется на запасном пути.
+        try await withSeededProviderKeys {
+            let gateway = RequestSelectionSpyGateway()
+            let sut = orchestrator(gateway: gateway) {
+                "auto:\(LLMProvider.openAI.rawValue)"
+            }
+
+            _ = try await sut.streamChat(
+                system: "system",
+                user: "Give a complete answer.",
+                images: [],
+                model: capturedAnthropicAuto,
+                maxOutputTokens: OutputTokenBudget.explicitUserFacing,
+                onDelta: { _ in })
+
+            let call = try #require(gateway.calls.first)
+            #expect(call.model.provider == .anthropic)
+            #expect(call.maxOutputTokens == OutputTokenBudget.explicitUserFacing)
         }
-
-        _ = try await sut.streamChat(
-            system: "system",
-            user: "Give a complete answer.",
-            images: [],
-            model: capturedAnthropicAuto,
-            maxOutputTokens: OutputTokenBudget.explicitUserFacing,
-            onDelta: { _ in })
-
-        let call = try #require(gateway.calls.first)
-        #expect(call.model.provider == .anthropic)
-        #expect(call.maxOutputTokens == OutputTokenBudget.explicitUserFacing)
     }
 
     @Test("fast-audit snapshot cannot fall through to a live Auto selection")

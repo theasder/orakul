@@ -1,5 +1,6 @@
 import SwiftUI
 import MCP
+import OrakulCore
 
 /// The human-confirm step for the one write-back MeetGPT performs: file the
 /// Tasks-button action items into a connected tracker (Linear / Jira / Asana)
@@ -12,7 +13,29 @@ struct TaskWritebackSheet: View {
 
     enum FileState: Equatable { case idle, filing, done(String), failed(String) }
 
-    @State private var targets: [MCPServerDescriptor] = []
+    /// Куда можно завести задачу. Две разные механики за одним списком:
+    /// MCP-серверы вызывают инструмент создания, российские трекеры — свой
+    /// REST. Для человека это один вопрос «в какой трекер», поэтому и список
+    /// один.
+    enum Target: Identifiable, Equatable {
+        case mcp(MCPServerDescriptor)
+        case russian(RussianTrackers.Service)
+
+        var id: String {
+            switch self {
+            case .mcp(let server):  return "mcp:\(server.id)"
+            case .russian(let s):   return "tracker:\(s.rawValue)"
+            }
+        }
+        var name: String {
+            switch self {
+            case .mcp(let server):  return server.name
+            case .russian(let s):   return s.title
+            }
+        }
+    }
+
+    @State private var targets: [Target] = []
     @State private var selectedServerID: String?
     @State private var states: [Int: FileState] = [:]
 
@@ -27,16 +50,16 @@ struct TaskWritebackSheet: View {
 
             if targets.isEmpty {
                 Label {
-                    Text("Подключите Linear, Jira или Asana в «Настройки → Рабочие приложения», чтобы заводить задачи. Задача создаётся только когда вы нажмёте «Создать».")
+                    Text("Подключите трекер в «Настройки → Подключённые приложения», чтобы заводить задачи. Российским трекерам нужно указать, куда класть задачу: очередь, доску или колонку. Задача создаётся только когда вы нажмёте «Создать».")
                         .font(Typo.callout).foregroundStyle(Theme.inkSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 } icon: {
                     Image(systemName: "link.badge.plus").foregroundStyle(Theme.accent)
                 }
             } else {
-                Picker("Tracker", selection: $selectedServerID) {
-                    ForEach(targets) { server in
-                        Text(server.name).tag(String?.some(server.id))
+                Picker("Трекер", selection: $selectedServerID) {
+                    ForEach(targets) { target in
+                        Text(target.name).tag(String?.some(target.id))
                     }
                 }
                 .pickerStyle(.segmented).labelsHidden()
@@ -58,21 +81,35 @@ struct TaskWritebackSheet: View {
         .frame(width: 480, height: 520)
         .background(Theme.canvas)
         .task {
-            targets = mcp.writebackTargets()
+            // Российские трекеры идут первыми — как и везде в приложении.
+            targets = mcp.trackerStore.writable.map(Target.russian)
+                + mcp.writebackTargets().map(Target.mcp)
             if selectedServerID == nil { selectedServerID = targets.first?.id }
         }
     }
 
     private func file(_ index: Int) {
         guard let id = selectedServerID,
-              let server = targets.first(where: { $0.id == id }) else { return }
+              let target = targets.first(where: { $0.id == id }) else { return }
         let item = tasks[index]
         states[index] = .filing
         Task {
             do {
-                let result = try await mcp.createTrackerItem(item, on: server)
-                let trimmed = result.trimmingCharacters(in: .whitespacesAndNewlines)
-                states[index] = .done(trimmed.isEmpty ? "Created." : String(trimmed.prefix(160)))
+                switch target {
+                case .mcp(let server):
+                    let result = try await mcp.createTrackerItem(item, on: server)
+                    let trimmed = result.trimmingCharacters(in: .whitespacesAndNewlines)
+                    states[index] = .done(trimmed.isEmpty ? "Задача создана." : String(trimmed.prefix(160)))
+                case .russian(let service):
+                    guard let client = mcp.trackerStore.client(for: service, http: mcp.trackerHTTP) else {
+                        states[index] = .failed("Трекер не настроен")
+                        return
+                    }
+                    let issue = try await client.createIssue(title: item.task, description: item.owner)
+                    // Показываем ключ, а не «готово»: по нему задачу можно
+                    // найти, и он же доказывает, что она действительно создана.
+                    states[index] = .done("Создана \(issue.key)")
+                }
             } catch {
                 states[index] = .failed(error.localizedDescription)
             }
@@ -128,7 +165,7 @@ private struct TaskRow: View {
             Button("Создать", action: onFile)
                 .buttonStyle(QuietButtonStyle())
                 .disabled(!canFile)
-                .accessibilityLabel("File task: \(item.task)")
+                .accessibilityLabel("Завести задачу: \(item.task)")
         }
     }
 }

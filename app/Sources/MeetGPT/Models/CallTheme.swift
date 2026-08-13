@@ -18,17 +18,17 @@ enum CallTheme: String, CaseIterable, Identifiable, Codable, Sendable {
     /// Menu label for a future theme picker.
     var label: String {
         switch self {
-        case .sales: return "Sales / deal"
-        case .hiring: return "Hiring / interview"
-        case .product: return "Product / discovery"
-        case .engineering: return "Engineering review"
-        case .fundraising: return "Fundraising / investor"
-        case .customerSuccess: return "Customer success"
+        case .sales: return "Продажи / сделка"
+        case .hiring: return "Найм / собеседование"
+        case .product: return "Продукт / исследование"
+        case .engineering: return "Технический разбор"
+        case .fundraising: return "Инвестиции / инвестор"
+        case .customerSuccess: return "Работа с клиентом"
         case .leadership: return "1:1 / coaching"
-        case .legal: return "Legal / contract"
-        case .strategy: return "Strategy / planning"
-        case .standup: return "Standup / status"
-        case .general: return "General"
+        case .legal: return "Юридическое / договор"
+        case .strategy: return "Стратегия / планирование"
+        case .standup: return "Планёрка / статус"
+        case .general: return "Общий"
         }
     }
 
@@ -81,7 +81,7 @@ enum CallTheme: String, CaseIterable, Identifiable, Codable, Sendable {
             """
         case .engineering:
             return """
-            SKILL PACK — Engineering review. Evaluate designs on trade-offs, not preferences.
+            SKILL PACK — Технический разбор. Evaluate designs on trade-offs, not preferences.
             Weigh scope, complexity, reliability, and cost; surface dependencies and failure
             modes; separate must-fix from nice-to-have; timebox spikes for unknowns. Bar:
             recommendations name the trade-off accepted and the riskiest assumption to validate.
@@ -95,7 +95,7 @@ enum CallTheme: String, CaseIterable, Identifiable, Codable, Sendable {
             """
         case .customerSuccess:
             return """
-            SKILL PACK — Customer success & renewal. Track value realization and account health.
+            SKILL PACK — Работа с клиентом & renewal. Track value realization and account health.
             Surface adoption, sentiment, and risk signals; connect usage to the customer's
             outcomes; spot expansion and churn early; drive to a clear success plan. Bar: outputs
             tie the conversation to renewal/expansion risk and a next step that protects the

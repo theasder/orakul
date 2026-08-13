@@ -48,7 +48,32 @@ struct ContentView: View {
             HStack(spacing: 0) {
                 if panes.layout.sidebar {
                     Sidebar()
-                        .frame(width: 264)
+                        // Гибкая ширина, а не жёсткая — по той же причине, что
+                        // и `maxHeight` ниже, только по горизонтали.
+                        //
+                        // Было `.frame(width: 264)`. Когда окно уже суммы
+                        // минимумов трёх колонок (264 + 360 + 340), HStack
+                        // сжимает эту колонку, а её содержимое всё равно
+                        // раскладывается на 264 и ЦЕНТРИРУЕТСЯ в том, что
+                        // осталось. Вылезает сразу за оба края, и у каждой
+                        // строки пропадает первая буква: «АСТРОЙКА» вместо
+                        // «НАСТРОЙКА», «о-пилот» вместо «Ко-пилот». Чем шире
+                        // ставили колонку, тем больше букв съедало — на 400
+                        // пропадало уже «НАСТ».
+                        //
+                        // Гибкая ширина оказалась лечением симптома и своей
+                        // ценой: колонка проседала до минимума (у панели
+                        // ассистента idealWidth 392, и она перетягивала), а в
+                        // 216 уже не помещался ряд «Добавить источник ·
+                        // Наборы» — подпись вылезала за иконку.
+                        //
+                        // Настоящая причина была не в ширине колонки, а в том,
+                        // что ScrollView не навязывал ширину содержимому: это
+                        // чинится в Sidebar через GeometryReader. Здесь снова
+                        // 264 — ширина, выбранная под макет. `alignment:
+                        // .leading` остаётся: если содержимое когда-нибудь всё
+                        // же окажется шире, пусть режет хвост, а не начало.
+                        .frame(width: 264, alignment: .leading)
                         .frame(maxHeight: .infinity, alignment: .top)
                         .background(Theme.sidebar)
                         .overlay(alignment: .trailing) { Hairline(vertical: true) }
@@ -234,11 +259,11 @@ private struct MandatoryInformationOverlay: View {
 private struct MeetingColumn: View {
     @EnvironmentObject var state: AppState
 
-    private static let dateFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "EEEE, MMM d · h:mm a"
-        return f
-    }()
+    private static let dateFormatter: DateFormatter =
+        // Было "EEEE, MMM d · h:mm a" без локали: на английской macOS шапка
+        // русского приложения читалась как «Wednesday, Aug 12 · 1:16 AM».
+        // AM/PM в русском не используется — часы двадцатичетырёхчасовые.
+        DisplayFormatting.displayFormatter("EEEE, d MMMM · HH:mm")
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -281,7 +306,7 @@ private struct MeetingColumn: View {
                         .truncationMode(.tail)
                     Button("Использовать") { state.acceptSuggestedMeetingTitle() }
                         .buttonStyle(QuietButtonStyle(prominent: true))
-                        .help("Name this meeting with the proposed title")
+                        .help("Назвать звонок предложенным заголовком")
                     Button { state.dismissSuggestedMeetingTitle() } label: {
                         Image(systemName: "xmark").font(.system(size: 8, weight: .bold))
                     }
@@ -320,7 +345,7 @@ private struct MeetingColumn: View {
             }
             .buttonStyle(IconButtonStyle(size: 22))
             .disabled(state.diarizing || state.enhancingTranscript)
-            .help("Download the transcript as a text file")
+            .help("Скачать транскрипт текстовым файлом")
             .accessibilityLabel("Скачать транскрипт")
         }
     }
@@ -344,7 +369,7 @@ private struct MeetingColumn: View {
         do {
             try text.data(using: .utf8)?.write(to: url, options: .atomic)
         } catch {
-            state.lastError = "Couldn't save the transcript: \(error.localizedDescription)"
+            state.lastError = "Не удалось сохранить транскрипт: \(error.localizedDescription)"
         }
     }
 
@@ -371,11 +396,11 @@ private struct MeetingColumn: View {
                         Label("Дополнить из Fireflies", systemImage: "flame")
                     }
                     .buttonStyle(QuietButtonStyle(prominent: true))
-                    .help("Merge on-device Whisper captions with the Fireflies transcript and clean with the LLM")
+                    .help("Свести локальную расшифровку с транскриптом Fireflies и вычистить моделью")
                 }
                 if state.canRetranscribeLocally {
                     Button { state.retranscribeLocallyNow() } label: {
-                        Label(state.localRetranscribing ? "Re-transcribing…" : "Re-transcribe locally",
+                        Label(state.localRetranscribing ? "Re-transcribing…" : "Расшифровать заново на устройстве",
                               systemImage: "waveform.badge.magnifyingglass")
                     }
                     .buttonStyle(QuietButtonStyle(prominent: false))
@@ -491,7 +516,7 @@ private struct MeetingTitleField: View {
     @FocusState private var focused: Bool
 
     var body: some View {
-        TextField("", text: $title, prompt: Text("Встреча без названия").foregroundColor(Theme.inkTertiary))
+        TextField("", text: $title, prompt: Text("Звонок без названия").foregroundColor(Theme.inkTertiary))
             .textFieldStyle(.plain)
             .font(Typo.displayL)
             .foregroundStyle(Theme.ink)

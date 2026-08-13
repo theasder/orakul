@@ -28,7 +28,7 @@ struct ConnectedWriteConfirmationTests {
             .environmentObject(state)
         let inspected = try view.inspect()
 
-        #expect(throws: Never.self) { try inspected.find(text: "Writes to Gmail · create_draft") }
+        #expect(throws: Never.self) { try inspected.find(text: "Запишет в Gmail · create_draft") }
         #expect(throws: Never.self) {
             try inspected.find(viewWithAccessibilityIdentifier: "connected-write.field.subject")
         }

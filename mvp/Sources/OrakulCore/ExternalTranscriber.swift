@@ -48,12 +48,25 @@ public enum WAVFile {
         return data
     }
 
-    public enum DecodeError: Error, Equatable {
+    public enum DecodeError: Error, Equatable, CustomStringConvertible {
         case notRIFF
         case notPCM16
         /// Частоту не пересчитываем: плохой ресемплер портит распознавание
         /// тише, чем отказ, и человек об этом не узнает.
         case unsupportedSampleRate(Int)
+
+        public var description: String {
+            switch self {
+            case .notRIFF:
+                return "Это не WAV-файл: в начале нет заголовка RIFF."
+            case .notPCM16:
+                return "WAV не в формате PCM 16 бит. Переведите так: "
+                    + "ffmpeg -i запись -ar 16000 -ac 1 -sample_fmt s16 запись-16k.wav"
+            case .unsupportedSampleRate(let rate):
+                return "Запись на \(rate) Гц, а движку нужно 16000. "
+                    + "Переведите её заранее: ffmpeg -i запись -ar 16000 -ac 1 запись-16k.wav"
+            }
+        }
     }
 
     /// Сэмплы из WAV-файла. Стерео сводится в моно усреднением каналов.
@@ -140,11 +153,37 @@ public struct ExternalTranscriber: Transcriber {
     public typealias Runner = @Sendable (_ executable: String, _ arguments: [String],
                                          _ audio: URL) throws -> String
 
-    public enum TranscriberError: Error, Equatable {
+    public enum TranscriberError: Error, Equatable, CustomStringConvertible {
         case commandIsEmpty
         case commandHasNoFilePlaceholder
         case engineFailed(String)
         case engineSaidNothing
+
+        /// По-русски и с действием.
+        ///
+        /// Печаталось `engineFailed("движок упал\n")` — имя случая
+        /// перечисления прямо в строке для человека. Соседние сообщения этой же
+        /// команды написаны нормально («Запись на 44100 Гц, а движку нужно
+        /// 16000»), и разница видна только в момент отказа: там, где человеку
+        /// и нужна помощь, он получал внутренности.
+        public var description: String {
+            switch self {
+            case .commandIsEmpty:
+                return "В ORAKUL_ENGINE пустая команда — запускать нечего."
+            case .commandHasNoFilePlaceholder:
+                return "В команде нет места для файла. Добавьте {файл} — "
+                    + "orakul подставит туда путь к записи."
+            case .engineFailed(let output):
+                let detail = output.trimmingCharacters(in: .whitespacesAndNewlines)
+                let tail = detail.isEmpty ? "Движок ничего не сказал о причине."
+                                          : "Движок ответил: \(detail)"
+                return "Движок распознавания не справился. \(tail)"
+            case .engineSaidNothing:
+                return "Движок отработал, но текста не вернул. Обычно это "
+                    + "тишина в записи или неверные ключи запуска — проверьте "
+                    + "команду в ORAKUL_ENGINE на этом же файле вручную."
+            }
+        }
     }
 
     let command: String

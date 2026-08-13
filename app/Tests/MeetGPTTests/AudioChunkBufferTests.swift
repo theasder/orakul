@@ -85,9 +85,9 @@ struct AudioChunkBufferTests {
         #expect(total == 32_000)
     }
 
-    @Test("VAD drops silent chunks before the engine (when VAD is enabled)")
+    @Test("VAD drops silent chunks before the engine (when VAD is enabled)",
+          .enabled(if: Config.vadEnabled))
     func vadGate() {
-        guard Config.vadEnabled else { return }   // only meaningful with VAD on
         var wavs: [Data] = []
         let buffer = AudioChunkBuffer(chunkSeconds: 1, overlapSeconds: 0) { wav, _ in wavs.append(wav) }
         buffer.append(AudioFixtures.silentBuffer(sampleRate: 16_000, seconds: 3))
@@ -114,9 +114,9 @@ struct AudioChunkBufferTests {
         #expect(rms > 0.028 && rms < 0.043)
     }
 
-    @Test("lowered VAD gate admits VP-attenuated speech that the default gate drops")
+    @Test("lowered VAD gate admits VP-attenuated speech that the default gate drops",
+          .enabled(if: Config.vadEnabled))
     func vpThresholdAdmitsQuietSpeech() {
-        guard Config.vadEnabled else { return }
         // ≈ −46 dBFS: below the −42 default gate, above the −52 VP gate.
         let quiet = AudioFixtures.voicedBuffer(sampleRate: 16_000, seconds: 1.2, amplitude: 0.007)
 
@@ -132,9 +132,9 @@ struct AudioChunkBufferTests {
         #expect(vpGate.count == 1)
     }
 
-    @Test("system-audio VAD admits quiet meeting playback that the mic gate drops")
+    @Test("system-audio VAD admits quiet meeting playback that the mic gate drops",
+          .enabled(if: Config.vadEnabled))
     func systemThresholdAdmitsQuietPlayback() {
-        guard Config.vadEnabled else { return }
         let quiet = AudioFixtures.voicedBuffer(sampleRate: 16_000, seconds: 1.2, amplitude: 0.007)
 
         var strictChunks: [Data] = []

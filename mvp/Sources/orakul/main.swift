@@ -64,6 +64,28 @@ let result: CommandLineApp.Result
 switch arguments.first {
 case "записать", "record":
     result = await recordFromMicrophone(Array(arguments.dropFirst()))
+case "спросить", "ask":
+    // Логика — в ядре и покрыта тестами; здесь только окружение и настоящий HTTP.
+    let rest = Array(arguments.dropFirst())
+    let environment = ProcessInfo.processInfo.environment
+    if rest.count < 2 {
+        result = CommandLineApp.Result(
+            output: "Нужно: orakul спросить <сервис> <вопрос>.\n"
+                + "Сервисы: " + ConnectorQuery.services.joined(separator: ", ") + ".",
+            exitCode: 2)
+    } else {
+        let settings = ConnectorQuery.Settings(
+            service: rest[0],
+            token: environment["ORAKUL_TOKEN"] ?? "",
+            host: environment["ORAKUL_HOST"],
+            scope: environment["ORAKUL_SCOPE"])
+        let answer = await ConnectorQuery.ask(settings,
+                                              query: rest.dropFirst().joined(separator: " "))
+        // Код возврата — не украшение: `orakul спросить … && развернуть`
+        // продолжал работу после «нет токена», потому что здесь всегда стоял
+        // ноль. Пустая выдача сбоем не считается — это ответ.
+        result = CommandLineApp.Result(output: answer.text, exitCode: answer.failed ? 1 : 0)
+    }
 default:
     result = CommandLineApp(store: store).run(arguments)
 }

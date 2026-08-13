@@ -138,9 +138,11 @@ struct LocalSpeakerLabelsTests {
 
     /// Env-gated smoke against the real CoreML models, like the Parakeet lane's.
     /// CRUXWING_DIARIZE_WAV=/path/to/call.wav swift test --filter smokeRealDiarization
-    @Test("smoke: real models label a real recording")
+    @Test("smoke: real models label a real recording",
+          .enabled(if: ProcessInfo.processInfo.environment["CRUXWING_DIARIZE_WAV"] != nil))
     func smokeRealDiarization() async throws {
-        guard let path = ProcessInfo.processInfo.environment["CRUXWING_DIARIZE_WAV"] else { return }
+        // Наличие гарантирует трейт выше — без переменной тело не соберётся.
+        let path = ProcessInfo.processInfo.environment["CRUXWING_DIARIZE_WAV"]!
         let wav = try Data(contentsOf: URL(fileURLWithPath: path))
         let samples = LocalWhisperTranscription.floatSamples(fromWAV: wav)
         let segments = try await LocalDiarization.segments(samples: samples)

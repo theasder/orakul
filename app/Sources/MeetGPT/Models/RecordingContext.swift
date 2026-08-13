@@ -27,6 +27,24 @@ enum RecordingContextKind: String, CaseIterable, Codable, Identifiable, Sendable
         }
     }
 
+    /// То же самое, но для экрана.
+    ///
+    /// `label` выше остаётся английским нарочно: он подставляется в промпт
+    /// («Recording type: \(kind.label)»), а промпты здесь модельные и
+    /// английские. Из-за этого совмещения тип записи оставался английским на
+    /// плашке записи, и заметить это удалось только одним способом — отрисовать
+    /// экран в тесте и прочитать, что на нём написано.
+    var displayLabel: String {
+        switch self {
+        case .meeting: "Звонок"
+        case .tutorial: "Разбор"
+        case .lecture: "Лекция"
+        case .interview: "Интервью"
+        case .podcast: "Подкаст"
+        case .presentation: "Презентация или демо"
+        }
+    }
+
     var symbol: String {
         switch self {
         case .meeting: "person.2.wave.2"
@@ -106,6 +124,13 @@ struct RecordingContextSelection: Codable, Equatable, Sendable {
     func resolvedLabel(detected: RecordingContextKind) -> String {
         if let kind = resolvedKind(detected: detected) { return kind.label }
         return Self.sanitizeCustomLabel(customLabel) ?? "Other recording"
+    }
+
+    /// Подпись для экрана. `resolvedLabel` остаётся английской: она уходит в
+    /// промпт.
+    func resolvedDisplayLabel(detected: RecordingContextKind) -> String {
+        if let kind = resolvedKind(detected: detected) { return kind.displayLabel }
+        return Self.sanitizeCustomLabel(customLabel) ?? "Другая запись"
     }
 
     func resolvedSymbol(detected: RecordingContextKind) -> String {

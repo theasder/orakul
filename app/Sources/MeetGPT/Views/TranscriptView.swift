@@ -44,7 +44,7 @@ struct TranscriptView: View {
                     })
                 .overlay(alignment: .bottomTrailing) {
                     if !followsLatest {
-                        JumpToLatestButton(accessibilityLabel: "Jump to latest transcript") {
+                        JumpToLatestButton(accessibilityLabel: "К последним строкам") {
                             followsLatest = true
                         }
                         .padding(Space.l)
@@ -68,7 +68,7 @@ struct TranscriptView: View {
                 }
             }
         }
-        .alert("Rename speaker", isPresented: Binding(
+        .alert("Переименовать говорящего", isPresented: Binding(
             get: { renamingSpeaker != nil },
             set: { if !$0 { renamingSpeaker = nil } }
         )) {
@@ -76,7 +76,7 @@ struct TranscriptView: View {
             Button("Переименовать") { applyRename() }
             Button("Отмена", role: .cancel) { renamingSpeaker = nil }
         } message: {
-            Text("Every \"\(renamingSpeaker ?? "")\" line becomes this name — in the transcript and in what the AI sees.")
+            Text("Каждая строка «\(renamingSpeaker ?? "")» получит это имя — и в транскрипте, и в том, что видит ИИ.")
         }
     }
 
@@ -226,7 +226,7 @@ private struct TranscriptRow: View {
                 Button("Спросить о выделенном") { onAskAbout() }
             }
             Divider()
-            Button(isSelected ? "Deselect line" : "Select line") { onSelect(false) }
+            Button(isSelected ? "Снять выделение со строки" : "Выделить строку") { onSelect(false) }
             if let speaker = entry.speaker {
                 Divider()
                 Button("Rename \"\(speaker)\"…") { onRenameSpeaker(speaker) }
@@ -310,28 +310,28 @@ private struct TranscriptEmptyState: View {
         guard recording else {
             return Presentation(
                 symbol: "waveform", tint: Theme.accent, soft: Theme.accentSoft,
-                title: "Nothing captured yet",
-                detail: "Press Start recording to capture system audio and your mic.",
+                title: "Пока ничего не записано",
+                detail: "Нажмите «Начать запись», чтобы писать звук собеседников и микрофон.",
                 showDots: false)
         }
         switch transcription {
         case .preparing:
             return Presentation(
                 symbol: "arrow.down.circle", tint: Theme.accent, soft: Theme.accentSoft,
-                title: "Preparing on-device model",
-                detail: "First run downloads the private speech model once (~150 MB). This can take a minute — after that, transcription is instant and never leaves your Mac.",
+                title: "Готовлю модель на устройстве",
+                detail: "При первом запуске один раз скачается модель распознавания речи (~150 МБ). Это займёт минуту — дальше расшифровка идёт сразу и никуда не уходит с вашего компьютера.",
                 showDots: true)
         case .failed(let message):
             return Presentation(
                 symbol: "exclamationmark.triangle", tint: Theme.recordRed, soft: Theme.dangerSoft,
-                title: "Transcription unavailable",
+                title: "Расшифровка недоступна",
                 detail: "\(message)\n\nCheck your connection, or switch the transcription engine in Settings (Deepgram / Whisper API).",
                 showDots: false)
         case .idle, .ready:
             return Presentation(
                 symbol: "ear", tint: Theme.recordRed, soft: Theme.dangerSoft,
-                title: "Listening to the room",
-                detail: "Transcript lines will appear here as people speak.",
+                title: "Слушаю",
+                detail: "Строки транскрипта появятся здесь по ходу разговора.",
                 showDots: true)
         }
     }

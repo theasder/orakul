@@ -23,9 +23,9 @@ struct TranscriptionPipelineTests {
         #expect(await mock.transcribeCount == wavs.count)
     }
 
-    @Test("silent audio yields no chunks to transcribe (VAD on)")
+    @Test("silent audio yields no chunks to transcribe (VAD on)",
+          .enabled(if: Config.vadEnabled))
     func silentFlow() async {
-        guard Config.vadEnabled else { return }
         let mock = MockTranscriptionService()
         var chunks = 0
         let buffer = AudioChunkBuffer(chunkSeconds: 1) { _, _ in chunks += 1 }

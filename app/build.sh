@@ -83,25 +83,38 @@ sw() {  # sw VAR  -> value of VAR from .env (empty if absent), Swift-string-esca
     if [ "$DIST" = "1" ]; then
         # Never emit a provider/org secret into a distributed binary.
         case " $SECRET_VARS " in *" $1 "*) printf ''; return ;; esac
-        # Force the keyless-safe serving paths regardless of the local .env.
-        [ "$1" = "LLM_GATEWAY" ] && { printf 'backend'; return; }
-        # Signed-in users get managed Whisper large-v3 (best quality); the
-        # engine self-falls-back to on-device while signed out / offline.
-        [ "$1" = "TRANSCRIPTION_ENGINE" ] && { printf 'server'; return; }
-        # A dist build must reach the production backend out of the box — a
-        # blank BACKEND_URL dead-ends the first run (launch loop M3). Local
-        # .env may still override for staging.
-        # An EXPORTED BACKEND_URL wins over .env. A working tree is normally
-        # pointed at a local server, so without this a release build inherited
-        # `http://localhost:8787` and every downloaded copy talked to a machine
-        # that is not the user's — silently, since the app looks fine offline.
-        if [ "$1" = "BACKEND_URL" ]; then
-            local burl="${BACKEND_URL:-}"
-            [ -z "$burl" ] && [ -f "$ENV_FILE" ] && burl="$(grep -E '^BACKEND_URL=' "$ENV_FILE" | tail -n1 | cut -d= -f2- || true)"
-            burl="$(printf '%s' "$burl" | sed -E 's/(^|[[:space:]])#.*$/\1/; s/^[[:space:]]+//; s/[[:space:]]+$//')"
-            printf '%s' "${burl:-https://api.cruxwing.ai}"
-            return
-        fi
+        # orakul: прямой доступ к провайдеру, не через шлюз.
+        #
+        # У Cruxwing здесь стояло 'backend' — и это правильно для продукта, у
+        # которого сервер есть: ключи остаются на сервере, в бинарник не
+        # попадает ничего. У orakul сервера нет (api.orakul.ai не резолвится),
+        # поэтому то же значение означало бы: каждый запрос уходит в никуда,
+        # введённый пользователем ключ не читается вовсе, а isConfigured
+        # отвечает «настроено» за все провайдеры сразу. Установщик выглядел бы
+        # рабочим и не отвечал ни на один вопрос — так и было, пока не поймали.
+        #
+        # Гарантия «в бинарнике нет секретов» не меняется: SECRET_VARS выше
+        # по-прежнему стирает все ключи. Ключ приезжает из Связки ключей в
+        # рантайме, его вводит человек в настройках.
+        [ "$1" = "LLM_GATEWAY" ] && { printf 'direct'; return; }
+        # Расшифровка — на устройстве. 'server' означал бы managed Whisper на
+        # нашем сервере, которого нет.
+        [ "$1" = "TRANSCRIPTION_ENGINE" ] && { printf 'local'; return; }
+        # Адрес сервера не бакается: у orakul сервера нет.
+        #
+        # У cruxwing здесь подставлялся боевой адрес, потому что без него
+        # первый запуск упирался в пустоту. У orakul наоборот. LLM_GATEWAY
+        # выше уже переключён на 'direct': запрос идёт к провайдеру с ключом
+        # пользователя, и адрес в бинарнике не нужен ни для чего. Любой,
+        # который сюда попадёт, будет либо мёртвым (`http://localhost:8787` —
+        # из рабочей копии сборщика), либо чужим (`https://api.cruxwing.ai` —
+        # сервер другого продукта). Второе хуже: этот адрес существует и
+        # отвечает.
+        #
+        # Пустая строка — рабочее значение, а не заглушка: Config и AppState
+        # проверяют её через `.isEmpty` и в этом случае не показывают вход и
+        # серверные модели.
+        [ "$1" = "BACKEND_URL" ] && { printf ''; return; }
     fi
     local v=""
     if [ -f "$ENV_FILE" ]; then
@@ -181,22 +194,20 @@ enum Secrets {
 EOF
 
 if [ "$DIST" = "1" ]; then
-    echo ">> DIST build: provider/org keys NOT baked — app uses the backend gateway + on-device transcription"
+    echo ">> DIST build: ключи не бакаются — их вводит человек, расшифровка на устройстве"
     DIST_BACKEND="$(sw BACKEND_URL)"
-    if [ -z "$DIST_BACKEND" ]; then
-        echo ">> WARNING: DIST build but BACKEND_URL is empty — the shipped app will have NO cloud LLM. Set BACKEND_URL in mac/.env before releasing."
+    # Проверка перевёрнута против cruxwing. Там запрещался адрес рабочей копии
+    # (`localhost`) при обязательном боевом; здесь запрещён любой непустой:
+    # orakul ходит к провайдеру напрямую, сервера у него нет, и адрес в
+    # бинарнике может только увести данные не туда. Останов жёсткий, потому что
+    # на машине сборщика такая ошибка не видна.
+    if [ -n "$DIST_BACKEND" ]; then
+        echo "!! В DIST-сборку попал адрес сервера ($DIST_BACKEND) — отказ." >&2
+        echo "!! У orakul нет сервера: LLM_GATEWAY=direct, ключ пользователя, запрос к провайдеру." >&2
+        echo "!! Убрать подстановку BACKEND_URL в sw() выше, а не задавать переменную." >&2
+        exit 1
     fi
-    # A shipped app cannot reach the builder's own machine. This is a hard stop,
-    # not a warning: the failure is invisible on the build machine (where
-    # localhost IS the backend) and total on every other one.
-    case "$DIST_BACKEND" in
-        *localhost*|*127.0.0.1*|*::1*|*0.0.0.0*)
-            echo "!! DIST build points at a loopback backend ($DIST_BACKEND) — refusing." >&2
-            echo "!! Export the real one for this build:  BACKEND_URL=https://api.cruxwing.ai MEETGPT_DIST=1 ./build.sh" >&2
-            exit 1
-            ;;
-    esac
-    echo ">> DIST backend: $DIST_BACKEND"
+    echo ">> сервер не задан — так и задумано"
 fi
 
 echo ">> swift build (release, $BUILD_ARCH)"
@@ -221,6 +232,29 @@ BUILD_NUM="$(git -C "$ROOT" rev-list --count HEAD 2>/dev/null || echo 1)"
 GIT_SHA="$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)"
 /usr/libexec/PlistBuddy -c "Add :OrakulCommit string $GIT_SHA" "$STAGE/Contents/Info.plist" 2>/dev/null \
     || /usr/libexec/PlistBuddy -c "Set :OrakulCommit $GIT_SHA" "$STAGE/Contents/Info.plist" 2>/dev/null || true
+# Хеш самих исходников — потому что коммита мало.
+#
+# Коммит отвечает на вопрос «какой ref был выписан», а не «что внутри». При
+# незакоммиченном дереве он врёт молча: 12 августа подряд собрано девять разных
+# DMG, и все девять несли один и тот же `OrakulCommit`, при 149 изменённых
+# файлах. Отличить сборку с десятью коннекторами от вчерашней по штампу было
+# нельзя.
+#
+# `Secrets.swift` исключён: он генерируется при каждой сборке из .env, и его
+# содержимое зависит от режима, а не от исходников. Включив его, мы получили бы
+# разный хеш у dev- и dist-сборки одного и того же кода.
+# Ядро входит в хеш наравне с приложением. Раньше считалось только по
+# `Sources/MeetGPT`, а с тех пор приложение линкует OrakulCore: коннекторы,
+# словарь и поиск ушли туда и физически лежат в этом же бинарнике. Проверено:
+# три файла ядра поменялись, бинарник пересобрался — штамп остался прежним.
+# Штамп, который не замечает половину того, что отгружает, хуже отсутствующего:
+# на него ссылается форма отчёта об ошибке.
+SOURCE_HASH="$(cd "$ROOT/.." && find app/Sources/MeetGPT mvp/Sources/OrakulCore -type f \
+    ! -name Secrets.swift | LC_ALL=C sort | xargs shasum -a 1 2>/dev/null \
+    | shasum -a 1 | cut -c1-12)"
+/usr/libexec/PlistBuddy -c "Add :OrakulSourceHash string $SOURCE_HASH" "$STAGE/Contents/Info.plist" 2>/dev/null \
+    || /usr/libexec/PlistBuddy -c "Set :OrakulSourceHash $SOURCE_HASH" "$STAGE/Contents/Info.plist" 2>/dev/null || true
+echo ">> исходники: $SOURCE_HASH (коммит $GIT_SHA)"
 # App-level privacy manifest (App Review requirement).
 cp "$ROOT/Support/PrivacyInfo.xcprivacy" "$STAGE/Contents/Resources/PrivacyInfo.xcprivacy"
 
@@ -311,17 +345,26 @@ else
     else
         WHY="no provisioning profile at $PROFILE"
     fi
-    # A shipped build that silently lacks the entitlement is a feature that is
-    # simply missing for every user, with no error anywhere. Refuse rather than
-    # degrade quietly; the escape hatch is explicit.
-    if [ "${MEETGPT_DIST:-0}" = "1" ] && [ "${MEETGPT_ALLOW_NO_APPLESIGNIN:-0}" != "1" ]; then
-        echo "!! distribution build would ship WITHOUT Sign in with Apple — $WHY" >&2
-        echo "   Create a Developer ID provisioning profile for ai.orakul.desktop with the" >&2
-        echo "   Sign in with Apple capability, save it as $PROFILE, and rebuild." >&2
-        echo "   To ship without the feature on purpose: MEETGPT_ALLOW_NO_APPLESIGNIN=1" >&2
+    # В cruxwing здесь был жёсткий останов: сборка без этого entitlement теряет
+    # вход через Apple молча, без ошибки, у всех сразу.
+    #
+    # В orakul терять нечего. Вход вообще не показывается: `wheesprAvailable`
+    # в AppState включается только при непустом адресе сервера, а DIST-сборка
+    # выше его не бакает. Аккаунтов у orakul нет — ключ провайдера человек
+    # вводит сам, и он лежит в Связке ключей. Так что останавливать сборку
+    # было бы требованием профиля ради возможности, которой в продукте нет.
+    #
+    # Останов остаётся на один случай: если вход когда-нибудь появится
+    # (адрес сервера непустой), молчаливая потеря снова станет ошибкой.
+    if [ "${MEETGPT_DIST:-0}" = "1" ] && [ -n "$DIST_BACKEND" ] \
+       && [ "${MEETGPT_ALLOW_NO_APPLESIGNIN:-0}" != "1" ]; then
+        echo "!! сборка для распространения потеряет вход через Apple — $WHY" >&2
+        echo "   Профиль Developer ID для ai.orakul.desktop с Sign in with Apple" >&2
+        echo "   положить в $PROFILE и пересобрать." >&2
+        echo "   Выпустить без этого намеренно: MEETGPT_ALLOW_NO_APPLESIGNIN=1" >&2
         exit 1
     fi
-    echo ">> Sign in with Apple: DISABLED in this build — $WHY"
+    echo ">> Вход через Apple: не собирается — $WHY (в orakul входа нет)"
 fi
 
 # Sign the staging bundle before installing it. Developers often launch

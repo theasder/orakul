@@ -817,7 +817,7 @@ enum LiveTestHooks {
                         Config.setLiveTestRealEntitlementMode(true)
                         state.refreshEntitlementAfterRedeem()
                     } catch {
-                        state.lastError = "livetest redeem failed: \(error.localizedDescription)"
+                        state.lastError = "livetest redeem не прошёл: \(error.localizedDescription)"
                         Log.general.error("livetest: redeem failed — \(error.localizedDescription, privacy: .public)")
                     }
                 }

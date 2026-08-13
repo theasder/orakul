@@ -59,20 +59,20 @@ enum CoachTip: String, CaseIterable {
 
     var title: String {
         switch self {
-        case .recordingType: "Not a meeting?"
-        case .goalQuality:   "Give the call a goal"
-        case .pinDecision:   "That's a decision"
+        case .recordingType: "Это не звонок?"
+        case .goalQuality:   "Задайте цель звонку"
+        case .pinDecision:   "Это решение"
         }
     }
 
     var body: String {
         switch self {
         case .recordingType:
-            "Cruxwing reads what's on screen and adapts — a lecture gets a learning plan, not action items. Override the type here any time."
+            "orakul смотрит, что происходит на экране, и подстраивается: у лекции будет план изучения, а не список задач. Тип можно переключить в любой момент."
         case .goalQuality:
-            "One line: what has to be true when this call ends? The co-pilot measures every blind spot against it."
+            "Одна строка: что должно быть верно к концу звонка? Ко-пилот меряет по ней каждую слепую зону."
         case .pinDecision:
-            "Press 📌 and the confirmed decision lands in the ledger with its rationale and owner. The transcript is not the record."
+            "Нажмите 📌 — и решение попадёт в журнал вместе с обоснованием и владельцем. Транскрипт — не запись решений."
         }
     }
 
@@ -173,16 +173,20 @@ enum CoachTipRetirement {
 /// easy to get subtly wrong in the direction of nagging someone who is busy.
 enum OnboardingPrompts {
     static func setupRemaining(captureVerified: Bool,
-                               signedIn: Bool,
+                               keyReady: Bool,
                                appsConnected: Bool) -> Int {
-        [captureVerified, signedIn, appsConnected].filter { !$0 }.count
+        [captureVerified, keyReady, appsConnected].filter { !$0 }.count
     }
 
-    /// Signing in is optional — recording works without it — so the row carries
-    /// its own dismiss. Hiding the whole card to be rid of one line would take
-    /// the connected-apps step with it.
-    static func showsSignInRow(signedIn: Bool, dismissed: Bool) -> Bool {
-        !signedIn && !dismissed
+    /// Ключ провайдера необязателен — запись, расшифровка и поиск по звонкам
+    /// работают без него, — поэтому строка убирается сама по себе. Скрыть всю
+    /// карточку ради одной строки нельзя: с ней уйдёт шаг про подключения.
+    ///
+    /// Раньше строка отвечала за вход в аккаунт. Условие осталось тем же
+    /// (`!выполнено && !отложено`), сменился смысл: аккаунтов у orakul нет,
+    /// есть ключ, который человек вставляет сам.
+    static func showsProviderKeyRow(hasKey: Bool, dismissed: Bool) -> Bool {
+        !hasKey && !dismissed
     }
 
     /// The empty evening between installing and the next real meeting — and

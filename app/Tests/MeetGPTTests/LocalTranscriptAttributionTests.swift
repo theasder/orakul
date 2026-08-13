@@ -24,8 +24,8 @@ struct LocalTranscriptAttributionTests {
 
         let rendered = TranscriptTextRenderer.render(
             entries: entries, provisional: [], appearance: nil)
-        #expect(!rendered.attributed.string.contains("You"))
-        #expect(!rendered.attributed.string.contains("Them"))
+        #expect(!rendered.attributed.string.contains("Вы"))
+        #expect(!rendered.attributed.string.contains("Собеседник"))
         #expect(rendered.segments.allSatisfy { $0.speaker == nil })
 
         // Anonymous does not mean unusable: body ranges and exact quotes stay
@@ -180,7 +180,7 @@ struct LocalTranscriptCapturePipelineTests {
         #expect(state.transcript.allSatisfy { $0.source == .system })
         let rendered = TranscriptTextRenderer.render(
             entries: state.transcript, provisional: [], appearance: nil)
-        #expect(!rendered.attributed.string.contains("You"))
+        #expect(!rendered.attributed.string.contains("Вы"))
         #expect(rendered.attributed.string.contains("Speaker A"))
     }
 
@@ -210,7 +210,7 @@ struct LocalTranscriptCapturePipelineTests {
         #expect(state.transcript.count == 4)
         #expect(state.transcript.last?.text == "Но я хочу уточнить план отката.")
         #expect(state.transcript.last?.source == .mic)
-        #expect(state.transcript.last?.attributionLabel == "You")
+        #expect(state.transcript.last?.attributionLabel == "Вы")
     }
 
     @Test("restoring a saved Local session applies session provenance to legacy entries")

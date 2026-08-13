@@ -23,11 +23,13 @@ struct FactClaim: Identifiable, Codable, Equatable {
 
         var label: String {
             switch self {
-            case .verified:     return "Verified"
-            case .contradicted: return "Contradicted"
-            case .needsContext: return "Needs source"
-            case .unverifiable: return "Not checkable"
-            case .inconsistent: return "Doesn't add up"
+            // Только подпись на экране. Статус хранится по `rawValue` выше,
+            // поэтому перевод не трогает уже сохранённые звонки.
+            case .verified:     return "Подтверждено"
+            case .contradicted: return "Опровергнуто"
+            case .needsContext: return "Нужен источник"
+            case .unverifiable: return "Не проверяется"
+            case .inconsistent: return "Не сходится"
             }
         }
     }
@@ -36,7 +38,16 @@ struct FactClaim: Identifiable, Codable, Equatable {
     enum Confidence: String, Codable {
         case high, medium, low
 
-        var label: String { rawValue.capitalized }
+        /// Подпись собирается разбором, а не из `rawValue`: заглавная буква у
+        /// «high» давала «High» на экране. Хранение при этом остаётся прежним —
+        /// в файле звонка лежит `rawValue`.
+        var label: String {
+            switch self {
+            case .high:   return "Высокая"
+            case .medium: return "Средняя"
+            case .low:    return "Низкая"
+            }
+        }
     }
 
     let id = UUID()
