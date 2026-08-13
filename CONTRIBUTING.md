@@ -11,6 +11,7 @@
 git clone <репозиторий> orakul && cd orakul
 cd app && swift build          # Swift 5.9+ (Xcode 15+)
 swift test                     # тесты приложения
+cd ../mvp && swift test        # тесты ядра: словарь, поиск, коннекторы
 cd .. && npm test              # тесты страницы, текстов и идентичности
 ```
 

@@ -181,6 +181,31 @@ describe('orakul landing (ru)', () => {
       'the page offers a download; verify the URL actually serves before allowing it');
   });
 
+  test('every test command the PR form asks for is taught in the quickstart', () => {
+    // Форма требовала `cd mvp && swift test`, а быстрый старт про mvp молчал:
+    // участник, прошедший старт целиком, всё равно не запускал 294 проверки
+    // ядра — и узнавал о них из галочки, которую нечем отметить.
+    const contributing = readFileSync(resolve(here, '..', 'CONTRIBUTING.md'), 'utf8');
+    const template = readFileSync(
+      resolve(here, '..', '.github', 'pull_request_template.md'), 'utf8');
+
+    const asked = [...template.matchAll(/- \[ \] `([^`]*(?:swift test|npm test)[^`]*)`/g)]
+      .map((m) => m[1].trim());
+    assert.ok(asked.length >= 3, `the form asks for ${asked.length} test commands`);
+
+    const quickstart = contributing.slice(contributing.indexOf('## Быстрый старт'));
+    const block = quickstart.slice(0, quickstart.indexOf('```', quickstart.indexOf('```') + 3));
+
+    for (const command of asked) {
+      // Сверяется исполняемая часть: в старте команды идут с `cd`, в форме —
+      // как их набирают. Общее у них — что именно запускается и где.
+      const target = command.includes('mvp') ? 'mvp'
+        : command.includes('npm') ? 'npm test' : 'swift test';
+      assert.ok(block.includes(target),
+        `the form asks for "${command}", and the quickstart never shows ${target}`);
+    }
+  });
+
   test('every connector section lists its services from allCases, not by hand', () => {
     // Коннектор, которого нет в настройках, не существует для человека, даже
     // если код к нему написан и закрыт тестами. Проверить это по-настоящему
