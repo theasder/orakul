@@ -281,6 +281,30 @@ describe('RESEARCH-AND-PLAN', () => {
     }
   });
 
+  test('the moderation claim on the page keeps its source in the plan', () => {
+    // Бриф спрашивал про предвзятость модерации отдельно. Претензии взяты из
+    // обсуждения правил самого Хабра, а не из чужого пересказа, и страница
+    // повторяет их. Утверждение без источника через месяц не отличить от
+    // мнения — здесь они держатся вместе.
+    const html = readFileSync(resolve(repo, 'public', 'index.html'), 'utf8');
+
+    assert.match(doc, /habr\.com\/ru\/companies\/habr\/articles\/1019036/,
+      'the plan lost the thread the moderation complaints came from');
+    assert.match(doc, /прочитано 2026-\d{2}-\d{2}/,
+      'the moderation reading has no date, so nobody knows how stale it is');
+
+    // Три механизма — не риторика, а то, что реально называют авторы.
+    for (const mechanism of [/карм/i, /корпоративн/i, /оспорить|обжалован/i]) {
+      assert.match(doc, mechanism, `the plan dropped a named moderation mechanism: ${mechanism}`);
+    }
+
+    // Страница обязана говорить то же, что план, а не сильнее.
+    if (/модерац/i.test(html)) {
+      assert.match(html, /карм/i,
+        'the page mentions moderation without the concrete mechanism the plan records');
+    }
+  });
+
   test('the tracker census matches the trackers that actually ship', () => {
     // Перепись — таблица «подключён / нет» с причинами. Такие таблицы устаревают
     // первыми: сервис доезжает до кода, а строка остаётся прежней. Здесь она
