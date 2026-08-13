@@ -155,3 +155,42 @@ private final class Recorder: @unchecked Sendable {
     var last: URLRequest? { lock.lock(); defer { lock.unlock() }; return requests.last }
     var count: Int { lock.lock(); defer { lock.unlock() }; return requests.count }
 }
+
+@Suite("Адрес сервера: где путь срезается, а где нет")
+struct HostNormalisationPolicyTests {
+    /// Три сервиса ведут себя по-разному, и это решение, а не случайность.
+    ///
+    /// У Kaiten путь срезается: подсказка ведёт человека на доску, он копирует
+    /// адрес доски из строки браузера, и `.../boards/5` + `/api/latest` дало бы
+    /// 404, который нечем объяснить. Так и было — об этом стоит комментарий в
+    /// коде.
+    ///
+    /// У поднятых у себя GitLab, Gitea, Redmine и у мессенджеров путь
+    /// сохраняется: их можно поставить в подкаталог (`company.ru/gitlab`), и
+    /// срезание сломало бы рабочую настройку ради предполагаемой ошибки,
+    /// которой мы не наблюдали. Подсказка у них просит адрес сервера, а не
+    /// адрес страницы.
+    ///
+    /// Проверка существует, чтобы разница осталась осознанной: если кто-то
+    /// решит выровнять поведение, он увидит здесь, что именно теряет.
+    @Test("Kaiten срезает путь, потому что туда ведёт подсказка")
+    func kaitenStripsPath() {
+        let host = RussianTrackers.Service.kaiten.host(secondary: "https://team.kaiten.ru/boards/5")
+        #expect(host == "https://team.kaiten.ru/api/latest")
+    }
+
+    @Test("свои серверы путь сохраняют — их ставят в подкаталог",
+          arguments: [SelfHostedTrackers.Service.gitlab, .gitea, .redmine])
+    func selfHostedKeepsSubpath(service: SelfHostedTrackers.Service) {
+        let host = service.host("https://company.ru/gitlab")
+        #expect(host == "https://company.ru/gitlab",
+                "путь срезан — установка в подкаталоге перестанет работать")
+    }
+
+    @Test("схема дописывается, если её не вписали")
+    func schemeIsAdded() {
+        #expect(SelfHostedTrackers.Service.gitlab.host("gitlab.company.ru")
+                == "https://gitlab.company.ru")
+        #expect(SelfHostedTrackers.Service.gitlab.host("  ") == nil)
+    }
+}

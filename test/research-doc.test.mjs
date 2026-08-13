@@ -27,10 +27,24 @@ describe('RESEARCH-AND-PLAN', () => {
     assert.match(config, /static func resolveBackendBaseURL/,
       'the doc names Config.resolveBackendBaseURL, which no longer exists');
 
-    const suites = readdirSync(resolve(repo, 'app', 'Tests', 'MeetGPTTests'));
+    // Наборы живут в двух пакетах: интерфейсные — в приложении, ядро — в mvp.
+    // Проверка сначала смотрела только в приложение и объявила несуществующим
+    // набор, который лежит в ядре. Ссылка была верной, узок был обход.
+    const trees = [['app', 'Tests', 'MeetGPTTests'], ['mvp', 'Tests', 'OrakulCoreTests']];
+    const files = trees.flatMap((tree) => readdirSync(resolve(repo, ...tree)));
+
+    // Имя набора может стоять и внутри файла: один файл нередко содержит
+    // несколько @Suite. Поэтому проверяется и имя файла, и объявление.
+    const declarations = trees.flatMap((tree) =>
+      readdirSync(resolve(repo, ...tree))
+        .filter((name) => name.endsWith('.swift'))
+        .map((name) => readFileSync(resolve(repo, ...tree, name), 'utf8')))
+      .join('\n');
+
     for (const named of doc.match(/\b[A-Z][A-Za-z]+Tests\b/g) ?? []) {
-      assert.ok(suites.includes(`${named}.swift`),
-        `the doc cites ${named}, which is not a suite in app/Tests/MeetGPTTests`);
+      assert.ok(files.includes(`${named}.swift`)
+        || new RegExp(`struct ${named}\\b`).test(declarations),
+        `the doc cites ${named}, which exists in neither test package`);
     }
   });
 
