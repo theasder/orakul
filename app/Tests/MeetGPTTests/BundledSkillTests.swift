@@ -197,7 +197,17 @@ struct BundledSkillTests {
             context: .init(promptID: "tasks", query: query),
             preferredIDs: [],
             library: [automation, brief])
-        #expect(unfiltered.first?.skill.id == "gmail-automation")
+        // Не «первый», а «вообще попал в выдачу». Ранжирование идёт одним из
+        // двух путей: по эмбеддингам, если индекс успел построиться, иначе по
+        // токенам. Что успело — зависит от порядка и скорости соседних
+        // наборов, поэтому порядок выдачи здесь недетерминирован: примерно раз
+        // в пять полных прогонов первым оказывался `brief`.
+        //
+        // Проверке это и не нужно. Она о другом: навык критического риска не
+        // должен всплывать сам. Достаточно показать, что без фильтра он
+        // всплывает — иначе проверка ниже ничего не значила бы.
+        #expect(unfiltered.contains { $0.skill.id == "gmail-automation" },
+                "без фильтра навык не всплыл вовсе — проверка ниже стала пустой")
 
         // Once the caller passes only rankable skills, it cannot be surfaced.
         let rankable = [automation, brief].filter { $0.risk != .critical }
@@ -206,7 +216,7 @@ struct BundledSkillTests {
             preferredIDs: [],
             library: rankable)
         #expect(!filtered.contains { $0.skill.id == "gmail-automation" })
-        #expect(filtered.first?.skill.id == "brief")
+        #expect(filtered.contains { $0.skill.id == "brief" })
     }
 
     @Test("no frontmatter falls back to the id and keeps the full body")

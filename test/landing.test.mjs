@@ -181,6 +181,43 @@ describe('orakul landing (ru)', () => {
       'the page offers a download; verify the URL actually serves before allowing it');
   });
 
+  test('GigaChat stays absent from the provider list while the plan says why', () => {
+    // Самый очевидный русский вопрос: «а где GigaChat?». Ответ измеренный и
+    // лежит в плане; если провайдера когда-нибудь добавят, заметка обязана
+    // уйти вместе с ним — иначе страница будет объяснять отсутствие того,
+    // что есть.
+    const plan = readFileSync(resolve(here, '..', 'docs', 'RESEARCH-AND-PLAN.md'), 'utf8');
+    const model = readFileSync(
+      resolve(here, '..', 'app', 'Sources', 'MeetGPT', 'AI', 'LLMModel.swift'), 'utf8');
+
+    const providers = bodyOf(model, 'public enum LLMProvider')
+      ?? bodyOf(model, 'enum LLMProvider');
+    assert.ok(providers, 'the provider list is no longer recognisable');
+    // Варианты перечисления объявляются и через запятую — в этом же файле
+    // стоит `case deepSeek, qwen, zhipu, moonshot`. Проверка, ждущая слова
+    // сразу после `case`, пропустила бы добавление в такую строку: сначала
+    // так и вышло, и мутация «добавили провайдера» прошла зелёной.
+    const caseLines = providers.split('\n')
+      .filter((line) => /^\s*case\s/.test(line)).join(',');
+    const shipsGigaChat = /\bgigaChat\b/.test(caseLines);
+
+    const explained = /GigaChat: не оценка модели/.test(plan);
+    assert.equal(shipsGigaChat, !explained,
+      shipsGigaChat
+        ? 'GigaChat ships, but the plan still explains why it is absent'
+        : 'GigaChat is absent and the plan no longer says why');
+
+    if (!shipsGigaChat) {
+      for (const host of ['ngw.devices.sberbank.ru', 'api.giga.chat']) {
+        assert.ok(plan.includes(host), `the plan stopped naming ${host}`);
+      }
+      assert.match(plan, /Russian Trusted Root CA/,
+        'the plan no longer names the root that macOS does not carry');
+      assert.ok(html.includes('GigaChat'),
+        'the page never answers the first question a Russian developer asks');
+    }
+  });
+
   test('the perf gate documents the same variable the tests read', () => {
     // Бюджеты задержки существуют, проходят и никому не видны: переменная
     // упоминалась только в самих тестах. Правишь поиск, видишь зелёный прогон

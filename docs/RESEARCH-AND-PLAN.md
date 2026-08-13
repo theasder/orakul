@@ -250,6 +250,35 @@ warning against picking a model from a leaderboard. It is the same mistake as
 choosing a diarization threshold from three files — one this codebase has already
 paid for (`cruxwing-app/docs/ROADMAP-RICE-2026H2.md`, findings 12 and 13).
 
+### 3.0 GigaChat: не оценка модели, а хранилище доверенных корней (проверено 2026-08-13)
+
+GigaChat в списке провайдеров orakul нет, и причина не в качестве. С обычного
+macOS до него не доходит TLS: цепочка заканчивается корнем Минцифры, которого
+в системном хранилище нет.
+
+Замер `curl`, 2026-08-13:
+
+| адрес | `ssl_verify_result` | что это значит |
+|---|---|---|
+| `ngw.devices.sberbank.ru:9443` (обмен ключа на токен) | 19 | самоподписанный сертификат в цепочке |
+| `api.giga.chat` (OpenAI-совместимый) | 20 | локально не найден издатель |
+
+Цепочка первого: `CN=ngw.devices.sberbank.ru` → `Russian Trusted Sub CA` →
+`Russian Trusted Root CA` (The Ministry of Digital Development and
+Communications).
+
+**Почему это решает вопрос.** Кнопка «Подключить», которая падает с «сертификат
+сервера недействителен», хуже отсутствующей кнопки — правило из CONTRIBUTING.
+Ставить корневой сертификат за человека приложение не должно и не будет: это
+изменение доверия всей системы, а не настройка одного продукта.
+
+**Что изменит вывод.** Пользователь, поставивший корень Минцифры сам, получает
+рабочий OpenAI-совместимый адрес `https://api.giga.chat/v1` с Bearer-токеном.
+Токен там живёт тридцать минут и берётся обменом ключа на `/api/v2/oauth` —
+это не статический ключ, как у остальных восьми провайдеров, и потребует
+отдельной ветки обновления. Если корень появится в macOS по умолчанию или
+Сбер выпустит цепочку от общедоверенного центра, эта заметка устаревает.
+
 **Decision for v1:**
 
 1. **Open-weight first, Apache-2.0 by preference.** Qwen (3.6/3.7 series) is
