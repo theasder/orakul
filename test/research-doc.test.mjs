@@ -16,6 +16,35 @@ const repo = resolve(here, '..');
 const doc = readFileSync(resolve(repo, 'docs', 'RESEARCH-AND-PLAN.md'), 'utf8');
 
 describe('RESEARCH-AND-PLAN', () => {
+  test('sections run in order and none of them lost its number', () => {
+    // Документ дописывался сверху вниз, и разделы расползлись: 8.1 стоял после
+    // 9, 1.4 — между 2.0.1 и 2.0.3, а один раздел вовсе остался без номера.
+    // Читателю это стоит доверия к остальному: если оглавление не сходится,
+    // почему должны сходиться цифры внутри.
+    const headings = [...doc.matchAll(/^(#{2,4})\s+(.*)$/gm)].map((m) => m[2].trim());
+    const unnumbered = headings.filter((h) => !/^[0-9]+(\.[0-9]+)*[.\s]/.test(h));
+    assert.deepEqual(unnumbered, [], `разделы без номера: ${unnumbered.join(' | ')}`);
+
+    const numbers = headings.map((h) => /^([0-9]+(?:\.[0-9]+)*)/.exec(h)[1]);
+    const key = (n) => n.split('.').map(Number);
+    const wrong = numbers
+      .map((n, i) => [n, numbers[i + 1]])
+      .filter(([a, b]) => b && key(a).join() > key(b).join()
+        && key(a).some((v, i) => v > (key(b)[i] ?? -1)) && key(a)[0] >= key(b)[0]);
+    const outOfOrder = [];
+    for (let i = 1; i < numbers.length; i += 1) {
+      const a = key(numbers[i - 1]); const b = key(numbers[i]);
+      const len = Math.max(a.length, b.length);
+      for (let d = 0; d < len; d += 1) {
+        const x = a[d] ?? -1; const y = b[d] ?? -1;
+        if (x === y) continue;
+        if (x > y) outOfOrder.push(`§${numbers[i - 1]} стоит перед §${numbers[i]}`);
+        break;
+      }
+    }
+    assert.deepEqual(outOfOrder, [], outOfOrder.join('; '));
+  });
+
   test('every symbol it names still exists in the code', () => {
     // §5.1 states the no-backend rule and names what enforces it. Those names
     // are the doc's load-bearing part: rename one and the doc sends the next
