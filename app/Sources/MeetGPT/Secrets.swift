@@ -1,0 +1,52 @@
+// GENERATED FILE — do not edit or commit real values.
+// build.sh regenerates this from mac/.env on every build. It is gitignored.
+enum Secrets {
+    static let openAIAPIKey    = ""
+    static let anthropicAPIKey = ""
+    static let googleAIAPIKey  = ""
+    static let deepgramAPIKey  = ""
+    static let assemblyAIAPIKey = ""
+    static let googleClientID  = ""
+    // A native OAuth client cannot keep this credential confidential, so Google
+    // does not treat it as a server secret. Keep it in distribution builds too;
+    // it identifies the Desktop client during code exchange and token refresh.
+    static let googleClientSecret = ""
+    static let backendBaseURL  = ""
+    static let backendCertPins = ""
+    static let transcriptionEngine = "local"
+    static let transcriptionChunkSeconds = "6"
+    static let transcriptionChunkOverlapSeconds = "1.5"
+    static let transcriptionBoundarySlackSeconds = "0"
+    static let defaultTier     = "free"
+    // NOT read from .env: "1" only when this is a dev build (MEETGPT_DIST unset).
+    // Gates the in-app Developer tools (tier preview). Dist builds bake "0".
+    static let devMode         = "0"
+    static let localWhisperModel = "base"
+    static let transcriptionVAD = "on"
+    static let transcriptionLanguage = "multi"
+    static let llmGateway      = "direct"
+    static let deepSeekAPIKey  = ""
+    static let dashScopeAPIKey = ""
+    static let zhipuAPIKey     = ""
+    static let moonshotAPIKey  = ""
+    static let ensemblePanel   = ""
+    static let ensembleChairman = ""
+    static let hubSpotClientID = ""
+    static let hubSpotClientSecret = ""
+    static let affinityClientID = ""
+    static let affinityClientSecret = ""
+    static let zoomClientID = ""
+    static let zoomClientSecret = ""
+    static let googleSignInClientID = ""
+    static let googleSignInClientSecret = ""
+    static let gmailClientID = ""
+    static let gmailClientSecret = ""
+    static let googleAnalyticsClientID = ""
+    static let googleAnalyticsClientSecret = ""
+    static let slackBotToken   = ""
+    static let slackChannelIDs = ""
+    static let confluenceSite  = ""
+    static let confluenceEmail = ""
+    static let confluenceToken = ""
+    static let teamWatchAutoAck = "off"
+}

@@ -3,7 +3,9 @@
 # compile into the app. It is generated on EVERY build; committing it publishes
 # live keys. In the monorepo this was ignored as mac/Sources/... — the path
 # moved when the repository was flattened.
-Sources/MeetGPT/Secrets.swift
+# Secrets.swift под контролем версий: без него `swift test` не собирается у
+# клонирующего вовсе, а секретов в нём нет — orakul не носит своих ключей.
+# Проверка в test/secrets.test.mjs не даёт положить туда учётные данные.
 .env
 .env.*
 !.env.example

@@ -101,23 +101,17 @@ describe('то, что получает клонирующий', () => {
     // половину проекта, и предыдущие проверки этого бы не увидели —
     // `ls-files --others --exclude-standard` тоже уважает .gitignore.
     //
-    // Единственное намеренное исключение — `Secrets.swift`: он генерируется
-    // сборкой и содержит ключи. По той же причине `build.sh` выкидывает его
-    // из хеша исходников. Список закрытый: любой ДРУГОЙ спрятанный исходник
-    // должен всплыть, иначе смысл проверки теряется.
-    const deliberate = ['app/Sources/MeetGPT/Secrets.swift'];
+    // Исключений нет. `Secrets.swift` раньше был спрятан — и ровно поэтому
+    // `cd app && swift test` у клонирующего не собирался: файл порождается
+    // сборкой, в клоне его нет, первая же ссылка на `Secrets.` роняет вывод
+    // типов. Теперь он под контролем версий и пуст, а за тем, чтобы в него не
+    // попали учётные данные, следит test/secrets.test.mjs.
     const swallowed = git('ls-files', '--others', '--ignored', '--exclude-standard')
       .split('\n')
       .filter(Boolean)
       .filter((f) => /\.(swift|mjs)$/.test(f))
-      .filter((f) => !/(^|\/)(\.build|build|dist|node_modules)\//.test(f))
-      .filter((f) => !deliberate.includes(f));
+      .filter((f) => !/(^|\/)(\.build|build|dist|node_modules)\//.test(f));
     assert.deepEqual(swallowed, [],
       `.gitignore прячет исходники:\n  ${swallowed.join('\n  ')}`);
-
-    // Исключение обязано оставаться исключением: если `Secrets.swift` попадёт
-    // под контроль версий, ключи уедут в открытый репозиторий.
-    assert.ok(!tracked().has('app/Sources/MeetGPT/Secrets.swift'),
-      'Secrets.swift под контролем версий — ключи уедут в клон');
   });
 });

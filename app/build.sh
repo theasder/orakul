@@ -147,11 +147,11 @@ enum Secrets {
     static let googleAIAPIKey  = "$(sw GOOGLE_AI_API_KEY)"
     static let deepgramAPIKey  = "$(sw DEEPGRAM_API_KEY)"
     static let assemblyAIAPIKey = "$(sw ASSEMBLYAI_API_KEY)"
-    static let googleClientID  = "$(sw GOOGLE_CLIENT_ID)"
+    static let googleClientID  = ""
     // A native OAuth client cannot keep this credential confidential, so Google
     // does not treat it as a server secret. Keep it in distribution builds too;
     // it identifies the Desktop client during code exchange and token refresh.
-    static let googleClientSecret = "$(sw GOOGLE_CLIENT_SECRET)"
+    static let googleClientSecret = ""
     static let backendBaseURL  = "$(sw BACKEND_URL)"
     static let backendCertPins = "$(sw BACKEND_CERT_PINS)"
     static let transcriptionEngine = "$(sw TRANSCRIPTION_ENGINE)"
@@ -178,8 +178,8 @@ enum Secrets {
     static let affinityClientSecret = "$(sw AFFINITY_CLIENT_SECRET)"
     static let zoomClientID = "$(sw ZOOM_CLIENT_ID)"
     static let zoomClientSecret = "$(sw ZOOM_CLIENT_SECRET)"
-    static let googleSignInClientID = "$(sw GOOGLE_SIGNIN_CLIENT_ID)"
-    static let googleSignInClientSecret = "$(sw GOOGLE_SIGNIN_CLIENT_SECRET)"
+    static let googleSignInClientID = ""
+    static let googleSignInClientSecret = ""
     static let gmailClientID = "$(sw GMAIL_CLIENT_ID)"
     static let gmailClientSecret = "$(sw GMAIL_CLIENT_SECRET)"
     static let googleAnalyticsClientID = "$(sw GOOGLE_ANALYTICS_CLIENT_ID)"
