@@ -289,8 +289,36 @@ public struct CommandLineApp {
             return Result(output: "Нужен идентификатор: orakul удалить <идентификатор>",
                           exitCode: 2)
         }
+        // Человек копирует идентификатор из `список`, где он в тридцать шесть
+        // знаков. Разрешаем начало — как git с хешами коммитов.
+        //
+        // Осторожно именно здесь: удаление не отменить. Поэтому начало короче
+        // четырёх знаков не принимается вовсе, а если под него подходит больше
+        // одного звонка, ничего не удаляется — вместо угадывания показывается
+        // список подходящих.
+        let resolved: String
+        switch resolveIdentifier(id) {
+        case .exact(let full):
+            resolved = full
+        case .tooShort:
+            return Result(output: """
+            Слишком короткое начало идентификатора: \(id)
+            Нужно хотя бы четыре знака — удаление не отменить.
+            """, exitCode: 2)
+        case .ambiguous(let matches):
+            return Result(output: """
+            Под «\(id)» подходит несколько звонков — уточните:
+            \(matches.joined(separator: "\n"))
+            """, exitCode: 2)
+        case .none:
+            return Result(output: """
+            Такого звонка нет: \(id)
+            Посмотреть, что есть: orakul список
+            """, exitCode: 1)
+        }
+
         do {
-            guard try store.delete(id: id) else {
+            guard try store.delete(id: resolved) else {
                 return Result(output: """
                 Такого звонка нет: \(id)
                 Посмотреть, что есть: orakul список
@@ -299,7 +327,39 @@ public struct CommandLineApp {
         } catch {
             return Result(output: "Не смог удалить: \(error)", exitCode: 1)
         }
-        return Result(output: "Удалено: \(id)", exitCode: 0)
+        return Result(output: "Удалено: \(resolved)", exitCode: 0)
+    }
+
+    /// Во что превращается начало идентификатора.
+    enum IdentifierMatch: Equatable {
+        case exact(String)
+        case ambiguous([String])
+        case tooShort
+        case none
+    }
+
+    /// Полное совпадение важнее начала: если человек вставил идентификатор
+    /// целиком, он не должен зависеть от того, чьим началом тот оказался.
+    ///
+    /// Пока идентификаторы — UUID одной длины, эта ветка недостижима: полный
+    /// идентификатор не может быть началом другого. Проверкой её не закрыть,
+    /// и придумывать для неё случай я не стал — она стоит здесь на случай
+    /// идентификаторов разной длины, где полный вдруг окажется чьим-то
+    /// началом. Мутация это подтверждает: снятие ветки ничего не ломает.
+    func resolveIdentifier(_ input: String) -> IdentifierMatch {
+        let needle = input.trimmingCharacters(in: .whitespaces).uppercased()
+        guard !needle.isEmpty else { return .none }
+
+        let ids = store.load().sessions.map(\.id)
+        if let exact = ids.first(where: { $0.uppercased() == needle }) { return .exact(exact) }
+        guard needle.count >= 4 else { return .tooShort }
+
+        let matches = ids.filter { $0.uppercased().hasPrefix(needle) }
+        switch matches.count {
+        case 0:  return .none
+        case 1:  return .exact(matches[0])
+        default: return .ambiguous(matches.sorted())
+        }
     }
 }
 

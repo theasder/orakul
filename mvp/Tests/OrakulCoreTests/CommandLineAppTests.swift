@@ -661,3 +661,86 @@ struct ProductVocabularyTests {
                 "«встреча» — второе имя тому же звонку")
     }
 }
+
+@Suite("Удаление по началу идентификатора")
+struct DeleteByPrefixTests {
+    private func app(with titles: [String]) -> (CommandLineApp, SessionStore) {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("orakul-prefix-\(UUID().uuidString)")
+        let store = SessionStore(root: root)
+        let app = CommandLineApp(store: store, readFile: { _ in "Аня: тарифы" })
+        for title in titles { _ = app.run(["добавить", "t.txt", title]) }
+        return (app, store)
+    }
+
+    /// В `список` идентификатор длиной в тридцать шесть знаков, и вставлять его
+    /// целиком — работа руками там, где git давно принимает начало.
+    @Test("начала хватает, если под него подходит один звонок")
+    func prefixDeletesTheOnlyMatch() throws {
+        let (app, store) = app(with: ["Планёрка"])
+        let id = try #require(store.load().sessions.first?.id)
+        let result = app.run(["удалить", String(id.prefix(8))])
+        #expect(result.exitCode == 0)
+        #expect(result.output.contains(id), "в ответе должен быть полный идентификатор")
+        #expect(store.load().sessions.isEmpty)
+    }
+
+    /// Главное здесь, и проверять это надо детерминированно.
+    ///
+    /// Первая версия брала два обычных звонка и надеялась, что их случайные
+    /// идентификаторы совпадут первыми знаками. Они не совпадают никогда, и
+    /// проверка молча не выполнялась: мутация «при неоднозначности удаляй
+    /// первый» проходила зелёной. Удаление не отменить — такую ветку нельзя
+    /// оставлять на волю случая, поэтому идентификаторы задаются руками.
+    @Test("под неоднозначное начало не удаляется ничего")
+    func ambiguousPrefixDeletesNothing() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("orakul-ambig-\(UUID().uuidString)")
+        let store = SessionStore(root: root)
+        for suffix in ["1111", "2222"] {
+            try store.save(RecallIndex.Session(
+                id: "ABCD0000-0000-0000-0000-00000000\(suffix)",
+                title: "Звонок \(suffix)", date: "2026-08-14", digest: "тарифы"))
+        }
+        let app = CommandLineApp(store: store, readFile: { _ in "" })
+
+        let result = app.run(["удалить", "ABCD"])
+        #expect(result.exitCode == 2, "неоднозначное начало не должно ничего удалять")
+        #expect(result.output.contains("несколько"), "не сказано, что совпадений много")
+        #expect(store.load().sessions.count == 2, "при неоднозначности удалили звонок")
+
+        // И обе стороны разбора, без удаления.
+        #expect(app.resolveIdentifier("ABCD") == .ambiguous([
+            "ABCD0000-0000-0000-0000-000000001111",
+            "ABCD0000-0000-0000-0000-000000002222",
+        ]))
+        #expect(app.resolveIdentifier("ABCD0000-0000-0000-0000-000000001111")
+                == .exact("ABCD0000-0000-0000-0000-000000001111"))
+        #expect(app.resolveIdentifier("") == .none)
+    }
+
+    @Test("слишком короткое начало не принимается", arguments: ["1", "ab", "abc"])
+    func tooShortIsRefused(prefix: String) throws {
+        let (app, store) = app(with: ["Планёрка"])
+        let result = app.run(["удалить", prefix])
+        #expect(result.exitCode == 2)
+        #expect(result.output.contains("четыре"), "не сказано, сколько знаков нужно")
+        #expect(store.load().sessions.count == 1, "по короткому началу что-то удалилось")
+    }
+
+    @Test("полный идентификатор работает как работал")
+    func fullIdentifierStillWorks() throws {
+        let (app, store) = app(with: ["Планёрка"])
+        let id = try #require(store.load().sessions.first?.id)
+        #expect(app.run(["удалить", id]).exitCode == 0)
+        #expect(store.load().sessions.isEmpty)
+    }
+
+    @Test("чужой идентификатор по-прежнему не находится")
+    func unknownIdentifierIsStillReported() throws {
+        let (app, _) = app(with: ["Планёрка"])
+        let result = app.run(["удалить", "00000000-0000-0000-0000-000000000000"])
+        #expect(result.exitCode == 1)
+        #expect(result.output.contains("Такого звонка нет"))
+    }
+}
