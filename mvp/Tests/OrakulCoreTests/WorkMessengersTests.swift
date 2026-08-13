@@ -262,3 +262,78 @@ private final class Recorder: @unchecked Sendable {
     var last: URLRequest? { lock.lock(); defer { lock.unlock() }; return requests.last }
     var count: Int { lock.lock(); defer { lock.unlock() }; return requests.count }
 }
+
+@Suite("Пара значений в одном поле")
+struct PairedTokenTests {
+    private func stub() -> (WorkMessengers.HTTP, () -> Int) {
+        var calls = 0
+        let http: WorkMessengers.HTTP = { _ in
+            calls += 1
+            return (Data("{}".utf8), HTTPURLResponse(
+                url: URL(string: "https://chat.company.ru")!, statusCode: 401,
+                httpVersion: nil, headerFields: nil)!)
+        }
+        return (http, { calls })
+    }
+
+    /// Раньше неполная пара уходила в сеть, возвращалась 401 и подпись «токен
+    /// истёк — создайте новый». Человек шёл перевыпускать исправный ключ.
+    @Test("одно значение вместо двух не уходит в сеть",
+          arguments: [WorkMessengers.Service.rocketChat, .zulip])
+    func singleValueNeverReachesTheNetwork(service: WorkMessengers.Service) async {
+        let (http, calls) = stub()
+        let client = WorkMessengers(service: service, token: "только-одно",
+                                    secondary: "chat.company.ru",
+                                    scope: "room-9", http: http)
+        await #expect(throws: WorkMessengers.ConnectorError.self) {
+            _ = try await client.search("тарифы")
+        }
+        #expect(calls() == 0, "запрос ушёл, хотя половины не хватает")
+    }
+
+    @Test("текст ошибки называет оба значения, а не советует новый токен",
+          arguments: [WorkMessengers.Service.rocketChat, .zulip])
+    func messageNamesBothHalves(service: WorkMessengers.Service) async throws {
+        let (http, _) = stub()
+        let client = WorkMessengers(service: service, token: "только-одно",
+                                    secondary: "chat.company.ru",
+                                    scope: "room-9", http: http)
+        do {
+            _ = try await client.search("тарифы")
+            Issue.record("ожидалась ошибка о неполной паре")
+        } catch let error as WorkMessengers.ConnectorError {
+            let text = try #require(error.errorDescription)
+            let expected = try #require(service.pairedTokenPrompt)
+            #expect(text.contains(expected))
+            #expect(!text.contains("создайте новый"),
+                    "совет перевыпустить токен здесь неверен: токен цел")
+        }
+    }
+
+    @Test("пустая половина считается отсутствующей", arguments: [":ключ", "почта:", " : "])
+    func emptyHalfIsMissing(token: String) {
+        let client = WorkMessengers(service: .zulip, token: token,
+                                    secondary: "zulip.company.ru",
+                                    http: { _ in (Data(), HTTPURLResponse()) })
+        #expect(!client.hasBothTokenHalves)
+    }
+
+    @Test("двоеточие внутри второй половины не ломает разбор")
+    func colonInsideSecondHalf() {
+        let client = WorkMessengers(service: .zulip, token: "user@company.ru:ab:cd",
+                                    secondary: "zulip.company.ru",
+                                    http: { _ in (Data(), HTTPURLResponse()) })
+        #expect(client.hasBothTokenHalves)
+    }
+
+    @Test("сервисам с одним значением пара не навязывается",
+          arguments: [WorkMessengers.Service.pachca, .mattermost, .matrix])
+    func singleValueServicesUnaffected(service: WorkMessengers.Service) {
+        #expect(service.pairedTokenPrompt == nil)
+        let client = WorkMessengers(service: service, token: "один-токен",
+                                    secondary: "chat.company.ru",
+                                    scope: "team-1",
+                                    http: { _ in (Data(), HTTPURLResponse()) })
+        #expect(client.hasBothTokenHalves)
+    }
+}

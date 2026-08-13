@@ -181,6 +181,26 @@ describe('orakul landing (ru)', () => {
       'the page offers a download; verify the URL actually serves before allowing it');
   });
 
+  test('the paired-credential services the page names are the ones the code checks', () => {
+    // Страница обещает проверку до запроса. Обещание держится, пока список
+    // сервисов на странице и в коде один и тот же.
+    const messengers = readFileSync(
+      resolve(here, '..', 'mvp', 'Sources', 'OrakulCore', 'WorkMessengers.swift'), 'utf8');
+    const body = bodyOf(messengers, 'public var pairedTokenPrompt: String?');
+    assert.ok(body, 'the code no longer marks which services need two values');
+
+    const paired = [...body.matchAll(/case \.([a-zA-Z]+):\s*return "/g)].map((m) => m[1]);
+    assert.ok(paired.length >= 2, `only ${paired.length} paired service(s) found`);
+
+    const titles = { rocketChat: 'Rocket.Chat', zulip: 'Zulip' };
+    for (const service of paired) {
+      const shown = titles[service];
+      assert.ok(shown, `${service} needs two values but this check does not know its name`);
+      assert.ok(html.includes(shown),
+        `${shown} needs two values, and the page never says so`);
+    }
+  });
+
   test('the org headers the page names are the ones the app can actually send', () => {
     // Страница обещает, что orakul сам выберет заголовок. Обещание держится,
     // пока обе половины — текст и код — говорят одно и то же.

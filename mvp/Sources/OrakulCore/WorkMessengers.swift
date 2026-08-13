@@ -106,6 +106,24 @@ public struct WorkMessengers {
 
         public var needsScope: Bool { scopePrompt != nil }
 
+        /// Второе значение внутри поля токена. У Rocket.Chat это
+        /// идентификатор пользователя, у Zulip — почта перед ключом; одного
+        /// значения сервер не принимает.
+        ///
+        /// Держать это здесь обязательно: на неполную пару сервер отвечает тем
+        /// же 401, что и на протухший ключ, и без проверки orakul советовал
+        /// «создайте новый токен» — то есть отправлял человека перевыпускать
+        /// исправный ключ вместо того, чтобы дописать вторую половину.
+        public var pairedTokenPrompt: String? {
+            switch self {
+            case .rocketChat: return "токен и идентификатор пользователя через двоеточие"
+            case .zulip:      return "почта и ключ API через двоеточие"
+            case .pachca, .mattermost, .matrix: return nil
+            }
+        }
+
+        public var needsPairedToken: Bool { pairedTokenPrompt != nil }
+
         /// Пачка живёт в облаке; у остальных адрес даёт пользователь.
         func host(secondary: String?) -> String? {
             switch self {
@@ -122,6 +140,10 @@ public struct WorkMessengers {
     public enum ConnectorError: Error, Equatable, LocalizedError {
         case notConfigured
         case unauthorised
+        /// Пара значений в одном поле, а вписано одно. Отдельно от
+        /// `unauthorised`: сервер отвечает на это тем же 401, и общий текст
+        /// советовал перевыпустить исправный токен.
+        case incompleteToken(String)
         /// Сервер ответил, но ошибкой. Отдельно от `unreadable`:
         /// 502 от обратного прокси — это живой сервер и внятный
         /// ответ, а прежний текст советовал проверить ВЕРСИЮ, то
@@ -141,6 +163,8 @@ public struct WorkMessengers {
                 return "Мессенджер не подключён. Откройте «Настройки → Подключённые приложения» и вставьте токен."
             case .unauthorised:
                 return "Мессенджер не принял токен. Обычно он истёк или у него не тех прав — создайте новый в самом сервисе."
+            case .incompleteToken(let expected):
+                return "В поле токена нужны два значения: \(expected). Сейчас там одно — сервис откажет, сколько бы раз токен ни перевыпускали."
             case .http(let status):
                 return "Мессенджер ответил ошибкой \(status). Сервер на месте — проверьте адрес и права токена, а если это 5xx, то сам сервер или прокси перед ним."
             case .unreadable:
@@ -174,16 +198,34 @@ public struct WorkMessengers {
         self.http = http
     }
 
-    public var isConfigured: Bool {
+    public var isConfigured: Bool { basicsFilled && hasBothTokenHalves }
+
+    /// Всё, кроме второй половины токена: сам токен, адрес сервера и место
+    /// поиска. Отдельно от `isConfigured`, чтобы `search` мог сказать
+    /// «не подключён» тому, кто ничего не вписал, и назвать недостающую
+    /// половину тому, кто вписал одно значение из двух.
+    var basicsFilled: Bool {
         guard !token.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               service.host(secondary: secondary) != nil else { return false }
         guard service.needsScope else { return true }
         return !(scope?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "").isEmpty
     }
 
+    /// Обе половины на месте — или пара этому сервису не нужна.
+    var hasBothTokenHalves: Bool {
+        guard service.needsPairedToken else { return true }
+        let parts = token.split(separator: ":", maxSplits: 1)
+        return parts.count == 2 && parts.allSatisfy {
+            !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+    }
+
     public func search(_ query: String) async throws -> [Hit] {
-        guard isConfigured, let host = service.host(secondary: secondary) else {
+        guard basicsFilled, let host = service.host(secondary: secondary) else {
             throw ConnectorError.notConfigured
+        }
+        guard hasBothTokenHalves else {
+            throw ConnectorError.incompleteToken(service.pairedTokenPrompt ?? "")
         }
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return [] }
