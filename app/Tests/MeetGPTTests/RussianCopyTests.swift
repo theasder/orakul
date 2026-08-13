@@ -41,21 +41,15 @@ struct RussianCopyTests {
     /// экране» — значит завышать долг и толкать себя переписывать выверенные
     /// промпты ради зелёного числа.
     private func onScreenLiterals() -> [(file: String, text: String)] {
-        // Платный экран исключён не «потому что руки не дошли», а потому что
-        // до него нельзя добраться: `Config.shouldShowPaywall` возвращает
-        // false всегда (NoTariffsTests). Переводить текст, которого никто не
-        // увидит, — работа ради числа. Условие проверяется здесь же, чтобы
-        // исключение отвалилось само, если экран когда-нибудь оживёт.
-        let paywallIsDead = !Config.shouldShowPaywall
+        // Исключения для экрана с ценами больше нет: сам экран удалён
+        // (`NoTariffsTests` следит, чтобы не вернулся). Пока он лежал в
+        // исходниках непереведённым, исключение приходилось объяснять; теперь
+        // объяснять нечего.
         return literals().filter { entry in
             if entry.file.hasSuffix("QuickPrompt.swift")
                 || entry.file.hasSuffix("PromptWorkflow.swift")
                 || entry.file.hasSuffix("SampleCall.swift")
                 || entry.file.hasSuffix("RecordingContext.swift") { return false }
-            if paywallIsDead,
-               entry.file.hasSuffix("PaywallView.swift") || entry.file.hasSuffix("PaywallAPI.swift") {
-                return false
-            }
             return true
         }
     }

@@ -70,3 +70,44 @@ struct NoTariffsTests {
                 "источники урезаны до \(selected.count) — это тарифный лимит")
     }
 }
+
+@Suite("Экрана с ценами нет в исходниках")
+struct NoPricingScreenTests {
+    private var sources: URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()   // MeetGPTTests
+            .deletingLastPathComponent()   // Tests
+            .deletingLastPathComponent()   // app
+            .appendingPathComponent("Sources/MeetGPT")
+    }
+
+    /// Экран был выключен флагом, но лежал в исходниках: 471 строка с
+    /// заголовком «Тарифы orakul» и планами. Репозиторий открытый, и это
+    /// первое, что находит любой, кто решит проверить обещание «бесплатно,
+    /// целиком». Выключенное — не то же самое, что удалённое.
+    @Test("файлов платного экрана не осталось")
+    func pricingViewIsGone() throws {
+        let manager = FileManager.default
+        let walker = try #require(manager.enumerator(atPath: sources.path))
+        let offenders = walker.compactMap { $0 as? String }.filter {
+            $0.hasSuffix("PaywallView.swift") || $0.contains("/Paywall/PaywallView")
+        }
+        #expect(offenders.isEmpty, "экран с ценами вернулся: \(offenders)")
+    }
+
+    @Test("ни одно представление не открывает экран с ценами")
+    func nothingPresentsPricing() throws {
+        let manager = FileManager.default
+        let walker = try #require(manager.enumerator(atPath: sources.path))
+        var offenders: [String] = []
+        var scanned = 0
+        for case let path as String in walker where path.hasSuffix(".swift") {
+            let text = try String(contentsOf: sources.appendingPathComponent(path),
+                                  encoding: .utf8)
+            scanned += 1
+            if text.contains("PaywallView(") { offenders.append(path) }
+        }
+        #expect(scanned > 50, "обход не нашёл исходников — проверка была бы фиктивной")
+        #expect(offenders.isEmpty, "экран с ценами снова показывают: \(offenders)")
+    }
+}

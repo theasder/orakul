@@ -13,7 +13,6 @@ enum OnboardingGate {
 struct ContentView: View {
     @EnvironmentObject var state: AppState
     @EnvironmentObject var mcp: MCPConnectionManager
-    @State private var showPaywall = false
     /// Which act to open on. Resolved once permissions have been re-checked, so
     /// a revoked permission reopens the capture check even mid-flow.
     @State private var onboardingStep: OnboardingStep? = OnboardingGate.step(
@@ -127,7 +126,6 @@ struct ContentView: View {
                 microphoneGranted: state.micGranted,
                 screenRecordingGranted: state.screenRecordingGranted)
             showOnboarding = onboardingStep != nil
-            if !showOnboarding { presentPaywallIfNeeded() }
 
             // Keychain XPC can wait on a stale signing ACL. Restore connection
             // badges only after the first window exists, and never on the main
@@ -144,15 +142,6 @@ struct ContentView: View {
             async let folders: Void = state.restoreContextFolders()
             _ = await (accounts, apps, folders)
         }
-        .onChange(of: showOnboarding) { isPresented in
-            if !isPresented,
-               OnboardingGate.step(
-                    lastCompleted: Config.onboardingStep,
-                    microphoneGranted: state.micGranted,
-                    screenRecordingGranted: state.screenRecordingGranted) == nil {
-                presentPaywallIfNeeded()
-            }
-        }
         // Settings ▸ General ▸ "Показать настройку заново". Settings is its own
         // window, so the request arrives through the shared AppState rather than
         // a notification. The gate is re-run rather than forcing the first step:
@@ -166,7 +155,6 @@ struct ContentView: View {
                 ?? OnboardingStep.allCases.first
             showOnboarding = true
         }
-        .sheet(isPresented: $showPaywall) { PaywallView() }
         .sheet(isPresented: $state.showRecordingConsent) { RecordingConsentSheet() }
         // Raised by stopRecording() when the first real meeting ends.
         // FirstMeetingPrompt has already recorded that it was asked by the time
@@ -179,14 +167,6 @@ struct ContentView: View {
         }
     }
 
-    private func presentPaywallIfNeeded() {
-        // Mandatory paywall: until answered, and once more after the trial
-        // lapses without a purchase. Permission pre-flight always wins so two
-        // sheets never contend during renamed/re-signed QA launches.
-        guard Config.shouldShowPaywall else { return }
-        showPaywall = true
-        Config.markPostTrialPromptShown()
-    }
 }
 
 /// Gives the nonce-gated live suite the same SwiftUI `openSettings` action as

@@ -540,7 +540,6 @@ private struct TranscriptionSettingsTab: View {
 
 private struct AISettingsTab: View {
     @EnvironmentObject var state: AppState
-    @State private var showPaywall = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.xl) {
@@ -622,7 +621,6 @@ private struct AISettingsTab: View {
         }
         .padding(Space.xl)
         .frame(width: 520)
-        .sheet(isPresented: $showPaywall) { PaywallView() }
     }
 }
 
