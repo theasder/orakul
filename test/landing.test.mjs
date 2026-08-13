@@ -980,6 +980,30 @@ describe('orakul landing (ru)', () => {
       `page says ${stated[1]} s, the suite enforces ${budget[1]} s`);
   });
 
+  test('the duplicate check compares text, and the answer cap makes it matter', () => {
+    assert.match(text, /не заводится дважды/,
+      'the page no longer promises duplicates are refused');
+    assert.match(text, /Сравнивается текст, а не название/,
+      'the page no longer states what the check compares');
+
+    const cli = stripComments(readFileSync(
+      resolve(here, '..', 'mvp', 'Sources', 'OrakulCore', 'CommandLineApp.swift'), 'utf8'));
+    assert.match(cli, /\$0\.digest == text/,
+      'the duplicate check compares something other than the transcript text');
+
+    // Обещание опирается на то, что мест в ответе мало. Если предел вырастет
+    // настолько, что копии перестанут вытеснять, довод на странице обветшает —
+    // пусть об этом узнают здесь, а не читатели.
+    const answer = stripComments(readFileSync(
+      resolve(here, '..', 'mvp', 'Sources', 'OrakulCore', 'RecallAnswer.swift'), 'utf8'));
+    const cap = /maximumMeetings = (\d+)/.exec(answer);
+    assert.ok(cap, 'the answer cap is gone — the page argues from it');
+    assert.ok(Number(cap[1]) <= 5,
+      `page says three copies fill the answer; the cap is now ${cap[1]}`);
+    assert.match(text, /не больше трёх звонков/,
+      'the page no longer states the cap its argument rests on');
+  });
+
   test('the "first ten, not all" notice is real and conditional', () => {
     assert.match(text, /Показаны первые 10/,
       'the page no longer shows the truncation notice');
