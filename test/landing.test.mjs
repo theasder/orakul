@@ -181,6 +181,47 @@ describe('orakul landing (ru)', () => {
       'the page offers a download; verify the URL actually serves before allowing it');
   });
 
+  test('the perf gate documents the same variable the tests read', () => {
+    // Бюджеты задержки существуют, проходят и никому не видны: переменная
+    // упоминалась только в самих тестах. Правишь поиск, видишь зелёный прогон
+    // — а оба набора в нём пропущены и сосчитаны как пройденные.
+    //
+    // Здесь связываются две половины: имя переменной в тестах и команда в
+    // документах. Разъедутся — команда напечатает «пропущено» и промолчит.
+    const walk = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+      const full = resolve(dir, entry.name);
+      if (entry.isDirectory()) return walk(full);
+      return entry.name.endsWith('.swift') ? [full] : [];
+    });
+    // Только наборы про скорость: под флагами живут ещё живые пробы
+    // коннекторов, диаризация и прогон настоящих моделей — у каждого своя
+    // переменная и свой повод, и документировать их одной командой нельзя.
+    const perfFiles = walk(resolve(here, '..', 'app', 'Tests'))
+      .filter((file) => /Performance[A-Za-z]*\.swift$/.test(file));
+    assert.ok(perfFiles.length >= 2, `only ${perfFiles.length} perf file(s) — nothing to document`);
+
+    const names = new Set(perfFiles.flatMap((file) =>
+      [...readFileSync(file, 'utf8').matchAll(/environment\["([A-Z_]+)"\]/g)].map((m) => m[1])));
+    assert.equal(names.size, 1,
+      `perf suites read ${names.size} different variables: ${[...names]}`);
+    const variable = [...names][0];
+
+    for (const doc of ['CONTRIBUTING.md', '.github/pull_request_template.md']) {
+      const text = readFileSync(resolve(here, '..', ...doc.split('/')), 'utf8');
+      assert.ok(text.includes(variable),
+        `${doc} never names ${variable}, so the budgets stay invisible`);
+      assert.ok(/--filter Performance/.test(text),
+        `${doc} names the variable but not a command that runs the gated suites`);
+    }
+
+    // Каждый файл про скорость обязан и запираться флагом: незапертый
+    // меряет время на занятой машине и падает у случайного участника.
+    const unlocked = perfFiles.filter(
+      (file) => !/\.enabled\(if:/.test(readFileSync(file, 'utf8')));
+    assert.deepEqual(unlocked.map((f) => f.slice(f.lastIndexOf('/') + 1)), [],
+      'a perf file runs unconditionally and will flake on a busy machine');
+  });
+
   test('the pull-request template carries every rule CONTRIBUTING enforces', () => {
     // Шесть правил, о которые ломаются чужие правки, лежали только в
     // CONTRIBUTING. Участник узнавал о них из отказа — после того, как вечер
