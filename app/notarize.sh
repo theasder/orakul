@@ -41,6 +41,21 @@ ENT="$ROOT/Support/MeetGPT.sandbox.entitlements"
 DIST="$ROOT/dist"
 PROFILE="${NOTARY_PROFILE:-meetgpt-notary}"
 
+# Учётные данные нотаризации проверяются ДО сборки, а не в момент отправки.
+#
+# 2026-08-13 профиль пропал из связки ключей, и это выяснилось после того, как
+# arm64 собрался и подписался: шесть минут работы впустую, а сообщение об
+# ошибке пришло с середины конвейера. Проверка стоит секунду и говорит, что
+# именно делать.
+if ! xcrun notarytool history --keychain-profile "$PROFILE" >/dev/null 2>&1; then
+    echo "!! Профиль нотаризации «${PROFILE}» недоступен в связке ключей." >&2
+    echo "   Сборка остановлена до компиляции — чинить здесь:" >&2
+    echo "     xcrun notarytool store-credentials ${PROFILE} \\" >&2
+    echo "       --apple-id <Apple ID> --team-id <Team ID> --password <app-specific>" >&2
+    echo "   Пароль вводит человек: он не хранится в репозитории и не должен." >&2
+    exit 1
+fi
+
 # --- Find a Developer ID identity (ad-hoc / self-signed can't notarize) ---
 SIGN_ID="${NOTARY_SIGN_ID:-}"
 if [ -z "$SIGN_ID" ]; then

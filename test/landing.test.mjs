@@ -540,6 +540,28 @@ describe('orakul landing (ru)', () => {
       + `${headless[0]?.trim().slice(0, 70)}`);
   });
 
+  test('notarisation credentials are checked before anything is compiled', () => {
+    // 2026-08-13 профиль нотаризации пропал из связки, и выяснилось это после
+    // сборки и подписи arm64: шесть минут впустую, ошибка из середины
+    // конвейера. Проверка ставится первой — иначе она бесполезна.
+    const script = readFileSync(resolve(here, '..', 'app', 'notarize.sh'), 'utf8');
+
+    const check = script.indexOf('notarytool history');
+    assert.ok(check > 0, 'the preflight credential check is gone');
+
+    // Всё, что стоит денег или времени, обязано идти ПОСЛЕ проверки.
+    for (const expensive of ['swift build', 'codesign', 'notarytool submit']) {
+      const at = script.indexOf(expensive);
+      if (at < 0) continue;
+      assert.ok(at > check,
+        `"${expensive}" runs before the credential check — the failure would come late`);
+    }
+
+    // И сообщение обязано называть команду, которой это чинится.
+    assert.match(script, /store-credentials/,
+      'the check fails without telling anyone how to fix it');
+  });
+
   test('the documented build produces every disk image the audit checks', () => {
     // Проверка сверяет два DMG, а README до 2026-08-13 описывал сборку одной
     // архитектуры. Кто шёл по README, собирал arm64, оставлял Intel вчерашним
