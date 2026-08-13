@@ -181,6 +181,26 @@ describe('orakul landing (ru)', () => {
       'the page offers a download; verify the URL actually serves before allowing it');
   });
 
+  test('every connector section lists its services from allCases, not by hand', () => {
+    // Коннектор, которого нет в настройках, не существует для человека, даже
+    // если код к нему написан и закрыт тестами. Проверить это по-настоящему
+    // (открыть окно и посмотреть) нельзя без запуска приложения, поэтому
+    // проверяется то, от чего зависит появление: список берётся у типа, а не
+    // переписан руками. Битрикс24 доехал в настройки только благодаря этому.
+    const sections = {
+      'RussianTrackersSection.swift': 'RussianTrackers.Service',
+      'WorkMessengersSection.swift': 'WorkMessengers.Service',
+      'SelfHostedTrackersSection.swift': 'SelfHostedTrackers.Service',
+      'TeamNotesSection.swift': 'TeamNotes.Service',
+    };
+    for (const [file, type] of Object.entries(sections)) {
+      const src = readFileSync(
+        resolve(here, '..', 'app', 'Sources', 'MeetGPT', 'Views', file), 'utf8');
+      assert.ok(src.includes(`ForEach(${type}.allCases`),
+        `${file} no longer lists ${type} from allCases — a new service would not appear`);
+    }
+  });
+
   test('every Russian tracker that ships is listed on the page', () => {
     // Тот же приём, что для мессенджеров и своих серверов: сплошной чип —
     // обещание, и сборка единственный судья, можно ли его сдержать. Для

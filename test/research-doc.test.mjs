@@ -247,6 +247,38 @@ describe('RESEARCH-AND-PLAN', () => {
       'the section does not say local capture still works on all four');
   });
 
+  test('the tracker census matches the trackers that actually ship', () => {
+    // Перепись — таблица «подключён / нет» с причинами. Такие таблицы устаревают
+    // первыми: сервис доезжает до кода, а строка остаётся прежней. Здесь она
+    // сверяется с типом: каждый сервис из `RussianTrackers.Service` обязан
+    // стоять в таблице со словом «подключён», и наоборот.
+    const src = readFileSync(
+      resolve(repo, 'mvp', 'Sources', 'OrakulCore', 'RussianTrackers.swift'), 'utf8');
+    const block = src.slice(src.indexOf('public var title: String'));
+    const shipped = [...block.slice(0, block.indexOf('}\n\n')).matchAll(/return "([^"]+)"/g)]
+      .map(([, title]) => title);
+    assert.ok(shipped.length >= 4, `found ${shipped.length} titles — the census would be hollow`);
+
+    const census = doc.slice(doc.indexOf('### 2.0.3'));
+    const table = census.slice(0, census.indexOf('\n\n###'));
+
+    for (const service of shipped) {
+      const row = table.split('\n').find((line) => line.startsWith(`| ${service} `));
+      assert.ok(row, `${service} ships and is missing from the census`);
+      assert.match(row, /подключён/,
+        `${service} ships, and the census does not say so: ${row}`);
+    }
+
+    // Обратная сторона: строка «подключён» про сервис, которого в коде нет.
+    const claimed = table.split('\n')
+      .filter((line) => /^\| .+ \| подключён/.test(line))
+      .map((line) => line.split('|')[1].trim());
+    for (const name of claimed) {
+      assert.ok(shipped.includes(name),
+        `the census calls ${name} connected, but no such service ships`);
+    }
+  });
+
   test('keeps the dead ends recorded, with the date they were checked', () => {
     // The doc's real value is that impossible things stay recorded as
     // impossible — Pyrus, WEEEK, Telegram history, keyless GitHub OAuth.
