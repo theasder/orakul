@@ -141,6 +141,56 @@ describe('RESEARCH-AND-PLAN', () => {
       `the Russian text contains characters from another script: ${[...new Set(stray)].join(' ')}`);
   });
 
+  test('no stray CJK crept into Russian comments or copy', () => {
+    // Уже случалось дважды: «на котором полагается生成 транспортный токен» в
+    // документе и «принесёт三сотни символов» в комментарии теста. Опечатка
+    // такого рода не видна при беглом чтении, не ломает сборку и сообщает
+    // читателю ровно одно: текст писали невнимательно.
+    //
+    // Три файла — исключение и перечислены поимённо: это проверки того, как
+    // продукт обходится с китайским текстом, и иероглифы там по делу. Список
+    // закрытый, чтобы новый случайный иероглиф всплыл.
+    const deliberate = new Set([
+      'app/Tests/MeetGPTTests/LLMStreamingClientTests.swift',
+      'app/Tests/MeetGPTTests/LoopbackCallbackTests.swift',
+      'app/Tests/MeetGPTTests/AssistantDOCXExporterTests.swift',
+    ]);
+
+    const walk = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+      const full = resolve(dir, entry.name);
+      if (entry.isDirectory()) {
+        return /(^|\/)(\.build|build|node_modules|\.git)$/.test(full) ? [] : walk(full);
+      }
+      // Только .swift и страница: под Resources/Skills лежат готовые
+      // определения навыков с китайскими подсказками — они там по делу, и
+      // это не русская проза, за которой тут следят.
+      return /\.swift$/.test(entry.name) ? [full] : [];
+    });
+
+    const offenders = [];
+    for (const dir of ['mvp', 'app/Sources/MeetGPT', 'app/Tests']) {
+      for (const file of walk(resolve(repo, dir))) {
+        const relative = file.slice(repo.length + 1);
+        if (deliberate.has(relative)) continue;
+        const stray = [...new Set([...readFileSync(file, 'utf8')].filter((ch) => {
+          const code = ch.codePointAt(0);
+          return code >= 0x3000 && code <= 0x9fff;
+        }))];
+        if (stray.length) offenders.push(`${relative}: ${stray.join('')}`);
+      }
+    }
+    for (const file of ['public/index.html', 'README.md', 'CONTRIBUTING.md']) {
+      const stray = [...new Set([...readFileSync(resolve(repo, file), 'utf8')].filter((ch) => {
+        const code = ch.codePointAt(0);
+        return code >= 0x3000 && code <= 0x9fff;
+      }))];
+      if (stray.length) offenders.push(`${file}: ${stray.join('')}`);
+    }
+
+    assert.deepEqual(offenders, [],
+      `Russian text carries characters from another script:\n  ${offenders.join('\n  ')}`);
+  });
+
   test('the VoIP verdict names all four platforms and says what blocks each', () => {
     // Бриф прямо просит коннекторы к ВКС. Ответ «их нет» без причины — это не
     // ответ, и через месяц кто-нибудь начнёт писать их заново. Раздел обязан

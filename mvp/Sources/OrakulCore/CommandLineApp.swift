@@ -135,8 +135,7 @@ public struct CommandLineApp {
             """, exitCode: 0)   // в архиве лежит то, чего хотели, — это не сбой
         }
 
-        let title = arguments.dropFirst().joined(separator: " ")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let title = Self.tidyTitle(arguments.dropFirst().joined(separator: " "))
         let session = RecallIndex.Session(
             id: makeIdentifier(),
             // Без названия берём имя файла: «Созвон» во всём списке не поможет
@@ -153,6 +152,30 @@ public struct CommandLineApp {
             return Result(output: "Не смог сохранить: \(error)", exitCode: 1)
         }
         return Result(output: "Добавлено: «\(session.title)» (\(session.id))", exitCode: 0)
+    }
+
+    /// Название встречи в том виде, в каком его можно печатать строкой.
+    ///
+    /// `orakul список` — построчный вывод: дата, идентификатор, название. Оно
+    /// приходит от человека как есть, и в нём попадается лишнее:
+    ///
+    /// - **Перевод строки** разрывает запись надвое, и вторая половина
+    ///   выглядит как ещё одна встреча — без даты и идентификатора, но
+    ///   отличить её нельзя ни глазом, ни скриптом. Архив у нас открытый, и
+    ///   список зовут разбирать.
+    /// - **Триста символов** (скрипт взял первую строку расшифровки) — и
+    ///   столбцы перестают быть столбцами.
+    ///
+    /// Пробелы схлопываются, длина ограничивается, обрезка ПОКАЗЫВАЕТСЯ
+    /// многоточием: молча потерянный кусок названия — это потерянный кусок
+    /// названия.
+    static let titleLimit = 120
+
+    static func tidyTitle(_ raw: String) -> String {
+        let flattened = raw.split(whereSeparator: { $0.isWhitespace || $0.isNewline })
+            .joined(separator: " ")
+        guard flattened.count > titleLimit else { return flattened }
+        return String(flattened.prefix(titleLimit - 1)) + "…"
     }
 
     private func transcribe(_ arguments: [String]) -> Result {
