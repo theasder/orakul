@@ -181,6 +181,31 @@ describe('orakul landing (ru)', () => {
       'the page offers a download; verify the URL actually serves before allowing it');
   });
 
+  test('the dependency counts README states are the ones the manifests declare', () => {
+    // README говорил «внешних зависимостей нет ни одной» прямо перед быстрым
+    // стартом. Для `mvp/` это правда, для `app/` — нет: там четыре пакета,
+    // и WhisperKit тянется долго. Читатель, собравший `app/`, ждёт клонов
+    // репозиториев, о которых ему сказали, что их нет.
+    const readme = readFileSync(resolve(here, '..', 'README.md'), 'utf8');
+    const count = (manifest) => {
+      const src = readFileSync(resolve(here, '..', manifest, 'Package.swift'), 'utf8');
+      return [...src.matchAll(/\.package\(url:/g)].length;
+    };
+
+    const mvp = count('mvp');
+    assert.equal(mvp, 0,
+      `mvp declares ${mvp} external package(s) — README promises none`);
+    assert.match(readme, /У `mvp\/`[\s\S]{0,80}внешних зависимостей нет ни одной/,
+      'README no longer scopes the "no dependencies" promise to mvp');
+
+    const app = count('app');
+    const words = { 2: 'две', 3: 'три', 4: 'четыре', 5: 'пять', 6: 'шесть' };
+    const stated = words[app];
+    assert.ok(stated, `app declares ${app} packages — this check has no word for that`);
+    assert.match(readme, new RegExp(`У приложения в \`app/\` их ${stated}`),
+      `app declares ${app} external packages; README says otherwise`);
+  });
+
   test('the systems the page names are the ones CI actually runs on', () => {
     // Страница говорила, что весь набор идёт на macOS. Проверки страницы и
     // README идут на Linux — макбук им не нужен. Мелочь, но это ровно та

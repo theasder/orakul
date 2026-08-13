@@ -136,6 +136,40 @@ struct ReadmeQuickstartTests {
                 "README обещает найти «\(quoted)», а выдача такая: \(output)")
     }
 
+    /// Обратная сторона проверки выше, и та, которой не хватало.
+    ///
+    /// Та смотрит, что строка из README нашлась в выдаче. Этого мало: выдача
+    /// может содержать И ЕЩЁ строки, которых в README нет, — так и вышло.
+    /// Когда после вопроса стали печатать ответ, README остался с одной
+    /// строкой вопроса, и проверка молчала, потому что её строка на месте.
+    /// Человек по примеру видит одно, а получает другое.
+    @Test("README не умалчивает ни об одной строке, которую печатает поиск")
+    func readmeShowsEveryQuotedLine() throws {
+        let readme = try Self.readme
+        let transcript = try #require(Self.transcript(from: readme))
+        let app = makeApp(transcript: transcript)
+        _ = app.run(try #require(Self.arguments(from: readme, command: "добавить")))
+
+        let output = app.run(try #require(Self.arguments(from: readme, command: "найти"))).output
+
+        // Цитаты в выдаче идут с отступом; заголовок с датой — без него, и
+        // сверять его нельзя: он меняется каждый день.
+        let printed = output.split(separator: "\n", omittingEmptySubsequences: false)
+            .filter { $0.hasPrefix("    ") }
+            .map { String($0).trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+        #expect(!printed.isEmpty, "поиск не вернул ни одной цитаты — сверять нечего")
+
+        let documented = readme.split(separator: "\n", omittingEmptySubsequences: false)
+            .filter { $0.hasPrefix("    ") }
+            .map { String($0).trimmingCharacters(in: .whitespaces) }
+
+        for line in printed {
+            #expect(documented.contains(line),
+                    "поиск печатает строку, которой в README нет: «\(line)»")
+        }
+    }
+
     @Test("отказ отвечать звучит дословно так, как напечатан в README")
     func refusalMatchesReadme() throws {
         let readme = try Self.readme
