@@ -107,7 +107,8 @@ public struct CommandLineApp {
             return Result(output: "Не смог прочитать файл: \(path)", exitCode: 1)
         }
 
-        let text = RussianLexicon.restore(raw).trimmingCharacters(in: .whitespacesAndNewlines)
+        let text = RussianLexicon.restore(TranscriptCleanup.strip(raw))
+            .trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else {
             return Result(output: "Файл пустой — сохранять нечего.", exitCode: 1)
         }

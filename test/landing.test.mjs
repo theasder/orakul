@@ -892,6 +892,34 @@ describe('orakul landing (ru)', () => {
     }
   });
 
+  test('the promise of a clean quote is backed by the cleanup', () => {
+    // Обещание «ничего между ними» держалось на удаче: движок из README
+    // (`whisper-cli … -otxt`) печатает отметку в одной строке с текстом, и
+    // цитата приходила как «[00: 320]   Аня: По тарифам…». Обе половины
+    // обещания — что чистим начало строки и что НЕ трогаем середину — должны
+    // иметь опору в коде, иначе это снова просто фраза.
+    assert.match(text, /никаких отметок времени/,
+      'the page no longer promises a quote free of timestamps');
+    assert.match(text, /из середины — нет/,
+      'the page no longer states the boundary it keeps');
+
+    const cleanup = readFileSync(
+      resolve(here, '..', 'mvp', 'Sources', 'OrakulCore', 'TranscriptCleanup.swift'), 'utf8');
+    // Якорь начала строки — это и есть граница. Без него отметка из цитаты
+    // лога тоже была бы вычищена, и обещание стало бы ложным.
+    assert.match(cleanup, /\^\\s\*\\\[/,
+      'the inline pattern lost its start-of-line anchor — mid-sentence stamps would go too');
+
+    // Чистка обязана стоять на обеих дверях в архив.
+    for (const [file, door] of [['CommandLineApp.swift', 'orakul добавить'],
+                                ['MeetingPipeline.swift', 'orakul расшифровать']]) {
+      const source = readFileSync(
+        resolve(here, '..', 'mvp', 'Sources', 'OrakulCore', file), 'utf8');
+      assert.match(source, /TranscriptCleanup\.strip/,
+        `${door} stores the raw transcript again`);
+    }
+  });
+
   test('the three quoted answers are the three the product really gives', () => {
     // Страница цитирует ответы дословно, и раньше уже расходилась с
     // программой на одном слове. Третий ответ — про пустой архив — добавлен

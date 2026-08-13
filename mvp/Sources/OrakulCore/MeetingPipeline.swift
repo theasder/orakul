@@ -54,7 +54,8 @@ public struct MeetingPipeline: Sendable {
     @discardableResult
     public func record(samples: [Float], title: String) async throws -> RecallIndex.Session {
         let raw = try await transcriber.transcribe(samples: samples)
-        let text = RussianLexicon.restore(raw).trimmingCharacters(in: .whitespacesAndNewlines)
+        let text = RussianLexicon.restore(TranscriptCleanup.strip(raw))
+            .trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { throw PipelineError.nothingRecognised }
 
         let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
