@@ -96,6 +96,14 @@ describe('RESEARCH-AND-PLAN', () => {
     assert.match(build, /swift package "\$\{SWIFT_BUILD_ARGS\[@\]\}" clean/,
       'the installer build reuses a stale scratch path — a new core file breaks it with "cannot find X in scope"');
 
+    // Один выпуск — один коммит на обе архитектуры. Хеш исходников этого не
+    // ловит: коммит, трогающий только страницу или тесты, оставляет хеш
+    // прежним. Так и вышло — правка документации легла между сборкой arm64 и
+    // сборкой Intel, и два DMG уехали со штампами 1928241 и 686618f при
+    // одинаковом хеше, а аудит дважды сказал «совпадает».
+    assert.match(audit, /РАСХОЖДЕНИЕ КОММИТОВ/,
+      'the audit no longer notices two architectures built from different commits');
+
     // Обе стороны обязаны считать ОДИНАКОВО, а не просто по одним папкам.
     // `shasum` печатает путь рядом с хешем, поэтому один и тот же файл,
     // записанный как `mvp/…` и как `app/../mvp/…`, даёт разный итог. Ровно на
