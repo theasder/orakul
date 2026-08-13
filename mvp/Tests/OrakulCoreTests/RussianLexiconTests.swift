@@ -169,3 +169,30 @@ struct RussianLexiconTests {
     }
 
 }
+
+@Suite("Слова, которые говорят вслух, а пишут по-английски")
+struct SpokenInfrastructureTests {
+    /// Человек на созвоне говорит «дженкинс», а через месяц ищет «jenkins».
+    /// Без канонизации это разные слова, и поиск честно отвечает «не
+    /// говорили» — при том что говорили.
+    @Test("сказанное по-русски находится по английскому запросу",
+          arguments: [("дженкинс", "jenkins"), ("питон", "python"),
+                      ("джава", "java"), ("кассандра", "cassandra"),
+                      ("эйрфлоу", "airflow"), ("постман", "postman"),
+                      ("сваггер", "swagger"), ("вебхук", "webhook"),
+                      ("зукипер", "zookeeper")])
+    func spokenMatchesWritten(spoken: String, written: String) {
+        #expect(RussianLexicon.canonicalToken(for: spoken) == RussianLexicon.canonicalToken(for: written),
+                "«\(spoken)» и «\(written)» остались разными словами для поиска")
+    }
+
+    /// Таблица только для поиска. Расшифровку она не трогает — иначе
+    /// «постман» превратился бы в postman там, где речь о почтальоне, а
+    /// «питон» в python там, где о змее.
+    @Test("расшифровку эти слова не переписывают",
+          arguments: ["постман", "питон", "джава", "кассандра"])
+    func transcriptIsNotRewritten(word: String) {
+        #expect(RussianLexicon.restore(word) == word,
+                "слово из поисковой таблицы попало в починку расшифровки")
+    }
+}

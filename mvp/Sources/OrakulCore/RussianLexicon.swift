@@ -178,6 +178,20 @@ public enum RussianLexicon {
         "кибана": "kibana", "kibana": "kibana",
         "тарантул": "tarantool", "tarantool": "tarantool",
         "кубер": "кубернетес", "k8s": "кубернетес",
+        // Добавлено 2026-08-13 по частоте в речи, а не по популярности
+        // технологии: слова, которые произносят вслух на созвонах, а пишут
+        // потом по-английски. Таблица только для поиска, поэтому совпадение с
+        // обычным русским словом здесь не беда — «постман» останется почтальоном
+        // в расшифровке и найдётся по запросу postman.
+        "дженкинс": "jenkins", "jenkins": "jenkins",
+        "питон": "python", "пайтон": "python", "python": "python",
+        "джава": "java", "жава": "java", "java": "java",
+        "кассандра": "cassandra", "касандра": "cassandra", "cassandra": "cassandra",
+        "эйрфлоу": "airflow", "эйрфлов": "airflow", "airflow": "airflow",
+        "постман": "postman", "postman": "postman",
+        "сваггер": "swagger", "свагер": "swagger", "swagger": "swagger",
+        "вебхук": "webhook", "вебхуки": "webhook", "webhook": "webhook",
+        "зукипер": "zookeeper", "zookeeper": "zookeeper",
     ]
 
     /// Разобрано по нормализованной форме один раз, как и остальные таблицы:
