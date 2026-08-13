@@ -141,6 +141,23 @@ describe('RESEARCH-AND-PLAN', () => {
       `the Russian text contains characters from another script: ${[...new Set(stray)].join(' ')}`);
   });
 
+  test('the recurring defect class is recorded with real cases', () => {
+    // Раздел стоит не ради красивого обобщения: он предсказывает, где
+    // появится следующая ошибка того же рода. Обобщение без случаев быстро
+    // превращается в лозунг, поэтому проверяется, что случаи на месте и что
+    // они настоящие — каждый из них лежит починенным в истории.
+    const section = doc.slice(doc.indexOf('Одна форма ошибки повторяется'));
+    assert.ok(section.length > 400, 'the recurring-defect section is missing or a stub');
+
+    for (const seen of ['Удалено', '502', 'unknown', 'служебные слова']) {
+      assert.ok(section.includes(seen),
+        `the section no longer cites the ${seen} case`);
+    }
+    // Правило важнее таблицы: таблица стареет, правило переносится на новое.
+    assert.match(section, /найдите\s+случай, когда исхода не было/,
+      'the rule the table exists to support is gone');
+  });
+
   test('no stray CJK crept into Russian comments or copy', () => {
     // Уже случалось дважды: «на котором полагается生成 транспортный токен» в
     // документе и «принесёт三сотни символов» в комментарии теста. Опечатка
