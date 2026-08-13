@@ -38,13 +38,14 @@ public struct RussianTrackers {
     }
 
     public enum Service: String, CaseIterable, Sendable {
-        case yandexTracker, kaiten, yougile
+        case yandexTracker, kaiten, yougile, bitrix24
 
         public var title: String {
             switch self {
             case .yandexTracker: return "Яндекс Трекер"
             case .kaiten:        return "Kaiten"
             case .yougile:       return "YouGile"
+            case .bitrix24:      return "Битрикс24"
             }
         }
 
@@ -56,6 +57,11 @@ public struct RussianTrackers {
             case .yandexTracker: return "OAuth-токен и идентификатор организации: «Администрирование» → «Организации», поле ID"
             case .kaiten:        return "API-токен из профиля, раздел «API», и адрес вашей команды"
             case .yougile:       return "Ключ компании из раздела «Интеграции»"
+            case .bitrix24:
+                // Вебхук показывают одной строкой вида
+                // https://фирма.bitrix24.ru/rest/1/abc.../ — сюда идёт
+                // середина, «1/abc...», а адрес портала в поле ниже.
+                return "Входящий вебхук: «Разработчикам» → «Другое» → «Входящий вебхук», право «Задачи». Нужна середина ссылки — номер пользователя и код через косую черту"
             }
         }
 
@@ -70,6 +76,8 @@ public struct RussianTrackers {
             case .yandexTracker: return "идентификатор организации"
             // У Kaiten нет общего адреса API: он свой у каждой команды.
             case .kaiten:        return "адрес команды, например team.kaiten.ru"
+            // Портал у каждой фирмы свой, общего адреса API нет.
+            case .bitrix24:      return "адрес портала, например фирма.bitrix24.ru"
             case .yougile:       return nil
             }
         }
@@ -90,6 +98,7 @@ public struct RussianTrackers {
             case .yandexTracker: return "ключ очереди, например TREK"
             case .kaiten:        return "номер доски, например 4"
             case .yougile:       return "идентификатор колонки"
+            case .bitrix24:      return "номер ответственного, например 1"
             }
         }
 
@@ -111,6 +120,15 @@ public struct RussianTrackers {
                     .map(String.init) ?? ""
                 return "https://\(domain.trimmingCharacters(in: .whitespaces))/api/latest"
             case .yougile:       return "https://yougile.com/api-v2"
+            case .bitrix24:
+                // Тот же случай, что у Kaiten: адрес копируют из строки
+                // браузера вместе со схемой и путём до раздела.
+                let domain = (secondary ?? "")
+                    .replacingOccurrences(of: "https://", with: "")
+                    .replacingOccurrences(of: "http://", with: "")
+                    .split(separator: "/").first
+                    .map(String.init) ?? ""
+                return "https://\(domain.trimmingCharacters(in: .whitespaces))/rest"
             }
         }
     }
@@ -187,7 +205,10 @@ public struct RussianTrackers {
         case 401, 403:  throw TrackerError.unauthorised(service)
         default:        throw TrackerError.http(service, response.statusCode)
         }
-        return try parse(data)
+        // Верхняя граница ещё раз, уже после разбора: у трёх сервисов размер
+        // задаётся параметром и это ничего не меняет, а у Битрикса страница
+        // всегда пятьдесят и урезать выдачу больше негде.
+        return Array(try parse(data).prefix(limit))
     }
 
     public func headers() -> [String: String] {
@@ -199,6 +220,10 @@ public struct RussianTrackers {
             return fields
         case .kaiten, .yougile:
             return ["Authorization": "Bearer \(token)"]
+        // У Битрикса ключа в заголовке нет вовсе: вебхук — это адрес, и права
+        // проверяются по нему. Заголовок остаётся один, про формат тела.
+        case .bitrix24:
+            return ["Content-Type": "application/json"]
         }
     }
 
@@ -225,6 +250,11 @@ public struct RussianTrackers {
         case .yandexTracker: path = "/issues/_search?perPage=\(limit)"
         case .kaiten:        path = "/cards?query=\(escaped)&limit=\(limit)"
         case .yougile:       path = "/tasks?title=\(escaped)&limit=\(limit)"
+        // У Битрикса ключ едет в адресе, а не в заголовке: вебхук — это
+        // и есть номер пользователя с кодом внутри пути. Размер страницы
+        // всегда пятьдесят и не настраивается, поэтому limit урезает
+        // выдачу уже здесь, после разбора.
+        case .bitrix24:      path = "/\(token)/tasks.task.list"
         }
         guard let url = URL(string: service.host(secondary: secondary) + path) else {
             throw TrackerError.unreadable(service)
@@ -272,6 +302,7 @@ public struct RussianTrackers {
         case .yandexTracker: path = "/issues/"
         case .kaiten:        path = "/cards"
         case .yougile:       path = "/tasks"
+        case .bitrix24:      path = "/\(token)/tasks.task.add"
         }
         guard let url = URL(string: service.host(secondary: secondary) + path) else {
             throw TrackerError.unreadable(service)
@@ -305,6 +336,17 @@ public struct RussianTrackers {
         case .yougile:
             payload = ["title": title, "columnId": place]
             if let description { payload["description"] = description }
+        case .bitrix24:
+            // Задача без ответственного в Битриксе не заводится, поэтому
+            // третье поле здесь — номер человека, а не доски или колонки.
+            // Строка вместо номера даёт ту же тихую подмену, что стоила
+            // Kaiten доски номер ноль, — отсюда та же проверка.
+            guard let responsible = Int(place.trimmingCharacters(in: .whitespaces)) else {
+                throw TrackerError.notConfigured(service)
+            }
+            var fields: [String: Any] = ["TITLE": title, "RESPONSIBLE_ID": responsible]
+            if let description { fields["DESCRIPTION"] = description }
+            payload = ["fields": fields]
         }
         guard let data = try? JSONSerialization.data(withJSONObject: payload) else {
             throw TrackerError.unreadable(service)
@@ -332,6 +374,10 @@ public struct RussianTrackers {
                 .replacingOccurrences(of: "/api/latest", with: "")
             return URL(string: "\(host)/ticket/\(key)")
         case .yougile: return nil
+        case .bitrix24:
+            let portal = service.host(secondary: secondary)
+                .replacingOccurrences(of: "/rest", with: "")
+            return URL(string: "\(portal)/company/personal/user/1/tasks/task/view/\(key)/")
         }
     }
 
@@ -349,6 +395,24 @@ public struct RussianTrackers {
             return data
         case .kaiten, .yougile:
             return nil
+        case .bitrix24:
+            // Документация метода: TITLE ищется по шаблону, где `%` и `_` —
+            // подстановочные знаки, и они ставятся В ЗНАЧЕНИЕ, а не приставкой
+            // к имени поля. Приставка `%TITLE` — общий приём Битрикса, но для
+            // этого метода он в документации не показан, поэтому здесь ровно
+            // то, что описано.
+            //
+            // Размер страницы всегда пятьдесят и параметром не задаётся —
+            // `limit` поэтому применяется после разбора, а не тут.
+            let payload: [String: Any] = [
+                "filter": ["TITLE": "%\(query)%"],
+                "select": ["ID", "TITLE", "STATUS"],
+                "start": 0,
+            ]
+            guard let data = try? JSONSerialization.data(withJSONObject: payload) else {
+                throw TrackerError.unreadable(service)
+            }
+            return data
         }
     }
 
@@ -362,21 +426,32 @@ public struct RussianTrackers {
         if let array = root as? [[String: Any]] {
             rows = array
         } else if let object = root as? [String: Any] {
+            // Битрикс кладёт список на этаж глубже: {"result": {"tasks": []}}.
+            // Разворачиваем `result` до поиска ключей, иначе выдача пустая, а
+            // ответ при этом совершенно исправный.
+            let unwrapped = (object["result"] as? [String: Any]) ?? object
             // YouGile отдаёт список под "content", Яндекс — массивом,
             // Kaiten — массивом; "tasks"/"data" оставлены на случай смены формы.
-            rows = (object["content"] as? [[String: Any]])
-                ?? (object["tasks"] as? [[String: Any]])
-                ?? (object["data"] as? [[String: Any]])
+            rows = (unwrapped["content"] as? [[String: Any]])
+                ?? (unwrapped["tasks"] as? [[String: Any]])
+                ?? (unwrapped["data"] as? [[String: Any]])
+                ?? (object["result"] as? [[String: Any]])
                 ?? []
         } else {
             throw TrackerError.unreadable(service)
         }
 
         return rows.compactMap { row in
-            let key = (row["key"] as? String) ?? (row["id"].map { "\($0)" }) ?? ""
+            // Битрикс отдаёт поля прописными: ID, TITLE. Строчные варианты
+            // остаются первыми — у трёх остальных сервисов они и приходят.
+            let key = (row["key"] as? String)
+                ?? (row["id"].map { "\($0)" })
+                ?? (row["ID"].map { "\($0)" })
+                ?? ""
             let title = (row["summary"] as? String)
                 ?? (row["title"] as? String)
                 ?? (row["name"] as? String)
+                ?? (row["TITLE"] as? String)
                 ?? "Без названия"
             guard !key.isEmpty else { return nil }
             return Issue(key: key, title: title, url: URL(string: (row["url"] as? String) ?? ""))

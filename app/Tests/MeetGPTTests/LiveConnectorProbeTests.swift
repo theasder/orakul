@@ -60,6 +60,20 @@ struct LiveConnectorProbeTests {
             return
         }
 
+        // Российские трекеры проба не покрывала вовсе, и это заметили только
+        // когда Битрикс24 понадобилось проверить на живом портале: команда,
+        // записанная в план, молча не нашла бы сервис.
+        if let russian = RussianTrackers.Service(rawValue: service) {
+            let issues = try await RussianTrackers(service: russian, token: token,
+                                                   secondary: host,
+                                                   http: RussianTrackers.live).search(query)
+            print("[\(russian.title)] найдено задач: \(issues.count)")
+            for issue in issues.prefix(3) {
+                print("  — \(issue.key) \(issue.title.prefix(100))")
+            }
+            return
+        }
+
         if let tracker = SelfHostedTrackers.Service(rawValue: service) {
             let items = try await SelfHostedTrackers(service: tracker, token: token,
                                                      host: host,

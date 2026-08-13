@@ -181,6 +181,24 @@ describe('orakul landing (ru)', () => {
       'the page offers a download; verify the URL actually serves before allowing it');
   });
 
+  test('every Russian tracker that ships is listed on the page', () => {
+    // Тот же приём, что для мессенджеров и своих серверов: сплошной чип —
+    // обещание, и сборка единственный судья, можно ли его сдержать. Для
+    // российских трекеров такой проверки не было: Битрикс24 доехал до кода
+    // раньше, чем до страницы, и никто бы не заметил.
+    const src = readFileSync(
+      resolve(here, '..', 'mvp', 'Sources', 'OrakulCore', 'RussianTrackers.swift'), 'utf8');
+    const block = src.slice(src.indexOf('public var title: String'));
+    const titles = [...block.slice(0, block.indexOf('}\n\n')).matchAll(/return "([^"]+)"/g)]
+      .map(([, title]) => title);
+    assert.ok(titles.length >= 4, `found ${titles.length} tracker titles — the list is now fake`);
+
+    for (const tool of titles) {
+      assert.ok(html.includes(`<span class="tool">${tool}</span>`),
+        `${tool} ships but the page does not list it`);
+    }
+  });
+
   test('GigaChat stays absent from the provider list while the plan says why', () => {
     // Самый очевидный русский вопрос: «а где GigaChat?». Ответ измеренный и
     // лежит в плане; если провайдера когда-нибудь добавят, заметка обязана

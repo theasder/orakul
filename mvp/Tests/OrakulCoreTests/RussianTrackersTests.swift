@@ -32,6 +32,7 @@ struct RussianTrackersTests {
         switch service {
         case .yandexTracker: return "1234567"
         case .kaiten:        return "team.kaiten.ru"
+        case .bitrix24:      return "company.bitrix24.ru"
         case .yougile:       return nil
         }
     }
@@ -52,8 +53,13 @@ struct RussianTrackersTests {
             let url = try #require(request.url?.absoluteString)
             #expect(url.hasPrefix(service.host(secondary: secondary(for: service))),
                     "\(service.title): чужой хост")
-            let auth = try #require(request.value(forHTTPHeaderField: "Authorization"))
-            #expect(auth.contains("t0ken"))
+            // Ключ обязан уехать — но каждый сервис берёт его по-своему:
+            // трое заголовком, Битрикс частью адреса. Требовать заголовок у
+            // всех значило бы либо выкинуть Битрикс из проверки, либо
+            // придумать ему заголовок, которого вендор не ждёт.
+            let auth = request.value(forHTTPHeaderField: "Authorization") ?? ""
+            #expect(auth.contains("t0ken") || url.contains("t0ken"),
+                    "\(service.title): ключ не уехал ни заголовком, ни адресом")
         }
     }
 
@@ -284,5 +290,105 @@ struct YandexOrgHeaderTests {
             #expect(client.headers()[RussianTrackers.orgHeader(for: organisation)]
                     == organisation)
         }
+    }
+}
+
+@Suite("Битрикс24")
+struct Bitrix24Tests {
+    private func stub(json: String) -> (RussianTrackers.HTTP, () -> URLRequest?) {
+        var last: URLRequest?
+        let http: RussianTrackers.HTTP = { request in
+            last = request
+            return (Data(json.utf8), HTTPURLResponse(
+                url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
+        }
+        return (http, { last })
+    }
+
+    private func client(http: @escaping RussianTrackers.HTTP,
+                        destination: String? = nil) -> RussianTrackers {
+        RussianTrackers(service: .bitrix24, token: "1/abc123",
+                        secondary: "company.bitrix24.ru",
+                        destination: destination, http: http)
+    }
+
+    /// Форма ответа — из документации метода: список лежит на этаж глубже,
+    /// под `result.tasks`, а поля прописными.
+    private static let listJSON = """
+    {"result": {"tasks": [
+        {"id": "42", "ID": "42", "TITLE": "Пересчитать тарифы"},
+        {"ID": "43", "TITLE": "Выкатить в биллинг"}
+    ]}, "total": 2}
+    """
+
+    @Test("ключ вебхука уходит в адрес, а не в заголовок")
+    func webhookTravelsInThePath() async throws {
+        let (http, recorder) = stub(json: Self.listJSON)
+        _ = try await client(http: http).search("тарифы")
+
+        let request = try #require(recorder())
+        let url = try #require(request.url?.absoluteString)
+        #expect(url == "https://company.bitrix24.ru/rest/1/abc123/tasks.task.list")
+        #expect(request.value(forHTTPHeaderField: "Authorization") == nil,
+                "ключ ушёл ещё и в заголовок — у Битрикса его там быть не должно")
+        #expect(request.httpMethod == "POST")
+    }
+
+    @Test("подстановочные знаки стоят в значении, как описано у вендора")
+    func patternGoesIntoTheValue() async throws {
+        let (http, recorder) = stub(json: Self.listJSON)
+        _ = try await client(http: http).search("тарифы")
+
+        let body = try #require(recorder()?.httpBody)
+        let payload = try #require(
+            try JSONSerialization.jsonObject(with: body) as? [String: Any])
+        let filter = try #require(payload["filter"] as? [String: Any])
+        #expect(filter["TITLE"] as? String == "%тарифы%")
+        #expect(filter["%TITLE"] == nil, "приставка к имени поля для этого метода не описана")
+        #expect(payload["select"] as? [String] == ["ID", "TITLE", "STATUS"])
+    }
+
+    @Test("список достаётся из result.tasks, а поля читаются прописными")
+    func readsNestedUppercaseFields() async throws {
+        let (http, _) = stub(json: Self.listJSON)
+        let issues = try await client(http: http).search("тарифы")
+
+        #expect(issues.map(\.key) == ["42", "43"])
+        #expect(issues.map(\.title) == ["Пересчитать тарифы", "Выкатить в биллинг"])
+    }
+
+    /// Страница у Битрикса всегда пятьдесят и параметром не задаётся, поэтому
+    /// граница держится уже после разбора.
+    @Test("выдача урезается до запрошенного размера")
+    func trimsToRequestedLimit() async throws {
+        let rows = (1...60).map { "{\"ID\": \"\($0)\", \"TITLE\": \"Задача \($0)\"}" }
+        let (http, _) = stub(json: "{\"result\": {\"tasks\": [\(rows.joined(separator: ","))]}}")
+        let issues = try await client(http: http).search("задача", limit: 10)
+        #expect(issues.count == 10)
+    }
+
+    /// Портал на кириллице — рабочий случай: Битрикс такие имена выдаёт.
+    /// `URL` переводит их в punycode, и это правильно: в сеть уходит именно
+    /// такой адрес. Проверка стоит здесь, чтобы «странный» хост в отладке не
+    /// приняли за поломку и не начали чинить исправное.
+    @Test("кириллический портал уходит в punycode, а не ломается")
+    func cyrillicPortalBecomesPunycode() async throws {
+        let (http, recorder) = stub(json: Self.listJSON)
+        _ = try await RussianTrackers(service: .bitrix24, token: "1/abc123",
+                                      secondary: "фирма.bitrix24.ru",
+                                      http: http).search("тарифы")
+        let url = try #require(recorder()?.url?.absoluteString)
+        #expect(url.hasPrefix("https://xn--"), "адрес не собрался вовсе: \(url)")
+        #expect(url.hasSuffix("/rest/1/abc123/tasks.task.list"))
+    }
+
+    @Test("задача без числового ответственного не заводится вовсе")
+    func refusesNonNumericResponsible() async {
+        let (http, recorder) = stub(json: "{}")
+        await #expect(throws: RussianTrackers.TrackerError.notConfigured(.bitrix24)) {
+            _ = try await client(http: http, destination: "Иванов")
+                .createIssue(title: "Проверить", description: nil)
+        }
+        #expect(recorder() == nil, "запрос ушёл с подменённым ответственным")
     }
 }

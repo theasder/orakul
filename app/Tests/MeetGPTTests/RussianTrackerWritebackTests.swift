@@ -34,6 +34,7 @@ struct RussianTrackerWritebackTests {
             switch service {
             case .yandexTracker: return "1234567"
             case .kaiten:        return "team.kaiten.ru"
+            case .bitrix24:      return "company.bitrix24.ru"
             case .yougile:       return nil
             }
         }()
@@ -45,6 +46,8 @@ struct RussianTrackerWritebackTests {
         switch service {
         case .yandexTracker: return "TREK"
         case .kaiten:        return "4"
+        // У Битрикса третье поле — номер ответственного, а не доски.
+        case .bitrix24:      return "1"
         case .yougile:       return "col-1"
         }
     }
@@ -55,6 +58,8 @@ struct RussianTrackerWritebackTests {
             .yandexTracker: "https://api.tracker.yandex.net/v3/issues/",
             .kaiten: "https://team.kaiten.ru/api/latest/cards",
             .yougile: "https://yougile.com/api-v2/tasks",
+            // У Битрикса ключ вебхука — часть пути, поэтому он виден и здесь.
+            .bitrix24: "https://company.bitrix24.ru/rest/t0ken/tasks.task.add",
         ]
         for service in RussianTrackers.Service.allCases {
             let (http, recorder) = stub()
