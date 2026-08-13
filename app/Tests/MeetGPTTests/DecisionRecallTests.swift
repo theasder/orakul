@@ -33,6 +33,31 @@ struct DecisionRecallTests {
 
     private let embedder = HashingSkillTextEmbedder()
 
+    @Test("окно расшифровки накрывает и вопрос, и ответ на него")
+    func windowCoversQuestionAndAnswer() throws {
+        // В командной строке цитата — одно предложение, и на вопрос она
+        // возвращала сам вопрос: отвечающий не повторяет тему, и словарный
+        // поиск до ответа не дотягивается. Там это чинилось отдельно.
+        //
+        // Здесь единица крупнее — окно в 220 символов по репликам, — поэтому
+        // ответ попадает в неё сам. Проверка не про новое поведение, а про то,
+        // что его нельзя потерять: уменьшив окно, легко разлучить вопрос с
+        // ответом и не заметить.
+        let store = try scratchStore()
+        try store.save(session(title: "Планёрка по тарифам", daysAgo: 2,
+                               digest: "Обсуждали тарифы.",
+                               transcript: [
+                                "По тарифам — что решили в итоге?",
+                                "Годовой не трогаем до декабря, месячный поднимаем на пятнадцать процентов.",
+                               ]))
+
+        let hits = DecisionRecallService.recall(query: "что решили по тарифам",
+                                                store: store, embedder: embedder)
+        let excerpt = hits.first?.excerpt ?? ""
+        #expect(excerpt.contains("Годовой не трогаем"),
+                "ответ не попал в цитату вместе с вопросом: «\(excerpt)»")
+    }
+
     @Test("модели говорят, что часть архива не открылась")
     func recordSaysWhenItIsIncomplete() throws {
         // Раньше `SessionStore.list()` выбрасывал нечитаемый файл через
