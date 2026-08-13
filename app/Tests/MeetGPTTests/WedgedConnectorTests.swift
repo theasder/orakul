@@ -66,6 +66,36 @@ struct WedgedConnectorTests {
                 "обёрнуто только \(wrapped) вызовов — часть источников снова без срока")
     }
 
+    @Test("подмена срока не видна соседнему набору")
+    func deadlineOverrideIsTaskLocal() async {
+        // Раньше срок был обычной изменяемой статикой, и `GroundingContextPolicyTests`
+        // выставлял 600 на время своей проверки. Наборы Swift Testing идут
+        // ПАРАЛЛЕЛЬНО, так что проверка ниже могла прочитать чужие 600 и
+        // сообщить о поломке продукта, которой нет. Тот же капкан уже
+        // срабатывал на `ProviderKeyStore` — и чинится так же.
+        //
+        // Здесь это проверяется прямо: пока одна задача держит подмену, другая
+        // обязана видеть продакшен-значение.
+        async let inside: TimeInterval = MCPConnectionManager
+            .$deadlineOverrideForTesting.withValue(600) { () async -> TimeInterval in
+                // Пауза даёт соседней задаче шанс прочитать значение, пока
+                // подмена ещё активна: без неё проверка проходила бы и на
+                // сломанном коде просто потому, что не успела пересечься.
+                try? await Task.sleep(nanoseconds: 20_000_000)
+                return await MCPConnectionManager.groundingDeadline
+            }
+        async let outside: TimeInterval = { () async -> TimeInterval in
+            try? await Task.sleep(nanoseconds: 5_000_000)
+            return await MCPConnectionManager.groundingDeadline
+        }()
+
+        let withOverride = await inside
+        let without = await outside
+        #expect(withOverride == 600, "подмена не подействовала внутри своей задачи")
+        #expect(without != 600,
+                "чужая подмена протекла наружу: соседний набор увидел \(without)")
+    }
+
     @Test("сам срок остаётся человеческим")
     @MainActor
     func deadlineStaysInteractive() {

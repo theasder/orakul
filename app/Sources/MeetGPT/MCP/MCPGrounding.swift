@@ -557,7 +557,25 @@ extension MCPConnectionManager {
     /// elapse before the stub is even scheduled, at which point the deadline
     /// fires, grounding correctly returns nothing, and the test reports a
     /// product failure that never happened. Production never assigns this.
-    static var groundingDeadline: TimeInterval = 8
+    /// Подмена срока для тестов — только внутри своей задачи.
+    ///
+    /// Была обычная изменяемая статическая переменная, и это тот же капкан,
+    /// который уже сработал на `ProviderKeyStore`: Swift Testing гоняет наборы
+    /// ПАРАЛЛЕЛЬНО. `GroundingContextPolicyTests` выставляет 600, чтобы часы не
+    /// вмешивались в его проверку, а `WedgedConnectorTests` в это же время
+    /// утверждает, что срок не больше пятнадцати. Пересекутся — второй упадёт с
+    /// «срок 600.0 с — это уже не срок», то есть сообщит о поломке продукта,
+    /// которой нет.
+    ///
+    /// Воспроизвести не удалось (шесть прогонов подряд зелёные): окно узкое.
+    /// Но чинится это устройством, а не дисциплиной, и стоит одну строку —
+    /// а разбирать раз в месяц падающий набор стоит вечера.
+    ///
+    /// Цена та же, что у `ProviderKeyStore`: `Task.detached` task-local не
+    /// наследует. Веер источников собран на `withTaskGroup`, а он наследует.
+    @TaskLocal static var deadlineOverrideForTesting: TimeInterval?
+
+    static var groundingDeadline: TimeInterval { deadlineOverrideForTesting ?? 8 }
 
     private func findSearchTool(server: MCPServerDescriptor) async -> Tool? {
         if !isConnected(server.id) { await connect(server) }

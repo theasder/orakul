@@ -204,10 +204,18 @@ struct MCPGroundingBudgetTests {
         // real eight seconds can elapse before a stub is scheduled, the deadline
         // fires, and grounding correctly returns nothing. The test then reports
         // an empty result as a product failure. Take the clock out of it.
-        let realDeadline = MCPConnectionManager.groundingDeadline
-        MCPConnectionManager.groundingDeadline = 600
-        defer { MCPConnectionManager.groundingDeadline = realDeadline }
+        //
+        // Через `withValue`, а не присваиванием: наборы идут параллельно, и
+        // выставленные здесь 600 видел `WedgedConnectorTests`, который в это же
+        // время утверждает, что срок не больше пятнадцати. Task-local виден
+        // только внутри своей задачи.
+        try await MCPConnectionManager.$deadlineOverrideForTesting.withValue(600) {
+            try await runGroundingCheck(manager: manager)
+        }
+    }
 
+    @MainActor
+    private func runGroundingCheck(manager: MCPConnectionManager) async throws {
         let gateway = MockLLMGateway(response: "CRX-42, migration blocker")
         let state = AppState(
             llm: gateway,
