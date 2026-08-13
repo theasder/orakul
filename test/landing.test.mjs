@@ -1930,6 +1930,33 @@ describe('orakul landing (ru)', () => {
       'ambiguous prefixes no longer refuse — the page promises they delete nothing');
   });
 
+  test('the findings list says how many findings it has, and has that many', () => {
+    // Число прописью в подводке — ровно та мелочь, которая тихо разъезжается
+    // с содержимым: восемнадцатую находку допишут, а слово останется прежним.
+    const items = html.match(/<details class="finding">/g) ?? [];
+    const words = {
+      двенадцать: 12, тринадцать: 13, четырнадцать: 14, пятнадцать: 15,
+      шестнадцать: 16, семнадцать: 17, восемнадцать: 18, девятнадцать: 19, двадцать: 20,
+    };
+    const lead = /([А-Яа-я]+) проверок ниже/.exec(text);
+    assert.ok(lead, 'the findings list lost its lead-in');
+    const stated = words[lead[1].toLowerCase()];
+    assert.ok(stated, `unknown number word: ${lead[1]}`);
+    assert.equal(items.length, stated,
+      `the page says ${stated} findings, the list holds ${items.length}`);
+
+    // Заголовок виден всегда, доказательство раскрывается. Значит заголовок
+    // обязан быть законченной фразой: с двоеточием он обещает продолжение,
+    // которого в свёрнутом виде не видно.
+    const summaries = [...html.matchAll(/<summary>(.*?)<\/summary>/gs)]
+      .map((m) => m[1].replace(/<[^>]+>/g, '').trim());
+    assert.equal(summaries.length, items.length, 'a finding lost its summary');
+    for (const s of summaries) {
+      assert.ok(s.length > 10, `a summary is too short to be a claim: «${s}»`);
+      assert.ok(!/[:—-]$/.test(s), `a summary dangles on punctuation: «${s}»`);
+    }
+  });
+
   test('names the licence, because "open source" alone is not a licence', () => {
     assert.match(text, /Apache 2\.0/);
   });
