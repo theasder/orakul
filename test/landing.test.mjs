@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { callsInside, stripComments } from './swift-source.mjs';
+import { bodyOf, callsInside, stripComments } from './swift-source.mjs';
 
 // Run with: node --test   (no dependencies, nothing to install)
 //
@@ -949,6 +949,35 @@ describe('orakul landing (ru)', () => {
       resolve(here, '..', 'app', 'Sources', 'MeetGPT', 'AI', 'DecisionRecallContext.swift'), 'utf8'));
     assert.match(context, /INCOMPLETE RECORD/,
       'the model is no longer told the record is partial');
+  });
+
+  test('the performance number on the page is tied to the suite', () => {
+    // Ровно тот класс, что чинился весь вечер, но направленный на claim:
+    // страница называла «полторы секунды», комментарий в тесте — «стало 2.8 с»,
+    // а замер даёт 0.4 с. Ничто их не связывало: потолок в тесте — 12 секунд,
+    // нарочно с запасом, и любое число между нулём и двенадцатью проходило.
+    //
+    // Проверяется не сам замер (он зависит от машины, и тест на него был бы
+    // хлипким), а то, что ПОТОЛОК на странице и потолок в наборе — одно число.
+    assert.match(text, /0,4 секунды/,
+      'the page no longer states the measured search time');
+    assert.match(text, /замер на M-процессоре, а не обещание/,
+      'the page presents the number as a guarantee rather than a measurement');
+
+    const perf = readFileSync(
+      resolve(here, '..', 'mvp', 'Tests', 'OrakulCoreTests', 'RecallIndexTests.swift'), 'utf8');
+    // Из ТЕЛА нужной функции, а не поиском по файлу: рядом лежит другой
+    // замер со своим потолком, и первая версия этой проверки поймала именно
+    // его — ровно та ошибка соседнего совпадения, что уже случалась здесь.
+    const body = bodyOf(perf, 'func searchStaysUsableOnFullLengthCalls');
+    assert.ok(body, 'the month-of-calls measurement is gone from the suite');
+    const budget = /#expect\(elapsed < (\d+)/.exec(body);
+    assert.ok(budget, 'the month-of-calls budget is no longer recognisable in the suite');
+
+    const stated = /потолок в (\d+) секунд/.exec(text);
+    assert.ok(stated, 'the page no longer quotes the regression ceiling');
+    assert.equal(stated[1], budget[1],
+      `page says ${stated[1]} s, the suite enforces ${budget[1]} s`);
   });
 
   test('the encoding promise covers both surfaces and still refuses binary', () => {
