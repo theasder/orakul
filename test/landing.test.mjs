@@ -1978,6 +1978,28 @@ describe('orakul landing (ru)', () => {
       `the button goes to ${button[1]}, the command clones ${onPage[1]}`);
   });
 
+  test('the version the page advertises is the version the app is built with', () => {
+    // Страница обещает конкретный выпуск. Версию поднимут в Info.plist, а
+    // страницу забудут — и человек скачает не то, что ему обещали.
+    const onPage = /·\s*(\d+\.\d+\.\d+)\s*</.exec(html);
+    assert.ok(onPage, 'the page no longer names a version');
+    const plist = readFileSync(resolve(here, '..', 'app', 'Support', 'Info.plist'), 'utf8');
+    const built = /<key>CFBundleShortVersionString<\/key>\s*<string>([^<]+)<\/string>/.exec(plist);
+    assert.ok(built, 'the app version is gone from Info.plist');
+    assert.equal(onPage[1], built[1],
+      `the page offers ${onPage[1]}, the app is built as ${built[1]}`);
+  });
+
+  test('the download button points at releases of the same repository', () => {
+    const download = /<a class="btn" href="(https:\/\/[^"]+)"/.exec(html);
+    assert.ok(download, 'the page stopped offering a download');
+    assert.match(download[1], /\/releases\/latest$/,
+      'the download link does not point at a release');
+    const clone = /git clone (\S+?)(?:\.git)? orakul/.exec(text);
+    assert.ok(download[1].startsWith(clone[1]),
+      `download from ${download[1]}, sources from ${clone[1]}`);
+  });
+
   test('names the licence, because "open source" alone is not a licence', () => {
     assert.match(text, /Apache 2\.0/);
   });
