@@ -33,6 +33,27 @@ struct DecisionRecallTests {
 
     private let embedder = HashingSkillTextEmbedder()
 
+    @Test("официальное имя базы находит русскую речь о ней")
+    func infrastructureNamesCrossAlphabet() throws {
+        // Приложение — то, что скачивают, а не клонируют, и разбор слов у него
+        // общий с командной строкой: `RussianLexicon.canonicalToken`. Общий он
+        // именно затем, чтобы такие правки доходили до обеих поверхностей —
+        // но «доходит» это утверждение, а не факт, пока его не проверить
+        // здесь. В командной строке до этой правки не находилось ни одно из
+        // девяти имён.
+        let store = try scratchStore()
+        try store.save(session(title: "Планёрка по инфраструктуре", daysAgo: 3,
+                               digest: "Подняли редис до пятидесяти тысяч ключей. Постгрес обновили до шестнадцатой версии, нжинкс перенастроили."))
+        try store.save(session(title: "Найм", daysAgo: 1,
+                               digest: "Открываем две вакансии бэкендеров."))
+
+        for asked in ["Redis", "PostgreSQL", "nginx"] {
+            let hits = DecisionRecallService.recall(query: asked, store: store, embedder: embedder)
+            #expect(hits.first?.sessionTitle == "Планёрка по инфраструктуре",
+                    "«\(asked)» не нашёл звонок, где это обсуждали по-русски")
+        }
+    }
+
     @Test("finds the meeting where a topic was decided, from the digest")
     func findsDecisionAcrossSessions() throws {
         let store = try scratchStore()
