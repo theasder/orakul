@@ -276,7 +276,17 @@ public struct RussianTrackers {
         case .kaiten:
             // board_id — целое. Строка тут даёт 400, а сообщение об этом
             // приходит на английском и посреди звонка.
-            payload = ["title": title, "board_id": Int(place) ?? 0]
+            //
+            // Раньше стояло `Int(place) ?? 0`, и это была тихая подмена: поле
+            // доски в настройках — обычная строка, подсказка «номер доски,
+            // например 4» ничего не проверяет, и человек, вписавший НАЗВАНИЕ
+            // доски, отправлял в чужой трекер запись с доской номер ноль. Для
+            // чтения такая подмена стоила бы пустой выдачи, для записи — 400
+            // посреди звонка или карточки не там, где ждали.
+            guard let board = Int(place.trimmingCharacters(in: .whitespaces)) else {
+                throw TrackerError.notConfigured(service)
+            }
+            payload = ["title": title, "board_id": board]
             if let description { payload["description"] = description }
         case .yougile:
             payload = ["title": title, "columnId": place]

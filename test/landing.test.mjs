@@ -919,6 +919,28 @@ describe('orakul landing (ru)', () => {
     }
   });
 
+  test('the "writing is stricter than reading" promise is in the write path', () => {
+    // Обещание про запись проверяемо только по коду записи. Тихая подстановка
+    // нуля вместо номера доски — это не косметика: запись уходит в чужой
+    // трекер, и повторить её нельзя.
+    assert.match(text, /Запись строже чтения/,
+      'the page no longer promises the write path checks first');
+    assert.match(text, /доской номер ноль/,
+      'the page no longer names the failure it fixed');
+
+    const trackers = stripComments(readFileSync(
+      resolve(here, '..', 'mvp', 'Sources', 'OrakulCore', 'RussianTrackers.swift'), 'utf8'));
+    assert.doesNotMatch(trackers, /Int\(place\)\s*\?\?\s*0/,
+      'the silent zero is back — a board name would ship as board 0');
+    assert.match(trackers, /guard let board = Int\(place\.trimmingCharacters/,
+      'the write path no longer refuses a non-numeric board before the request');
+
+    // Запись обязана оставаться строгой и в разборе ответа: «завели задачу,
+    // которой нет» — худшее, что может сделать кнопка после звонка.
+    assert.match(trackers, /guard let created = parseCreated\(data\) else/,
+      'createIssue accepts an unparseable response again');
+  });
+
   test('the "server error names its number" promise holds in every connector', () => {
     // Обещание проверяемо только по коду: страница называет 502, а держится
     // это на том, что КАЖДЫЙ коннектор отличает ошибку сервера от мусора в

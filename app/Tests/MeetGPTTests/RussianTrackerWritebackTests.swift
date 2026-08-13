@@ -96,6 +96,41 @@ struct RussianTrackerWritebackTests {
         #expect(payload["title"] as? String == "Поднять лимиты")
     }
 
+    @Test("не-число в доске Kaiten останавливает запись, а не уходит нулём")
+    func kaitenRefusesANonNumericBoard() async throws {
+        // Поле доски в настройках — обычная строка, и подсказка «номер доски,
+        // например 4» её не проверяет. Человек вписывает НАЗВАНИЕ доски —
+        // «Разработка», — а `Int(place) ?? 0` молча подставлял ноль и уходил
+        // POST-ом. Это запись в чужой трекер: либо 400 по-английски посреди
+        // звонка, либо карточка не там, где ждали.
+        //
+        // Отказ должен случиться ДО сети — как с организацией Яндекса.
+        let calls = WritebackCounter()
+        let counting: @Sendable (URLRequest) async throws -> (Data, HTTPURLResponse) = { request in
+            await calls.bump()
+            return (Data(#"{"id": 1}"#.utf8),
+                    HTTPURLResponse(url: request.url!, statusCode: 200,
+                                    httpVersion: nil, headerFields: nil)!)
+        }
+        await #expect(throws: RussianTrackers.TrackerError.notConfigured(.kaiten)) {
+            _ = try await client(.kaiten, destination: "Разработка", http: counting)
+                .createIssue(title: "Поднять лимиты")
+        }
+        #expect(await calls.value == 0, "запрос ушёл с доской, которой нет")
+    }
+
+    @Test("пробелы вокруг номера доски не мешают")
+    func kaitenBoardTolerantOfSpaces() async throws {
+        // Граница: строгость не должна ломать нормальный ввод. Пробел с краю
+        // при копировании номера — обычное дело.
+        let (http, recorder) = stub(json: #"{"id": 314, "title": "Поднять лимиты"}"#)
+        _ = try await client(.kaiten, destination: " 4 ", http: http)
+            .createIssue(title: "Поднять лимиты")
+        let body = try #require(recorder.last?.httpBody)
+        let payload = try #require(try JSONSerialization.jsonObject(with: body) as? [String: Any])
+        #expect(payload["board_id"] as? Int == 4, "пробелы сломали разбор номера")
+    }
+
     @Test("у YouGile задача кладётся в колонку")
     func yougileGetsItsColumn() async throws {
         let (http, recorder) = stub(json: #"{"id": "task-9"}"#)
@@ -215,4 +250,10 @@ private final class Recorder: @unchecked Sendable {
     }
     var last: URLRequest? { lock.lock(); defer { lock.unlock() }; return requests.last }
     var count: Int { lock.lock(); defer { lock.unlock() }; return requests.count }
+}
+
+/// Счётчик обращений к сети в проверках записи.
+private actor WritebackCounter {
+    private(set) var value = 0
+    func bump() { value += 1 }
 }
