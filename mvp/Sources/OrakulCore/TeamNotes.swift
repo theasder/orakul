@@ -67,6 +67,11 @@ public struct TeamNotes {
     public enum ConnectorError: Error, Equatable, LocalizedError {
         case notConfigured
         case unauthorised
+        /// Сервер ответил, но ошибкой. Отдельно от `unreadable`:
+        /// 502 от обратного прокси — это живой сервер и внятный
+        /// ответ, а прежний текст советовал проверить ВЕРСИЮ, то
+        /// есть отправлял человека не туда.
+        case http(Int)
         case unreadable
 
         /// По-русски и с действием.
@@ -81,6 +86,8 @@ public struct TeamNotes {
                 return "База знаний не подключён. Откройте «Настройки → Подключённые приложения» и вставьте токен."
             case .unauthorised:
                 return "База знаний не принял токен. Обычно он истёк или у него не тех прав — создайте новый в самом сервисе."
+            case .http(let status):
+                return "База знаний ответил ошибкой \(status). Сервер на месте — проверьте адрес и права токена, а если это 5xx, то сам сервер или прокси перед ним."
             case .unreadable:
                 return "База знаний ответил непонятным образом. Если у вас свой сервер, проверьте адрес и версию."
             }
@@ -134,6 +141,12 @@ public struct TeamNotes {
         let (data, response) = try await http(request)
         if response.statusCode == 401 || response.statusCode == 403 {
             throw ConnectorError.unauthorised
+        }
+        // Всё прочее, кроме успеха, — ошибка сервера, а не мусор в
+        // ответе. Раньше сюда проваливались 404, 500 и 502, и разбор
+        // JSON объявлял их «непонятным ответом».
+        guard (200..<300).contains(response.statusCode) else {
+            throw ConnectorError.http(response.statusCode)
         }
         // `{ "data": [ { "context": …, "document": { "title": … } } ] }`.
         // Объект без `data` — это тело ошибки, и выдать его за пустую выдачу

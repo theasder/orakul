@@ -892,6 +892,37 @@ describe('orakul landing (ru)', () => {
     }
   });
 
+  test('the "server error names its number" promise holds in every connector', () => {
+    // Обещание проверяемо только по коду: страница называет 502, а держится
+    // это на том, что КАЖДЫЙ коннектор отличает ошибку сервера от мусора в
+    // ответе. Три из пяти этого не делали, и находилось это лишь настоящим
+    // рейсом до сервера, отвечающего как сломанный прокси.
+    assert.match(text, /ответил ошибкой 502/,
+      'the page no longer shows what a server error reads like');
+    assert.match(text, /502 или 504/,
+      'the page no longer names the on-premise failure it is about');
+
+    const core = resolve(here, '..', 'mvp', 'Sources', 'OrakulCore');
+    for (const file of ['SelfHostedTrackers.swift', 'TeamNotes.swift',
+                        'WorkMessengers.swift']) {
+      const source = stripComments(readFileSync(resolve(core, file), 'utf8'));
+      assert.match(source, /case http\(Int\)/,
+        `${file} has no distinct case for a server error`);
+      assert.match(source, /200\.\.<300/,
+        `${file} only inspects 401/403 again — 502 will read as unreadable`);
+      // И противоположная ветка обязана уцелеть: 200 с мусором это мусор.
+      assert.match(source, /ConnectorError\.unreadable/,
+        `${file} lost the unreadable case — garbage with a 200 needs it`);
+    }
+
+    // Те два, с которых брался образец, обязаны остаться правильными.
+    for (const file of ['RussianTrackers.swift', 'GitHubConnector.swift']) {
+      const source = stripComments(readFileSync(resolve(core, file), 'utf8'));
+      assert.match(source, /default:\s*throw/,
+        `${file} stopped handling unexpected statuses`);
+    }
+  });
+
   test('the infrastructure-name promise is backed by a search-only table', () => {
     // Обещание из двух половин, и вторая важнее: имена ищутся на обоих
     // алфавитах, но расшифровку НЕ переписывают. Если таблица переедет в
