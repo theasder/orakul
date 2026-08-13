@@ -62,18 +62,9 @@ private struct ProviderKeyRow: View {
 
     /// Где взять ключ. «Нужен ключ» без адреса — тот же тупик, что был у
     /// коннекторов к трекерам.
-    private var hint: String {
-        switch provider {
-        case .deepSeek:  return "platform.deepseek.com → API keys"
-        case .qwen:      return "dashscope.console.aliyun.com → API-KEY"
-        case .zhipu:     return "open.bigmodel.cn → ключи API"
-        case .moonshot:  return "platform.moonshot.cn → API keys"
-        case .openAI:    return "platform.openai.com → API keys"
-        case .anthropic: return "console.anthropic.com → API keys"
-        case .google:    return "aistudio.google.com → Get API key"
-        case .yandexGPT: return "console.yandex.cloud → сервисный аккаунт, API-ключ; там же идентификатор каталога"
-        }
-    }
+    /// Подсказка живёт у провайдера, рядом с адресом запроса: консоль и
+    /// адрес — две половины одного факта, и порознь они уже разъезжались.
+    private var hint: String { provider.keyConsoleHint }
 
     /// Сохранять половину настройки нельзя: провайдер будет выглядеть готовым
     /// и падать на первом же запросе.

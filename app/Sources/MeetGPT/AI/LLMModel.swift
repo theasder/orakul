@@ -113,6 +113,30 @@ enum LLMProvider: String, Codable, CaseIterable {
         var headers: () -> [String: String] = { [:] }
     }
 
+    /// Где человек берёт ключ. Живёт рядом с адресом запроса намеренно.
+    ///
+    /// У трёх китайских провайдеров две площадки — китайская и международная,
+    /// — и это РАЗНЫЕ сервисы с независимыми аккаунтами. Ключ одной на другой
+    /// даёт 401. Пока подсказка лежала во вьюхе, а адрес здесь, они разошлись:
+    /// запросы шли на международные адреса, а подсказка звала на китайскую
+    /// консоль. Русский разработчик получал ключ, который не мог заработать,
+    /// и три провайдера из брифа выглядели сломанными; вдобавок регистрация на
+    /// китайских площадках обычно требует местного телефона.
+    ///
+    /// Теперь обе половины одного факта стоят рядом, и тест сверяет их.
+    var keyConsoleHint: String {
+        switch self {
+        case .deepSeek:  return "platform.deepseek.com → API keys"
+        case .qwen:      return "modelstudio.console.aliyun.com → API-KEY (регион Сингапур)"
+        case .zhipu:     return "z.ai → ключи API"
+        case .moonshot:  return "platform.moonshot.ai → API keys"
+        case .openAI:    return "platform.openai.com → API keys"
+        case .anthropic: return "console.anthropic.com → API keys"
+        case .google:    return "aistudio.google.com → Get API key"
+        case .yandexGPT: return "console.yandex.cloud → сервисный аккаунт, API-ключ; там же идентификатор каталога"
+        }
+    }
+
     var openAIDialect: Dialect? {
         switch self {
         case .openAI, .anthropic, .google:

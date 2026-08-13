@@ -24,6 +24,13 @@ struct RussianCopyTests {
         let base = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
             .appendingPathComponent("Sources/MeetGPT")
+        // Три папки интерфейса — и один файл из AI: `LLMProvider.keyConsoleHint`
+        // показывается в настройках рядом с полем ключа, хотя лежит вместе с
+        // адресами запросов. Лежит намеренно: консоль и адрес — две половины
+        // одного факта, и порознь они уже разъезжались (китайская консоль
+        // против международного адреса, ключ на 401). Но переезд вынес шесть
+        // видимых строк из поля зрения этой проверки, и она замолчала — так
+        // что путь добавлен явно.
         return ["Views", "Onboarding", "Models"].map(base.appendingPathComponent)
     }
 
@@ -205,6 +212,15 @@ struct RussianCopyTests {
     /// зелёным тестом было бы враньём себе.
     /// Английские фразы, которые остаются английскими намеренно.
     ///
+    /// Подсказок «где взять ключ» здесь больше нет: они переехали к
+    /// `LLMProvider.keyConsoleHint`, чтобы стоять рядом с адресом запроса —
+    /// консоль и адрес оказались двумя половинами одного факта и порознь
+    /// разъехались (китайская консоль против международного адреса, ключ на
+    /// 401). Эта проверка обходит папки интерфейса, а весь файл `LLMModel`
+    /// включить нельзя: там же лежат подсказки модели, и проверка утонет в
+    /// шуме. Сами подсказки проверяет `ProviderConsoleMatchTests` — построчно
+    /// и по существу, а не по числу.
+    ///
     /// Их восемь, и каждая — не недоделка перевода:
     ///
     /// - `Google Calendar` — имя продукта, по-русски его не называют;
@@ -218,13 +234,7 @@ struct RussianCopyTests {
     /// переводом требуют объяснения.
     static let deliberateEnglish: Set<String> = [
         "Google Calendar",
-        "aistudio.google.com → Get API key",
-        "console.anthropic.com → API keys",
-        "dashscope.console.aliyun.com → API-KEY",
         "orakul, RICE, ARR, Kubernetes…",
-        "platform.deepseek.com → API keys",
-        "platform.moonshot.cn → API keys",
-        "platform.openai.com → API keys",
     ]
 
     static let remainingEnglishPhrases = deliberateEnglish.count

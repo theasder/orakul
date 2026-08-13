@@ -15,6 +15,16 @@ import { bodyOf, callsInside, stripComments } from './swift-source.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const html = readFileSync(resolve(here, '..', 'public', 'index.html'), 'utf8');
+
+/// Подсказки «где взять ключ» — они видны в настройках рядом с полем, но
+/// живут у провайдера, а не в папках интерфейса.
+function consoleHints() {
+  const model = readFileSync(
+    resolve(here, '..', 'app', 'Sources', 'MeetGPT', 'AI', 'LLMModel.swift'), 'utf8');
+  const body = bodyOf(model, 'var keyConsoleHint: String');
+  assert.ok(body, 'the provider key hints are no longer recognisable');
+  return [...body.matchAll(/return "([^"]+)"/g)].map((m) => m[1]);
+}
 const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
 
 describe('orakul landing (ru)', () => {
@@ -171,6 +181,31 @@ describe('orakul landing (ru)', () => {
       'the page offers a download; verify the URL actually serves before allowing it');
   });
 
+  test('every console the page sends you to is the one the app actually names', () => {
+    // Страница обещает: адрес рядом с полем ключа — тот же, куда пойдёт
+    // запрос. Обещание держится ровно до тех пор, пока кто-нибудь не
+    // поправит одну половину. Здесь проверяется, что страница называет
+    // международные консоли и что приложение говорит то же самое.
+    const promised = [...html.matchAll(/<code>([a-z0-9.-]+\.(?:ai|com|cn))<\/code>/g)]
+      .map((m) => m[1]).filter((host) => host !== 'platform.openai.com');
+    assert.ok(promised.length >= 2, `the page stopped naming consoles: ${promised}`);
+
+    const hints = consoleHints().join('\n');
+    for (const host of promised) {
+      assert.ok(hints.includes(host),
+        `the page sends people to ${host}, but no provider hint mentions it`);
+    }
+
+    // Китайские половины: ключ оттуда отвечает 401 на международном адресе,
+    // а регистрация обычно упирается в местный телефон.
+    for (const chinaOnly of ['platform.moonshot.cn', 'open.bigmodel.cn']) {
+      assert.ok(!html.includes(chinaOnly),
+        `the page points at ${chinaOnly} — a Russian developer cannot use a key from there`);
+      assert.ok(!hints.includes(chinaOnly),
+        `a provider hint points at ${chinaOnly}, which does not match the endpoint`);
+    }
+  });
+
   test('every command the page prints actually exists', () => {
     // The page now tells a visitor to run two commands to check us rather than
     // trust us. That is the strongest thing an open-source page can say — and
@@ -289,8 +324,19 @@ describe('orakul landing (ru)', () => {
     // с прежней цифрой, если бы проверку не поправили.
     const listed = /deliberateEnglish: Set<String> = \[([\s\S]*?)\n    \]/.exec(ratchet);
     assert.ok(listed, 'the Swift ratchet no longer pins the list of phrases');
-    const remaining = listed[1].split('\n').filter((line) => line.trim().startsWith('"')).length;
-    assert.ok(remaining > 0, 'the pinned list is empty — the page would claim a false zero');
+    const inViews = listed[1].split('\n').filter((line) => line.trim().startsWith('"')).length;
+
+    // Плюс подсказки «где взять ключ»: они видны в настройках, но лежат у
+    // провайдера рядом с адресом запроса, а не в папках интерфейса. Считать
+    // надо ОБА источника — иначе страница назовёт число меньше того, что
+    // человек видит глазами.
+    // Только те, где нет кириллицы: у Zhipu, Qwen и Яндекса подсказки уже
+    // по-русски, и числить их в «осталось английских» — приписать себе
+    // работу, которая сделана.
+    const hints = consoleHints().filter((s) => !/[А-Яа-яЁё]/.test(s)).length;
+    assert.ok(hints > 0, 'no provider hints found — the page would undercount');
+
+    const remaining = inViews + hints;
 
     // Anchored to the sentence that states the count, not loose anywhere on the
     // page. A bare word match was worthless: "пять" already occurs three times
