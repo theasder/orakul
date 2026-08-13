@@ -172,4 +172,66 @@ struct ConnectorHTTPStatusTests {
     func labelRenders(key: String, state: String, expected: String) {
         #expect(IssueLabel.render(key: key, state: state) == expected)
     }
+
+    // MARK: - Обрезка выдачи
+
+    private func returning(_ count: Int)
+        -> @Sendable (URLRequest) async throws -> (Data, HTTPURLResponse) {
+        { request in
+            let items = (1...max(count, 1)).map {
+                #"{"iid": \#($0), "title": "Задача про лимиты номер \#($0)", "state": "opened"}"#
+            }.joined(separator: ",")
+            return (Data("[\(items)]".utf8),
+                    HTTPURLResponse(url: request.url!, statusCode: 200,
+                                    httpVersion: nil, headerFields: nil)!)
+        }
+    }
+
+    @Test("полная выдача честно называет себя первой десяткой")
+    func fullPageSaysThereMayBeMore() async {
+        // Сервер отдал ровно столько, сколько просили. Молчание тут создаёт
+        // ложное впечатление, что в трекере всего десять таких задач —
+        // человек на звонке ошибётся про собственные данные. Проверено на
+        // сервере с сорока семью совпадениями: десять строк и ни слова.
+        let settings = ConnectorQuery.Settings(service: "gitlab", token: "tok",
+                                               host: "http://gitlab.internal", scope: nil)
+        let answer = await ConnectorQuery.ask(settings, query: "лимиты",
+                                              trackerHTTP: returning(ConnectorQuery.searchLimit))
+        #expect(answer.text.contains("Показаны первые \(ConnectorQuery.searchLimit)"),
+                "об обрезке не сказано: «\(answer.text.suffix(80))»")
+        #expect(answer.text.contains("сузьте запрос"), "не сказано, что делать дальше")
+        #expect(!answer.failed, "обрезка — не сбой")
+    }
+
+    @Test("неполная выдача о продолжении не выдумывает")
+    func partialPageStaysQuiet() async {
+        // Граница: приписка на каждой выдаче — это шум, который перестают
+        // читать, и вдобавок неправда, когда найдено всё.
+        let settings = ConnectorQuery.Settings(service: "gitlab", token: "tok",
+                                               host: "http://gitlab.internal", scope: nil)
+        let answer = await ConnectorQuery.ask(settings, query: "лимиты",
+                                              trackerHTTP: returning(3))
+        #expect(!answer.text.contains("Показаны первые"),
+                "приписка на неполной выдаче: «\(answer.text)»")
+        #expect(answer.text.contains("номер 3"), "находки потерялись")
+    }
+
+    @Test("сколько просим у сервиса и сколько показываем — одно число")
+    func limitMatchesWhatWeAsk() throws {
+        // Если запрашивать двадцать, а показывать десять, приписка станет
+        // враньём наоборот: обрезали мы, а скажем, что сервис.
+        let source = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent().deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("Sources/OrakulCore/SelfHostedTrackers.swift"),
+            encoding: .utf8)
+        for field in ["per_page", "limit"] {
+            if let match = source.range(of: #"URLQueryItem\(name: "\#(field)", value: "(\d+)"\)"#,
+                                        options: .regularExpression) {
+                #expect(String(source[match]).contains("\(ConnectorQuery.searchLimit)"),
+                        "у \(field) в запросе другое число, чем показываем")
+            }
+        }
+    }
 }

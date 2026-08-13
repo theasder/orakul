@@ -151,13 +151,34 @@ public enum ConnectorQuery {
         }
     }
 
+    /// Сколько находок просим у каждого сервиса. То же число стоит в запросах
+    /// коннекторов (`limit=10`, `per_page=10`).
+    static let searchLimit = 10
+
     private static func render(_ service: String, _ lines: [String]) -> Answer {
         guard !lines.isEmpty else {
             // Пустая выдача — ответ, а не сбой: слова могло и не быть сказано.
             return .init(text: "\(service): по этим словам ничего не нашлось.", failed: false)
         }
-        return .init(text: ([service + ":"] + lines.prefix(10).map { "    " + $0 })
-                        .joined(separator: "\n"),
-                     failed: false)
+        var text = ([service + ":"] + lines.prefix(searchLimit).map { "    " + $0 })
+            .joined(separator: "\n")
+
+        // Сервис спрашивают ровно про `searchLimit` находок. Если пришло
+        // столько же, сколько просили, — почти наверняка есть ещё, и молчать
+        // об этом нельзя: человек на звонке решит, что в его трекере всего
+        // десять таких задач, и ошибётся про собственные данные. Проверено на
+        // сервере, отдающем десять из сорока семи: десять строк и ни слова.
+        //
+        // Продукт эту разницу уже проводит в поиске по звонкам — «Ещё N
+        // звонков с упоминанием — в архиве». Здесь то же правило.
+        //
+        // Точное число тоже достижимо: GitHub и Redmine кладут `total_count` в
+        // ответ, GitLab и Gitea — в заголовки `X-Total` и `X-Total-Count`.
+        // Это потребовало бы протащить его через все коннекторы; пока сказано
+        // то, что верно всегда и без лишней проводки.
+        if lines.count >= searchLimit {
+            text += "\n\nПоказаны первые \(searchLimit) — сузьте запрос, если нужного здесь нет."
+        }
+        return .init(text: text, failed: false)
     }
 }

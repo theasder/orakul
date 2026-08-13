@@ -980,6 +980,27 @@ describe('orakul landing (ru)', () => {
       `page says ${stated[1]} s, the suite enforces ${budget[1]} s`);
   });
 
+  test('the "first ten, not all" notice is real and conditional', () => {
+    assert.match(text, /Показаны первые 10/,
+      'the page no longer shows the truncation notice');
+    assert.match(text, /Когда нашлось меньше десяти, приписки нет/,
+      'the page no longer states the notice is conditional');
+
+    const query = stripComments(readFileSync(
+      resolve(here, '..', 'mvp', 'Sources', 'OrakulCore', 'ConnectorQuery.swift'), 'utf8'));
+    assert.match(query, /lines\.count >= searchLimit/,
+      'the notice is unconditional or gone — either way the page is wrong');
+    assert.match(query, /Показаны первые \\\(searchLimit\)/,
+      'the notice no longer quotes the same limit it enforces');
+
+    // Число на странице обязано быть тем же, что просят у сервиса.
+    const limit = /static let searchLimit = (\d+)/.exec(query);
+    assert.ok(limit, 'the shared limit constant is gone');
+    const onPage = /Показаны первые (\d+)/.exec(text);
+    assert.equal(onPage[1], limit[1],
+      `page says ${onPage[1]}, the code asks for ${limit[1]}`);
+  });
+
   test('the encoding promise covers both surfaces and still refuses binary', () => {
     // Обещание про кодировки держится на двух разных читателях файлов —
     // командной строке и импортёре контекста приложения. Правка, дошедшая до
