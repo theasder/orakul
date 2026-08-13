@@ -82,7 +82,17 @@ public struct SessionStore: Sendable {
     public func load() -> Archive {
         let manager = FileManager.default
         guard let names = try? manager.contentsOfDirectory(atPath: root.path) else {
-            return Archive(sessions: [], skipped: [])
+            // Каталога нет — архив и правда пуст: это первый запуск, и «искать
+            // пока негде» верно.
+            //
+            // Каталог есть, а прочитать его не вышло (права, битая файловая
+            // система) — это отказ. Сказать тут «архив пуст» значит уверенно
+            // сообщить, что звонков нет, тогда как они, возможно, лежат рядом
+            // и просто недоступны. Человек поверит и начнёт заново.
+            guard manager.fileExists(atPath: root.path) else {
+                return Archive(sessions: [], skipped: [])
+            }
+            return Archive(sessions: [], skipped: [root.lastPathComponent + "/"])
         }
 
         var sessions: [RecallIndex.Session] = []

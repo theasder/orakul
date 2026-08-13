@@ -43,6 +43,14 @@ public enum RecallAnswer {
                                archiveIsEmpty: Bool = false,
                                unreadable: [String] = []) -> String {
         guard !archiveIsEmpty else {
+            // Пусто и при этом что-то не прочиталось — это не пустой архив, а
+            // архив, до которого мы не добрались. Разница решающая: в первом
+            // случае человеку нечего терять, во втором его записи, возможно,
+            // на месте, и «пуст» отправит его заводить всё заново.
+            guard unreadable.isEmpty else {
+                return withWarning(
+                    "Не смог прочитать архив — сказать, что в нём, не могу.", unreadable)
+            }
             return withWarning(
                 "Архив пуст — искать пока негде. Добавьте расшифровку: orakul добавить <файл>",
                 unreadable)

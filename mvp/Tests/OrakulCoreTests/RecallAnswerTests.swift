@@ -232,3 +232,58 @@ struct RecallAnswerTests {
     }
 }
 
+
+@Suite("Непрочитанный архив — не пустой архив")
+struct UnreadableArchiveTests {
+    /// Первый запуск: каталога нет, архив действительно пуст.
+    @Test("нет каталога — архив пуст, и так и сказано")
+    func missingDirectoryIsEmptyArchive() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("orakul-нет-\(UUID().uuidString)")
+        let archive = SessionStore(root: root).load()
+        #expect(archive.sessions.isEmpty)
+        #expect(archive.skipped.isEmpty, "пустой архив не должен ничем жаловаться")
+
+        let answer = RecallAnswer.compose(query: "тарифы", hits: [],
+                                          archiveIsEmpty: true, unreadable: archive.skipped)
+        #expect(answer.contains("Архив пуст"))
+    }
+
+    /// Каталог есть, а прочитать нельзя. Сказать «пуст» — значит уверенно
+    /// сообщить, что звонков нет, когда они, возможно, лежат рядом.
+    @Test("каталог не читается — это отказ, а не пустота")
+    func unreadableDirectoryIsNotEmptiness() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("orakul-закрыт-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: root.path)
+            try? FileManager.default.removeItem(at: root)
+        }
+        // Права снимаются после создания: каталог существует, но не читается.
+        try FileManager.default.setAttributes([.posixPermissions: 0o000],
+                                              ofItemAtPath: root.path)
+
+        let archive = SessionStore(root: root).load()
+        #expect(archive.sessions.isEmpty)
+        #expect(!archive.skipped.isEmpty, "отказ каталога проглочен как пустой архив")
+
+        let answer = RecallAnswer.compose(query: "тарифы", hits: [],
+                                          archiveIsEmpty: true, unreadable: archive.skipped)
+        #expect(!answer.contains("Архив пуст"),
+                "непрочитанный архив назван пустым: \(answer)")
+        #expect(answer.contains("Не смог прочитать архив"))
+    }
+
+    /// Отдельно от каталога: сам ответ обязан различать эти два случая.
+    @Test("текст ответа зависит от того, был ли отказ")
+    func wordingFollowsTheCause() {
+        let empty = RecallAnswer.compose(query: "тарифы", hits: [],
+                                         archiveIsEmpty: true, unreadable: [])
+        let broken = RecallAnswer.compose(query: "тарифы", hits: [],
+                                          archiveIsEmpty: true, unreadable: [".orakul/"])
+        #expect(empty.contains("Архив пуст"))
+        #expect(broken.contains("Не смог прочитать архив"))
+        #expect(empty != broken, "оба случая звучат одинаково")
+    }
+}
