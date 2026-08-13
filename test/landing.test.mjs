@@ -892,6 +892,39 @@ describe('orakul landing (ru)', () => {
     }
   });
 
+  test('the "builds from a clone" promise is itself checked', () => {
+    // Обещание на странице проверяемо ровно постольку, поскольку существует
+    // проверка, которая смотрит в git, а не в рабочее дерево. Без неё это
+    // просто утверждение — и оно уже было ложным: пятьдесят исходников не
+    // были под контролем версий, включая ProviderKeyStore.swift.
+    assert.match(text, /из клона всё собирается/,
+      'the page no longer promises a clone builds');
+    assert.match(text, /пропускаются с указанной причиной/,
+      'the page no longer explains why a clone reports skips');
+    assert.match(text, /Ключей в сборке нет/,
+      'the page no longer promises a credential-free build');
+
+    const clonable = readFileSync(resolve(here, 'clonable.test.mjs'), 'utf8');
+    assert.match(clonable, /ls-files/,
+      'the clone check reads the working tree again — it cannot see what a clone lacks');
+
+    const secrets = readFileSync(resolve(here, 'secrets.test.mjs'), 'utf8');
+    // Формы, а не список утёкшего: список ловит только прошлое.
+    for (const shape of ['GOCSPX-', 'sk-', 'ghp_', 'PRIVATE KEY']) {
+      assert.ok(secrets.includes(shape),
+        `the credential check no longer looks for ${shape}`);
+    }
+    // И смотрит в собранное приложение: утекло именно оттуда.
+    assert.match(secrets, /Contents', 'MacOS'/,
+      'the credential check stopped reading the built binary');
+
+    // Обещание «ключей нет» обязано опираться на пустой файл, а не на слова.
+    const baked = readFileSync(
+      resolve(here, '..', 'app', 'Sources', 'MeetGPT', 'Secrets.swift'), 'utf8');
+    assert.doesNotMatch(baked, /GOCSPX-|sk-[A-Za-z0-9]{20,}|apps\.googleusercontent\.com/,
+      'Secrets.swift carries a credential again — the page is lying');
+  });
+
   test('the terminal promises — exit status and a Russian network error — hold', () => {
     // Обе найдены запуском собранной команды, а не чтением кода: `orakul
     // спросить kaiten` с недоступным адресом печатал «Could not connect to
