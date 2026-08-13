@@ -2017,6 +2017,38 @@ describe('orakul landing (ru)', () => {
       'на странице нет адреса репозитория');
   });
 
+  test('small text meets AA contrast against the ground it sits on', () => {
+    // Подписи и надзаголовки набраны 11–12.5px цветом --faint. Он давал
+    // 3.49:1 — ниже 4.5, положенных для текста мельче 18.66px. Проверить это
+    // глазами нельзя: на тёмном фоне блёклая подпись выглядит «стильно»
+    // ровно до того, как её попробуют прочитать.
+    const token = (name) => {
+      const m = new RegExp(`--${name}:\\s*(#[0-9A-Fa-f]{6})`).exec(html);
+      assert.ok(m, `токен --${name} пропал`);
+      return m[1];
+    };
+    const channel = (hex, i) => {
+      const v = parseInt(hex.slice(1 + i * 2, 3 + i * 2), 16) / 255;
+      return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+    };
+    const luminance = (hex) =>
+      0.2126 * channel(hex, 0) + 0.7152 * channel(hex, 1) + 0.0722 * channel(hex, 2);
+    const contrast = (a, b) => {
+      const [x, y] = [luminance(a), luminance(b)].sort((p, q) => q - p);
+      return (x + 0.05) / (y + 0.05);
+    };
+
+    const ground = token('ink');
+    for (const name of ['text', 'muted', 'faint']) {
+      const ratio = contrast(token(name), ground);
+      assert.ok(ratio >= 4.5,
+        `--${name} даёт ${ratio.toFixed(2)}:1 на --ink, нужно 4.5 для мелкого текста`);
+    }
+    // Кнопка своим фоном: тёмный текст на янтарном.
+    assert.ok(contrast(token('ink'), token('amber')) >= 4.5,
+      'текст на главной кнопке не дотягивает до AA');
+  });
+
   test('names the licence, because "open source" alone is not a licence', () => {
     assert.match(text, /Apache 2\.0/);
   });
