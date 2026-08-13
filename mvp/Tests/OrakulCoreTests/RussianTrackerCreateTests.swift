@@ -54,25 +54,6 @@ struct RussianTrackerCreateTests {
                             "тело запроса — не объект JSON")
     }
 
-    /// `#expect(throws: значение)` ловит «ошибка не брошена», но не «брошена
-    /// не та»: с ним мутация «убрать ветку 401» проходила зелёной, потому что
-    /// вместо `.unauthorised` летело `.http(401)` и проверка этого не замечала.
-    /// Поэтому ошибка ловится руками и сравнивается.
-    private func expectError(_ expected: RussianTrackers.TrackerError,
-                             sourceLocation: SourceLocation = #_sourceLocation,
-                             _ body: () async throws -> Void) async {
-        do {
-            try await body()
-            Issue.record("ошибка не брошена вовсе, ждали \(expected)",
-                         sourceLocation: sourceLocation)
-        } catch let error as RussianTrackers.TrackerError {
-            #expect(error == expected, "брошено \(error), ждали \(expected)",
-                    sourceLocation: sourceLocation)
-        } catch {
-            Issue.record("брошена чужая ошибка: \(error)", sourceLocation: sourceLocation)
-        }
-    }
-
     @Test("каждый сервис пишет по своему адресу и методом POST",
           arguments: RussianTrackers.Service.allCases)
     func endpointPerService(service: RussianTrackers.Service) async throws {
@@ -149,8 +130,8 @@ struct RussianTrackerCreateTests {
                                            httpVersion: nil, headerFields: nil)!
             return (Data(#"{"id": 1}"#.utf8), response)
         }
-        await expectError(.notConfigured(service)) {
-            _ = try await self.client(service, destination: "Разработка", http: http)
+        await #expect(throws: RussianTrackers.TrackerError.notConfigured(service)) {
+            _ = try await client(service, destination: "Разработка", http: http)
                 .createIssue(title: "Выкатить биллинг")
         }
         #expect(!reached, "запрос всё-таки ушёл — значит доска подменена молча")
@@ -171,7 +152,7 @@ struct RussianTrackerCreateTests {
             secondary: "1234567",
             destination: missing == "место" ? "" : "TREK",
             http: http)
-        await expectError(.notConfigured(.yandexTracker)) {
+        await #expect(throws: RussianTrackers.TrackerError.notConfigured(.yandexTracker)) {
             _ = try await tracker.createIssue(title: missing == "название" ? "   " : "Задача")
         }
         #expect(!reached, "сеть тронули, хотя настройка неполная")
@@ -185,8 +166,8 @@ struct RussianTrackerCreateTests {
         let expected: RussianTrackers.TrackerError = kind == "unauthorised"
             ? .unauthorised(.kaiten)
             : .http(.kaiten, status)
-        await expectError(expected) {
-            _ = try await self.client(.kaiten, http: http).createIssue(title: "Задача")
+        await #expect(throws: expected) {
+            _ = try await client(.kaiten, http: http).createIssue(title: "Задача")
         }
     }
 
@@ -196,8 +177,8 @@ struct RussianTrackerCreateTests {
           arguments: ["не json вовсе", "{}", #"{"id": ""}"#, "[]"])
     func unreadableResponse(json body: String) async throws {
         let (http, _) = stub(json: body)
-        await expectError(.unreadable(.yougile)) {
-            _ = try await self.client(.yougile, http: http).createIssue(title: "Задача")
+        await #expect(throws: RussianTrackers.TrackerError.unreadable(.yougile)) {
+            _ = try await client(.yougile, http: http).createIssue(title: "Задача")
         }
     }
 
