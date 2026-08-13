@@ -892,6 +892,39 @@ describe('orakul landing (ru)', () => {
     }
   });
 
+  test('the infrastructure-name promise is backed by a search-only table', () => {
+    // Обещание из двух половин, и вторая важнее: имена ищутся на обоих
+    // алфавитах, но расшифровку НЕ переписывают. Если таблица переедет в
+    // общий канон, «купили редис» превратится в «купили Redis» — и страница
+    // станет враньём ровно там, где обещает обратное.
+    assert.match(text, /имена инфраструктуры/i,
+      'the page no longer promises infrastructure names work in both alphabets');
+    assert.match(text, /не переписывает расшифровку/,
+      'the page no longer states the boundary that makes this safe');
+
+    const lexicon = readFileSync(
+      resolve(here, '..', 'mvp', 'Sources', 'OrakulCore', 'RussianLexicon.swift'), 'utf8');
+
+    // Имена, названные на странице, обязаны быть в таблице.
+    for (const name of ['redis', 'postgres', 'git', 'nginx', 'clickhouse']) {
+      assert.ok(lexicon.includes(`"${name}"`),
+        `the page names ${name}; the lexicon does not carry it`);
+    }
+
+    // Таблица читается ТОЛЬКО поиском. `restore` строит канон из
+    // canonicalForms(), и infrastructure не должна туда попадать.
+    const canonical = /private static func buildCanonicalForms\(\)[\s\S]*?\n    \}/.exec(lexicon);
+    assert.ok(canonical, 'buildCanonicalForms is no longer recognisable');
+    assert.ok(!canonical[0].includes('infrastructure'),
+      'infrastructure names leaked into the rewrite canon — transcripts will be altered');
+
+    // …и наоборот: поиск обязан её читать, иначе обещание пустое.
+    const token = /public static func canonicalToken[\s\S]*?\n    \}/.exec(lexicon);
+    assert.ok(token, 'canonicalToken is no longer recognisable');
+    assert.match(token[0], /infrastructureIndex/,
+      'search stopped consulting the infrastructure table');
+  });
+
   test('the promise of a clean quote is backed by the cleanup', () => {
     // Обещание «ничего между ними» держалось на удаче: движок из README
     // (`whisper-cli … -otxt`) печатает отметку в одной строке с текстом, и

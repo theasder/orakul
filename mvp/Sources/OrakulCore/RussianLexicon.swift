@@ -128,7 +128,92 @@ public enum RussianLexicon {
         let key = normalized(word)
         if let canonical = canonicalIndex[key] { return normalized(canonical) }
         if let canonical = inflectionIndex[key] { return normalized(canonical) }
+        // Имена инфраструктуры — последними: они действуют ТОЛЬКО на поиск и не
+        // должны перебивать канон, по которому переписывается расшифровка.
+        if let canonical = infrastructureIndex[key] { return canonical }
         return nil
+    }
+
+    // MARK: - Имена инфраструктуры (только поиск)
+
+    /// Одно и то же место, названное по-русски и официально.
+    ///
+    /// **Зачем.** На планёрке говорят «подняли редис», «постгрес обновили», «в
+    /// гите ветку смержили». Ищут — официальным именем: так оно написано в
+    /// конфиге и в документации. До этой таблицы не находилось ни одно из
+    /// девяти проверенных имён; работали только `Kubernetes` и `Docker`,
+    /// единственные из этого ряда, попавшие в таблицу вариантов.
+    ///
+    /// **Почему отдельно от `variants`.** По `variants` строится канон, которым
+    /// `restore` ПЕРЕПИСЫВАЕТ расшифровку. Половина этих имён совпадает с
+    /// обычными русскими словами: «редис» — овощ, «кафка» — писатель,
+    /// «прометей» — титан. Переписать их в тексте созвона значит испортить
+    /// нормальную фразу; этот файл такие слова и исключает намеренно — см.
+    /// «агент», «канал», «очередь» в комментарии к `loanwords`. А счесть их
+    /// одним словом ПРИ ПОИСКЕ безопасно: цена ошибки — лишняя находка про
+    /// овощ, а не испорченный архив.
+    ///
+    /// Ключ — что человек мог сказать или набрать; значение — общий токен.
+    /// Сам токен латиницей и вниз регистром: он не показывается человеку,
+    /// только сравнивается.
+    static let infrastructure: [String: String] = [
+        "редис": "redis", "redis": "redis",
+        "кафка": "kafka", "kafka": "kafka",
+        "постгрес": "postgres", "постгре": "postgres",
+        "postgres": "postgres", "postgresql": "postgres", "psql": "postgres",
+        "нжинкс": "nginx", "энжиникс": "nginx", "nginx": "nginx",
+        "гит": "git", "git": "git",
+        "эластик": "elastic", "эластиксёрч": "elastic",
+        "elastic": "elastic", "elasticsearch": "elastic",
+        "кликхаус": "clickhouse", "clickhouse": "clickhouse",
+        "графана": "grafana", "grafana": "grafana",
+        "прометей": "prometheus", "прометеус": "prometheus",
+        "prometheus": "prometheus",
+        "монга": "mongo", "монго": "mongo", "mongo": "mongo", "mongodb": "mongo",
+        "рэббит": "rabbitmq", "раббит": "rabbitmq",
+        "rabbit": "rabbitmq", "rabbitmq": "rabbitmq",
+        "терраформ": "terraform", "terraform": "terraform",
+        "ансибл": "ansible", "ansible": "ansible",
+        "сентри": "sentry", "sentry": "sentry",
+        "кибана": "kibana", "kibana": "kibana",
+        "тарантул": "tarantool", "tarantool": "tarantool",
+        "кубер": "кубернетес", "k8s": "кубернетес",
+    ]
+
+    /// Разобрано по нормализованной форме один раз, как и остальные таблицы:
+    /// разбор зовётся на каждое слово каждого звонка.
+    private static let infrastructureIndex: [String: String] = {
+        var table: [String: String] = [:]
+        for (spoken, canonical) in infrastructure {
+            table[normalized(spoken)] = normalized(canonical)
+        }
+        // Падежи русских написаний: «постгресу», «кафку», «графану» человек
+        // произносит не задумываясь, а ищет именительным падежом или латиницей.
+        // Ставятся ПОСЛЕ основных ключей и не затирают их: у «гит» падеж
+        // «гита» не должен перебить само слово.
+        for (spoken, canonical) in infrastructure where isCyrillic(spoken) {
+            for form in russianCases(of: spoken) where table[normalized(form)] == nil {
+                table[normalized(form)] = normalized(canonical)
+            }
+        }
+        return table
+    }()
+
+    private static func isCyrillic(_ word: String) -> Bool {
+        guard let first = word.unicodeScalars.first else { return false }
+        return first.value >= 0x0400 && first.value <= 0x04FF
+    }
+
+    /// Падежные формы русского слова по трём общим правилам — тем же, что
+    /// `inflections()` применяет к заимствованиям.
+    private static func russianCases(of word: String) -> [String] {
+        guard let last = word.last else { return [] }
+        let stem = String(word.dropLast())
+        switch last {
+        case "а":  return [stem + "у", stem + "е", stem + "и", stem + "ой", stem + "ы"]
+        case "й":  return [stem + "я", stem + "ю", stem + "е", stem + "ем", stem + "и"]
+        default:   return [word + "а", word + "у", word + "е", word + "ом", word + "ы", word + "и"]
+        }
     }
 
     /// Падежи и числа терминов → сам термин.
