@@ -99,7 +99,7 @@ public enum ConnectorQuery {
                 let items = try await GitHubConnector(
                     token: settings.token, repositories: repositories,
                     http: githubHTTP).search(trimmed)
-                return render("GitHub", items.map { "\(label($0.key, $0.state)) \($0.title)" })
+                return render("GitHub", items.map { "\(IssueLabel.render(key: $0.key, state: $0.state)) \($0.title)" })
             }
             if let service = WorkMessengers.Service(rawValue: settings.service) {
                 let hits = try await WorkMessengers(
@@ -112,7 +112,7 @@ public enum ConnectorQuery {
                 let items = try await SelfHostedTrackers(
                     service: service, token: settings.token, host: settings.host,
                     http: trackerHTTP).search(trimmed)
-                return render(service.title, items.map { "\(label($0.key, $0.state)) \($0.title)" })
+                return render(service.title, items.map { "\(IssueLabel.render(key: $0.key, state: $0.state)) \($0.title)" })
             }
             if let service = TeamNotes.Service(rawValue: settings.service) {
                 let hits = try await TeamNotes(
@@ -149,16 +149,6 @@ public enum ConnectorQuery {
         default:
             return "Не получилось спросить сервис\(host): \(url.localizedDescription)"
         }
-    }
-
-    /// `[#314]` или `[#314, closed]`.
-    ///
-    /// Состояние приписывается, только если сервис его сообщил. Поиск Redmine
-    /// состояния не отдаёт, и раньше здесь появлялось `[#314, unknown]` —
-    /// строка, которая выглядит как «состояние неизвестно вам». Оно не
-    /// неизвестно: его просто не спрашивали, и говорить о нём нечего.
-    private static func label(_ key: String, _ state: String) -> String {
-        state.isEmpty ? "[\(key)]" : "[\(key), \(state)]"
     }
 
     private static func render(_ service: String, _ lines: [String]) -> Answer {

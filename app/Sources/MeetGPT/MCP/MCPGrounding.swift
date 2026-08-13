@@ -342,7 +342,7 @@ extension MCPConnectionManager {
                     // Состояние задачи в тексте: «уже закрыто» меняет смысл
                     // находки на противоположный.
                     let text = items.prefix(10)
-                        .map { "[\($0.key), \($0.state)] \($0.title)" }
+                        .map { "\(IssueLabel.render(key: $0.key, state: $0.state)) \($0.title)" }
                         .joined(separator: "\n")
                         .prefix(maxCharsPerSource).description
                     return (index, GroundingSnippet(
@@ -409,7 +409,7 @@ extension MCPConnectionManager {
                     // смысл находки на противоположный, а по одному заголовку
                     // этого не видно.
                     let text = items.prefix(10)
-                        .map { "[\($0.key), \($0.state)] \($0.title)" }
+                        .map { "\(IssueLabel.render(key: $0.key, state: $0.state)) \($0.title)" }
                         .joined(separator: "\n")
                         .prefix(maxCharsPerSource).description
                     return (index, GroundingSnippet(

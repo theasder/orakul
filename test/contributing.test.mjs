@@ -35,6 +35,23 @@ describe('CONTRIBUTING', () => {
     assert.ok(pkg.scripts?.test, 'the guide promises npm test, package.json has no test script');
   });
 
+  test('the guide warns about the stale core file list', () => {
+    // Ловушка, на которую напоролись дважды за одну ночь: файл добавлен в
+    // ядро, импорт на месте, а сборка сообщает `cannot find <Тип> in scope`.
+    // Обычный `swift build` в app/ и сборка установщика держат РАЗНЫЕ кеши, и
+    // зелёный первый ничего не говорит про второй. Пришедший со стороны
+    // потратит на это вечер, если не написать.
+    assert.match(guide, /swift package clean/,
+      'CONTRIBUTING no longer tells contributors how to refresh the core file list');
+    assert.match(guide, /cannot find/,
+      'the guide does not name the error, so nobody will find this section');
+
+    // И то, что сборка установщика делает это сама, — обещание в тексте.
+    const build = readFileSync(resolve(repo, 'app', 'build.sh'), 'utf8');
+    assert.match(build, /swift package .* clean/,
+      'the guide says the installer build cleans itself; build.sh no longer does');
+  });
+
   test('the example it points a new connector at is still there', () => {
     // "Look at this file" is the most useful line in the guide and the first
     // to rot: the file gets renamed and nobody re-reads the docs.

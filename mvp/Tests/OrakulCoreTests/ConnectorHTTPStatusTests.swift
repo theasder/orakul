@@ -144,4 +144,32 @@ struct ConnectorHTTPStatusTests {
         let answer = await ConnectorQuery.ask(settings, query: "лимиты", trackerHTTP: gitlab)
         #expect(answer.text.contains("[#42, closed]"), "состояние потеряно: «\(answer.text)»")
     }
+
+    @Test("подпись задачи собирается в одном месте, а не в трёх")
+    func labelHasASingleImplementation() throws {
+        // Ровно этим разрывом правка выше едва не обернулась ухудшением:
+        // выражение стояло в трёх местах, состояние перестало выдумываться в
+        // одном, и два оставшихся начали печатать «[#314, ]» — хуже, чем
+        // «[#314, unknown]». Проверяется не стиль, а то, что решение одно.
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        for file in ["mvp/Sources/OrakulCore/ConnectorQuery.swift",
+                     "app/Sources/MeetGPT/MCP/MCPGrounding.swift"] {
+            let source = try String(contentsOf: root.appendingPathComponent(file),
+                                    encoding: .utf8)
+            #expect(!source.contains("$0.key), \\($0.state)]"),
+                    "\(file) снова собирает подпись сам")
+            #expect(source.contains("IssueLabel.render"),
+                    "\(file) не пользуется общей подписью")
+        }
+    }
+
+    @Test("общая подпись ведёт себя как обещано",
+          arguments: [("#314", "", "[#314]"),
+                      ("#42", "closed", "[#42, closed]"),
+                      ("#7", "   ", "[#7]")])
+    func labelRenders(key: String, state: String, expected: String) {
+        #expect(IssueLabel.render(key: key, state: state) == expected)
+    }
 }
