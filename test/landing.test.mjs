@@ -181,6 +181,45 @@ describe('orakul landing (ru)', () => {
       'the page offers a download; verify the URL actually serves before allowing it');
   });
 
+  test('every card on the page has a heading, not just a paragraph', () => {
+    // Абзац, вставленный чуть выше нужной строки, оказался отдельной
+    // карточкой без заголовка: тесты прошли, потому что структуру карточек
+    // никто не проверял, а на странице она выглядела оборванной.
+    //
+    // Проверяется заголовок, а не надкатегория: пять карточек обходятся одним
+    // <h3>, и требовать «кикер» значило бы придумать правило, которого
+    // страница не держится.
+    const cards = [...html.matchAll(/<article class="card">([\s\S]*?)<\/article>/g)]
+      .map((m) => m[1]);
+    assert.ok(cards.length > 3, `too few cards found (${cards.length}) — the markup changed shape`);
+
+    const headless = cards.filter((body) => !/<h[23][^>]*>/.test(body));
+    assert.deepEqual(headless, [],
+      `${headless.length} card(s) have no heading; first starts: `
+      + `${headless[0]?.trim().slice(0, 70)}`);
+  });
+
+  test('the documented build produces every disk image the audit checks', () => {
+    // Проверка сверяет два DMG, а README до 2026-08-13 описывал сборку одной
+    // архитектуры. Кто шёл по README, собирал arm64, оставлял Intel вчерашним
+    // и получал от проверки расхождение без объяснения причины.
+    const audit = readFileSync(resolve(here, '..', 'scripts', 'audit-dmg.sh'), 'utf8');
+    const loop = /for arch in ([^;\n]+); do/.exec(audit);
+    assert.ok(loop, 'the audit no longer loops over architectures');
+    const distinct = [...new Set(loop[1].trim().split(/\s+/))];
+    assert.ok(distinct.length > 0, 'the audit no longer names any architecture');
+
+    const readme = readFileSync(resolve(here, '..', 'README.md'), 'utf8');
+    const build = /Сборка установщика: `([^`]+)`/.exec(readme);
+    assert.ok(build, 'README no longer states how to build the installer');
+
+    if (distinct.length > 1) {
+      assert.ok(build[1].includes('dist-all.sh'),
+        `the audit checks ${distinct.length} architectures, but README documents `
+        + `"${build[1]}" — following it leaves the others stale`);
+    }
+  });
+
   test('every console the page sends you to is the one the app actually names', () => {
     // Страница обещает: адрес рядом с полем ключа — тот же, куда пойдёт
     // запрос. Обещание держится ровно до тех пор, пока кто-нибудь не
