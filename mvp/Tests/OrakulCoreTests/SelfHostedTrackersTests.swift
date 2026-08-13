@@ -143,7 +143,6 @@ struct SelfHostedTrackersTests {
     }
 }
 
-/// Запоминает запросы: замыкание `Sendable`, поэтому состояние под замком.
 
 @Suite("Адрес сервера: где путь срезается, а где нет")
 struct HostNormalisationPolicyTests {

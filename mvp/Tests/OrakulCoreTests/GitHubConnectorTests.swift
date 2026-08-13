@@ -141,11 +141,50 @@ struct GitHubConnectorTests {
         }
     }
 
+    /// Ровно то, что человек читает, когда GitHub отказал. Без этого наружу шло
+    /// «The operation couldn't be completed» — по-английски и без намёка, что
+    /// делать. Тексты не были покрыты ничем.
+    @Test("отказ объясняется по-русски и говорит, что делать")
+    func errorsSpeakRussian() throws {
+        let cases: [(GitHubConnector.ConnectorError, [String])] = [
+            (.notConfigured, ["GitHub не подключён", "Настройки"]),
+            (.unauthorised, ["не принял токен", "read"]),
+            (.http(404), ["404", "репозиторий"]),
+            (.unreadable, ["разобрать"]),
+        ]
+        for (error, expected) in cases {
+            let text = try #require(error.errorDescription)
+            for fragment in expected {
+                #expect(text.contains(fragment), "в «\(text)» нет «\(fragment)»")
+            }
+            #expect(text.hasPrefix("GitHub"), "человек не поймёт, какой сервис отказал")
+        }
+    }
+
+    /// Пустая выдача и невыполненный запрос — разные вещи, и здесь их три:
+    /// ответ не объект вовсе, объект без `items` и без `message` (пусто —
+    /// это ответ), объект с `message` (это отказ).
+    @Test("пустота отличается от невыполненного запроса")
+    func emptyIsNotAFailure() async throws {
+        let (empty, _) = stub(json: #"{"total_count": 0, "items": []}"#)
+        #expect(try await client(http: empty).search("q").isEmpty)
+
+        // Ни items, ни message: считаем, что задач нет.
+        let (bare, _) = stub(json: #"{"total_count": 0}"#)
+        #expect(try await client(http: bare).search("q").isEmpty)
+
+        // Не объект вовсе — разобрать нечего, и это не «задач нет».
+        for body in ["[]", "не json", ""] {
+            let (broken, _) = stub(json: body)
+            await #expect(throws: GitHubConnector.ConnectorError.unreadable) {
+                try await self.client(http: broken).search("q")
+            }
+        }
+    }
+
     @Test("сказано, где взять токен и что писать в репозитории")
     func promptsExplainThemselves() {
         #expect(GitHubConnector.credentialHint.contains("Personal access tokens"))
         #expect(GitHubConnector.repositoriesPrompt.contains("/"))
     }
 }
-
-/// Запоминает запросы: замыкание `Sendable`, поэтому состояние под замком.

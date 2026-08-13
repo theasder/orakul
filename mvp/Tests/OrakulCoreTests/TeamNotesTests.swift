@@ -103,6 +103,37 @@ struct TeamNotesTests {
                 of: "[а-яё]", options: [.regularExpression, .caseInsensitive]) != nil)
         }
     }
-}
 
-/// Запоминает запросы: замыкание `Sendable`, поэтому состояние под замком.
+    /// Тексты отказов не были покрыты ничем — и в них жила ошибка, которую
+    /// видел каждый, кто подключал заметки: «База знаний не подключён»,
+    /// «не принял токен», «ответил ошибкой». Название женского рода, глаголы
+    /// мужского. У остальных коннекторов подлежащее мужского рода («Трекер»,
+    /// «Мессенджер», «GitHub»), поэтому там та же заготовка читается верно —
+    /// отсюда и ошибка при переносе.
+    @Test("отказ написан по-русски и согласован с «базой знаний»")
+    func errorsAgreeInGender() throws {
+        let cases: [(TeamNotes.ConnectorError, String)] = [
+            (.notConfigured, "не подключена"),
+            (.unauthorised, "не приняла токен"),
+            (.http(500), "ответила ошибкой 500"),
+            (.unreadable, "ответила непонятным образом"),
+        ]
+        for (error, expected) in cases {
+            let text = try #require(error.errorDescription)
+            #expect(text.hasPrefix("База знаний "), "сервис не назван: \(text)")
+            #expect(text.contains(expected), "в «\(text)» нет «\(expected)»")
+            for masculine in ["не подключён", "не принял ", "ответил ", "ответило "] {
+                #expect(!text.contains(masculine),
+                        "мужской род при женском подлежащем: \(text)")
+            }
+        }
+    }
+
+    @Test("название и подсказка адреса есть у каждого сервиса заметок",
+          arguments: TeamNotes.Service.allCases)
+    func serviceStrings(service: TeamNotes.Service) {
+        #expect(!service.title.isEmpty)
+        #expect(service.hostPrompt.contains("адрес"),
+                "подсказка не говорит, что вписывать: \(service.hostPrompt)")
+    }
+}

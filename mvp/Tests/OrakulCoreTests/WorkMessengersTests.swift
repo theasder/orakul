@@ -250,7 +250,6 @@ struct WorkMessengersTests {
     // MARK: - Хранение
 }
 
-/// Запоминает запросы: замыкание `Sendable`, поэтому состояние под замком.
 
 @Suite("Пара значений в одном поле")
 struct PairedTokenTests {
