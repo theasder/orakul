@@ -61,8 +61,10 @@ public struct MeetingPipeline: Sendable {
         let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         let session = RecallIndex.Session(
             id: makeIdentifier(),
-            // Пустое название — это «Созвон», а не пустая строка в списке.
-            title: trimmedTitle.isEmpty ? "Созвон" : trimmedTitle,
+            // Пустое название — это «Звонок», а не пустая строка в списке.
+            // Слово продукта одно и то же везде: на странице, в приложении и
+            // здесь. «Созвон» тут был единственным местом, где оно расходилось.
+            title: trimmedTitle.isEmpty ? "Звонок" : trimmedTitle,
             date: today(),
             digest: text)
 

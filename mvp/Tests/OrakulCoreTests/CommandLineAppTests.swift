@@ -607,3 +607,48 @@ private final class Numbers: @unchecked Sendable {
         return "s\(value)"
     }
 }
+
+@Suite("Слово продукта одно на всех поверхностях")
+struct ProductVocabularyTests {
+    /// Страница проверяет это про себя с самого начала: продукт говорит
+    /// «звонок». В командной строке при этом стояло «поиск по своим
+    /// созвонам» — первая строка, которую видит каждый, кто запустил `orakul`,
+    /// и единственное место, где слово расходилось.
+    ///
+    /// Проверяется текст для человека, а не комментарии: в исходниках ядра
+    /// «созвон» встречается три десятка раз, и это нормально — читают их
+    /// разработчики, а не пользователи.
+    @Test("в текстах командной строки нет «созвон»")
+    func commandLineSpeaksTheProductWord() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appendingPathComponent("Sources/OrakulCore")
+        let manager = FileManager.default
+        let walker = try #require(manager.enumerator(atPath: root.path))
+
+        var offenders: [String] = []
+        var scanned = 0
+        for case let path as String in walker where path.hasSuffix(".swift") {
+            let text = try String(contentsOf: root.appendingPathComponent(path), encoding: .utf8)
+            scanned += 1
+            for line in text.split(separator: "\n", omittingEmptySubsequences: false) {
+                let trimmed = line.trimmingCharacters(in: .whitespaces)
+                guard !trimmed.hasPrefix("//") else { continue }
+                // Строковые литералы и многострочные блоки — то, что видит человек.
+                guard line.contains("\"") || line.contains("orakul —") else { continue }
+                if line.lowercased().contains("созвон") {
+                    offenders.append("\(path): \(trimmed.prefix(60))")
+                }
+            }
+        }
+        #expect(scanned > 10, "обход нашёл \(scanned) файлов — проверка была бы фиктивной")
+        #expect(offenders.isEmpty,
+                "продукт говорит «звонок», а здесь «созвон»:\n\(offenders.joined(separator: "\n"))")
+    }
+
+    @Test("подсказка командной строки говорит «звонкам»")
+    func usageUsesTheProductWord() {
+        #expect(CommandLineApp.usage.contains("звонкам"))
+        #expect(!CommandLineApp.usage.lowercased().contains("созвон"))
+    }
+}

@@ -57,7 +57,7 @@ public struct CommandLineApp {
     let makeTranscriber: @Sendable (String) -> any Transcriber
 
     public static let usage = """
-    orakul — поиск по своим созвонам, на русском и без сети
+    orakul — поиск по своим звонкам, на русском и без сети
 
       orakul добавить <файл> [название]   готовая расшифровка в архив
       orakul расшифровать <wav> [название] расшифровать запись и положить в архив

@@ -107,7 +107,7 @@ struct MeetingPipelineTests {
                                        store: store, today: { "2026-07-24" },
                                        makeIdentifier: { "s1" })
         let session = try await pipeline.record(samples: [], title: "   ")
-        #expect(session.title == "Созвон")
+        #expect(session.title == "Звонок")
     }
 
     @Test("две записи подряд не перетирают друг друга")
