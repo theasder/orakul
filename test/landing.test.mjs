@@ -892,6 +892,23 @@ describe('orakul landing (ru)', () => {
     }
   });
 
+  test('the number the page quotes for the racing suite is the real one', () => {
+    // Мелкая величина, но живая: страница называет 600 секунд как то, что
+    // выставляет один из наборов. Изменят на 300 — страница соврёт в детали,
+    // и заметить это будет некому. Тот же случай, что и с «полторы секунды»,
+    // только дешевле.
+    const stated = /срок ответа в (\d+) секунд/.exec(text);
+    assert.ok(stated, 'the page no longer quotes the deadline the suite sets');
+
+    const policy = readFileSync(
+      resolve(here, '..', 'app', 'Tests', 'MeetGPTTests', 'GroundingContextPolicyTests.swift'),
+      'utf8');
+    const used = /withValue\((\d+)\)/.exec(policy);
+    assert.ok(used, 'the suite no longer overrides the deadline at all');
+    assert.equal(stated[1], used[1],
+      `page says ${stated[1]} s, the suite sets ${used[1]} s`);
+  });
+
   test('the parallel-suite hazard the page describes is actually closed', () => {
     // Страница признаёт породу поломок, которая живёт в самом наборе, и
     // называет лечение. Признание без лечения — просто текст, поэтому здесь
