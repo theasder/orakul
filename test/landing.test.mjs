@@ -181,6 +181,23 @@ describe('orakul landing (ru)', () => {
       'the page offers a download; verify the URL actually serves before allowing it');
   });
 
+  test('the systems the page names are the ones CI actually runs on', () => {
+    // Страница говорила, что весь набор идёт на macOS. Проверки страницы и
+    // README идут на Linux — макбук им не нужен. Мелочь, но это ровно та
+    // форма ошибки, за которой тут следят: уверенная фраза о том, чего нет.
+    const ci = readFileSync(resolve(here, '..', '.github', 'workflows', 'ci.yml'), 'utf8');
+    const runners = [...ci.matchAll(/runs-on:\s*([a-z0-9.-]+)/g)].map((m) => m[1]);
+    assert.ok(runners.length >= 2, `CI declares ${runners.length} runner(s) — the claim is unverifiable`);
+
+    const usesMac = runners.some((r) => r.startsWith('macos'));
+    const usesLinux = runners.some((r) => r.startsWith('ubuntu'));
+
+    assert.equal(usesMac, /на macOS/.test(html),
+      `CI on macOS: ${usesMac}, but the page says otherwise`);
+    assert.equal(usesLinux, /на Linux/.test(html),
+      `CI on Linux: ${usesLinux}, but the page says otherwise`);
+  });
+
   test('the paired-credential services the page names are the ones the code checks', () => {
     // Страница обещает проверку до запроса. Обещание держится, пока список
     // сервисов на странице и в коде один и тот же.

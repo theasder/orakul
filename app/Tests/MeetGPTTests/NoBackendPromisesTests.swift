@@ -137,3 +137,42 @@ struct NoBackendPromisesTests {
         }
     }
 }
+
+/// SECURITY.md обещает: наружу уходит ровно две вещи — запрос к модели и
+/// запрос к подключённому сервису. Ни телеметрии, ни счётчиков.
+///
+/// При запуске приложение вызывает `PaywallAPI.claimDeviceTrial()`, и тот
+/// собирается отправить POST с идентификатором устройства. Держится обещание
+/// на одном: адреса сервера в сборке нет, поэтому отправлять некуда. Стоит
+/// кому-нибудь вписать адрес по умолчанию — обещание станет ложью тихо, без
+/// единой падающей проверки. Здесь та самая связка и закреплена.
+@Suite("Обещание SECURITY.md про запуск")
+struct LaunchSendsNothingTests {
+    @Test("адреса сервера в сборке нет — отправлять идентификатор устройства некуда")
+    func noAddressMeansNoLaunchRequest() async {
+        #expect(Config.backendBaseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                "появился адрес сервера: запуск начнёт слать идентификатор устройства")
+
+        // Без сессии это единственная ветка, которая доходит до сети.
+        #expect(Config.wheesprSession == nil, "предусловие: сессии нет")
+        let claimed = await PaywallAPI.claimDeviceTrial()
+        #expect(!claimed, "устройство заявлено — значит, запрос куда-то ушёл")
+    }
+
+    /// Отдельно от флага: `claimDeviceTrial` не спрятан за `llmViaBackend`,
+    /// в отличие от `refreshEntitlement`. Разница неочевидна, и проверка
+    /// существует, чтобы её не потеряли при чтении.
+    @Test("вызов при запуске не закрыт флагом серверного режима")
+    func launchCallIsNotGatedByTheBackendFlag() throws {
+        let source = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent().deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("Sources/MeetGPT/Views/Paywall/PaywallAPI.swift"),
+            encoding: .utf8)
+        let body = try #require(source.range(of: "static func claimDeviceTrial")
+            .map { String(source[$0.lowerBound...].prefix(400)) })
+        #expect(!body.contains("llmViaBackend"),
+                "ветка закрылась флагом — тогда обещание держит флаг, и проверка выше лишняя")
+    }
+}
