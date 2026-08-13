@@ -181,6 +181,43 @@ describe('orakul landing (ru)', () => {
       'the page offers a download; verify the URL actually serves before allowing it');
   });
 
+  test('the pull-request template carries every rule CONTRIBUTING enforces', () => {
+    // Шесть правил, о которые ломаются чужие правки, лежали только в
+    // CONTRIBUTING. Участник узнавал о них из отказа — после того, как вечер
+    // уже потрачен. Шаблон повторяет их у поля описания; проверка следит,
+    // чтобы седьмое правило не осталось только в документе.
+    const contributing = readFileSync(resolve(here, '..', 'CONTRIBUTING.md'), 'utf8');
+    const template = readFileSync(
+      resolve(here, '..', '.github', 'pull_request_template.md'), 'utf8');
+
+    // Правила — жирные заголовки в своём разделе, а не по всему файлу: выше по
+    // тексту тем же способом оформлена подсказка про кеш SwiftPM.
+    const section = contributing.slice(
+      contributing.indexOf('## Правила, о которые ломаются чужие пулл-реквесты'));
+    assert.ok(section.length > 200, 'CONTRIBUTING no longer has the rules section');
+
+    const rules = [...section.matchAll(/^\*\*(.+?)\*\*/gm)].map((m) => m[1].trim());
+    assert.ok(rules.length >= 6, `found ${rules.length} rules — the check would be hollow`);
+
+    const missing = rules.filter((rule) => !template.includes(rule));
+    assert.deepEqual(missing, [],
+      `rules a contributor only learns from a rejection: ${missing.join(' | ')}`);
+
+    // И обратно: пункт в шаблоне без правила в CONTRIBUTING — требование
+    // ниоткуда, спорить с которым не с чем.
+    const claimed = [...template.matchAll(/- \[ \] \*\*(.+?)\*\*/g)].map((m) => m[1].trim());
+    const groundless = claimed.filter((item) => !rules.includes(item));
+    assert.deepEqual(groundless, [],
+      `template demands what CONTRIBUTING never states: ${groundless.join(' | ')}`);
+
+    // Страница называет их число. Число — первое, что устаревает.
+    const words = { 4: 'Четыре', 5: 'Пять', 6: 'Шесть', 7: 'Семь', 8: 'Восемь' };
+    const spelled = words[rules.length];
+    assert.ok(spelled, `${rules.length} rules — this check has no word for that`);
+    assert.match(html, new RegExp(`${spelled} пунктов`, 'i'),
+      `there are ${rules.length} rules, and the page says otherwise`);
+  });
+
   test('the Q&A measurement on the page matches the one recorded in the plan', () => {
     // Число, измеренное руками, живёт в двух местах: на странице и в плане.
     // Такие пары и разъезжаются — правят одно, забывают второе. Здесь заодно
