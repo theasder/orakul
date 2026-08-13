@@ -181,6 +181,29 @@ describe('orakul landing (ru)', () => {
       'the page offers a download; verify the URL actually serves before allowing it');
   });
 
+  test('the org headers the page names are the ones the app can actually send', () => {
+    // Страница обещает, что orakul сам выберет заголовок. Обещание держится,
+    // пока обе половины — текст и код — говорят одно и то же.
+    const trackers = readFileSync(
+      resolve(here, '..', 'mvp', 'Sources', 'OrakulCore', 'RussianTrackers.swift'), 'utf8');
+    const chooser = bodyOf(trackers, 'static func orgHeader(for organisation: String)');
+    assert.ok(chooser, 'the app no longer chooses an organisation header');
+    const sendable = [...chooser.matchAll(/"([A-Za-z-]*Org-ID)"/g)].map((m) => m[1]);
+    assert.equal(new Set(sendable).size, 2,
+      `the app can send ${new Set(sendable).size} organisation header(s): ${sendable}`);
+
+    const named = [...html.matchAll(/<code>([A-Za-z-]*Org-ID)<\/code>/g)].map((m) => m[1]);
+    assert.ok(named.length > 0, 'the page stopped naming the organisation headers');
+    for (const header of named) {
+      assert.ok(sendable.includes(header),
+        `the page names ${header}, which the app never sends`);
+    }
+    for (const header of new Set(sendable)) {
+      assert.ok(named.includes(header),
+        `the app sends ${header}, but the page never mentions it`);
+    }
+  });
+
   test('every card on the page has a heading, not just a paragraph', () => {
     // Абзац, вставленный чуть выше нужной строки, оказался отдельной
     // карточкой без заголовка: тесты прошли, потому что структуру карточек

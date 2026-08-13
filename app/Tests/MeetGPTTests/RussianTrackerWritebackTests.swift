@@ -32,7 +32,7 @@ struct RussianTrackerWritebackTests {
                         http: @escaping RussianTrackers.HTTP) -> RussianTrackers {
         let secondary: String? = {
             switch service {
-            case .yandexTracker: return "org-1"
+            case .yandexTracker: return "1234567"
             case .kaiten:        return "team.kaiten.ru"
             case .yougile:       return nil
             }
@@ -79,7 +79,7 @@ struct RussianTrackerWritebackTests {
         let payload = try #require(try JSONSerialization.jsonObject(with: body) as? [String: Any])
         #expect(payload["summary"] as? String == "Поднять лимиты")
         #expect(payload["queue"] as? String == "TREK")
-        #expect(recorder.last?.value(forHTTPHeaderField: "X-Org-ID") == "org-1")
+        #expect(recorder.last?.value(forHTTPHeaderField: "X-Org-ID") == "1234567")
     }
 
     @Test("у Kaiten номер доски уходит числом, а не строкой")

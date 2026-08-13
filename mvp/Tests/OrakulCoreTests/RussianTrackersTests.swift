@@ -30,7 +30,7 @@ struct RussianTrackersTests {
     /// Второе поле значит разное: организация у Яндекса, домен команды у Kaiten.
     private func secondary(for service: RussianTrackers.Service) -> String? {
         switch service {
-        case .yandexTracker: return "org-1"
+        case .yandexTracker: return "1234567"
         case .kaiten:        return "team.kaiten.ru"
         case .yougile:       return nil
         }
@@ -114,15 +114,30 @@ struct RussianTrackersTests {
 
     @Test("Яндекс Трекер получает идентификатор организации, остальные — нет")
     func yandexNeedsOrganisation() async throws {
-        // Без X-Org-ID Трекер отвечает 403, и это самая частая причина, по
-        // которой «токен правильный, а не работает».
+        // Без идентификатора организации Трекер отвечает 403, и это самая
+        // частая причина, по которой «токен правильный, а не работает».
+        //
+        // Заголовка два, и какой уйдёт — решает форма значения: у Яндекс 360
+        // это число, у Yandex Cloud Organization — двадцать знаков с «bpf».
+        // Поэтому здесь настоящие формы, а не выдуманная «org-1»: на ней
+        // проверка молчала бы о том, что вторая ветка вообще есть.
         let (http, recorder) = stub()
         _ = try await client(.yandexTracker, http: http).search("q")
-        #expect(recorder.last?.value(forHTTPHeaderField: "X-Org-ID") == "org-1")
+        #expect(recorder.last?.value(forHTTPHeaderField: "X-Org-ID") == "1234567")
+        #expect(recorder.last?.value(forHTTPHeaderField: "X-Cloud-Org-ID") == nil)
+
+        let (httpCloud, recorderCloud) = stub()
+        _ = try await RussianTrackers(
+            service: .yandexTracker, token: "t0ken",
+            secondary: "bpf3crucp1v28b74p3rk", http: httpCloud).search("q")
+        #expect(recorderCloud.last?.value(forHTTPHeaderField: "X-Cloud-Org-ID")
+                == "bpf3crucp1v28b74p3rk")
+        #expect(recorderCloud.last?.value(forHTTPHeaderField: "X-Org-ID") == nil)
 
         let (http2, recorder2) = stub()
         _ = try await client(.yougile, http: http2).search("q")
         #expect(recorder2.last?.value(forHTTPHeaderField: "X-Org-ID") == nil)
+        #expect(recorder2.last?.value(forHTTPHeaderField: "X-Cloud-Org-ID") == nil)
     }
 
     @Test("пустой токен — это «не настроено», а не поход в сеть")
@@ -235,4 +250,39 @@ private final class Recorder: @unchecked Sendable {
     }
     var last: URLRequest? { lock.lock(); defer { lock.unlock() }; return requests.last }
     var count: Int { lock.lock(); defer { lock.unlock() }; return requests.count }
+}
+
+@Suite("Заголовок организации Яндекс Трекера")
+struct YandexOrgHeaderTests {
+    /// Два заголовка, и перепутанный отвечает отказом, в котором про заголовок
+    /// не сказано ни слова — человек идёт перевыпускать исправный токен.
+    @Test("числовой идентификатор — Яндекс 360, буквенно-цифровой — Yandex Cloud",
+          arguments: [
+            ("1234567", "X-Org-ID"),
+            ("42", "X-Org-ID"),
+            ("bpf3crucp1v28b74p3rk", "X-Cloud-Org-ID"),
+            ("bpfaa11bb22cc33dd44e", "X-Cloud-Org-ID"),
+          ])
+    func headerFollowsShape(organisation: String, expected: String) {
+        #expect(RussianTrackers.orgHeader(for: organisation) == expected)
+    }
+
+    @Test("пробелы вокруг значения не меняют выбор")
+    func trimsBeforeDeciding() {
+        #expect(RussianTrackers.orgHeader(for: "  1234567  ") == "X-Org-ID")
+        #expect(RussianTrackers.orgHeader(for: " bpf3crucp1v28b74p3rk ") == "X-Cloud-Org-ID")
+    }
+
+    @Test("запрос несёт ровно один заголовок организации")
+    func exactlyOneOrgHeader() {
+        for organisation in ["1234567", "bpf3crucp1v28b74p3rk"] {
+            let client = RussianTrackers(
+                service: .yandexTracker, token: "y0_test", secondary: organisation,
+                http: { _ in (Data(), HTTPURLResponse()) })
+            let sent = client.headers().keys.filter { $0.hasSuffix("Org-ID") }
+            #expect(sent.count == 1, "заголовков организации \(sent.count): \(sent)")
+            #expect(client.headers()[RussianTrackers.orgHeader(for: organisation)]
+                    == organisation)
+        }
+    }
 }

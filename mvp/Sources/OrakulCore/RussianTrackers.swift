@@ -53,7 +53,7 @@ public struct RussianTrackers {
         /// уточнения, какой именно, — это тупик.
         public var credentialHint: String {
             switch self {
-            case .yandexTracker: return "OAuth-токен из настроек организации, плюс её идентификатор"
+            case .yandexTracker: return "OAuth-токен и идентификатор организации: «Администрирование» → «Организации», поле ID"
             case .kaiten:        return "API-токен из профиля, раздел «API», и адрес вашей команды"
             case .yougile:       return "Ключ компании из раздела «Интеграции»"
             }
@@ -195,11 +195,25 @@ public struct RussianTrackers {
         case .yandexTracker:
             var fields = ["Authorization": "OAuth \(token)",
                           "Content-Type": "application/json"]
-            if let secondary { fields["X-Org-ID"] = secondary }
+            if let secondary { fields[Self.orgHeader(for: secondary)] = secondary }
             return fields
         case .kaiten, .yougile:
             return ["Authorization": "Bearer \(token)"]
         }
+    }
+
+    /// Заголовков организации у Трекера два, и они не взаимозаменяемы:
+    /// `X-Org-ID` — организация в Яндекс 360, `X-Cloud-Org-ID` — в Yandex
+    /// Cloud Organization. Отправленный не тот даёт отказ, по которому не
+    /// догадаться, что дело в заголовке, а не в токене.
+    ///
+    /// Спрашивать тип организации у человека незачем: идентификаторы разной
+    /// формы. У Яндекс 360 это число, у Cloud — двадцать знаков, начинающихся
+    /// с `bpf` (`bpf3crucp1v28b74p3rk`). По форме и выбираем.
+    static func orgHeader(for organisation: String) -> String {
+        let value = organisation.trimmingCharacters(in: .whitespaces)
+        let isNumeric = !value.isEmpty && value.allSatisfy(\.isNumber)
+        return isNumeric ? "X-Org-ID" : "X-Cloud-Org-ID"
     }
 
     func endpoint(for query: String, limit: Int) throws -> URL {
