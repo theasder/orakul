@@ -1193,6 +1193,23 @@ describe('orakul landing (ru)', () => {
     }
   });
 
+  test('the page admits where the question-answer rule stops working', () => {
+    // Правило простое и потому ограниченное: между вопросом и ответом на
+    // живом звонке встревает «секунду, найду документ». Проверено прогоном.
+    // Обещание без этой оговорки было бы преувеличением.
+    assert.match(text, /секунду, найду документ/,
+      'the page no longer admits the filler case');
+    assert.match(text, /не пытаемся угадать/,
+      'the page no longer says why the rule is not made smarter');
+
+    const index = stripComments(readFileSync(
+      resolve(here, '..', 'mvp', 'Sources', 'OrakulCore', 'RecallIndex.swift'), 'utf8'));
+    // Оговорка правдива только пока правило действительно простое: если
+    // появится отбор «какая реплика настоящая», страница станет врать.
+    assert.doesNotMatch(index, /bestLineIndex \+ 2/,
+      'the rule now reaches past the next line; the page says it does not');
+  });
+
   test('the headline example shows the answer, and the rule behind it', () => {
     // Главный пример на странице — первое, что видит пришедший. Он показывал
     // решение Бориса, а быстрый старт из README на своём же примере возвращал
