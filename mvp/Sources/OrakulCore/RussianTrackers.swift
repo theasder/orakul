@@ -146,6 +146,14 @@ public struct RussianTrackers {
         case notConfigured(Service)
         case unauthorised(Service)
         case http(Service, Int)
+        /// Сервис ответил успехом, а внутри — отказ.
+        ///
+        /// Битрикс так и работает: HTTP 200 и `{"error": …,
+        /// "error_description": …}` в теле. Без этой ветки отозванный вебхук
+        /// или нехватка права «Задачи» выглядели бы как «ничего не нашлось» —
+        /// то есть продукт уверенно сообщал бы об исходе поиска, которого не
+        /// было.
+        case vendor(Service, code: String, description: String)
         case unreadable(Service)
 
         /// По-русски, с названием сервиса и с действием.
@@ -160,6 +168,9 @@ public struct RussianTrackers {
                 return "\(service.title) не подключён. Вставьте токен в «Настройки → Подключённые приложения»."
             case .unauthorised(let service):
                 return "\(service.title) не принял токен: истёк или не хватает прав. Создайте новый в самом сервисе."
+            case .vendor(let service, let code, let description):
+                let detail = description.isEmpty ? code : description
+                return "\(service.title) отказал: \(detail). Если это Битрикс24 — проверьте, что вебхук не удалён и у него есть право «Задачи»."
             case .http(let service, let status):
                 return "\(service.title) ответил ошибкой \(status). Если это 404 — проверьте очередь или доску в настройках."
             case .unreadable(let service):
@@ -456,6 +467,13 @@ public struct RussianTrackers {
     /// остальные.
     func parse(_ data: Data) throws -> [Issue] {
         let root = try? JSONSerialization.jsonObject(with: data)
+        // Проверяется до разбора списка: у Битрикса отказ приезжает с кодом
+        // 200, и если сначала искать задачи, отказ станет пустой выдачей.
+        if let object = root as? [String: Any], let code = object["error"] as? String {
+            throw TrackerError.vendor(
+                service, code: code,
+                description: (object["error_description"] as? String) ?? "")
+        }
         let rows: [[String: Any]]
         if let array = root as? [[String: Any]] {
             rows = array

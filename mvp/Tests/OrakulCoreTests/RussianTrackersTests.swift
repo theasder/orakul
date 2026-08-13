@@ -457,3 +457,65 @@ struct BitrixWebhookPasteTests {
         #expect(parsed.host == nil, "портал взялся из ниоткуда")
     }
 }
+
+@Suite("Отказ, приехавший с кодом 200")
+struct VendorErrorInsideSuccessTests {
+    private func client(json: String) -> RussianTrackers {
+        RussianTrackers(service: .bitrix24, token: "1/abc123",
+                        secondary: "company.bitrix24.ru") { request in
+            (Data(json.utf8), HTTPURLResponse(url: request.url!, statusCode: 200,
+                                              httpVersion: nil, headerFields: nil)!)
+        }
+    }
+
+    /// Битрикс отвечает 200 и кладёт отказ в тело. Пока разбор шёл сразу к
+    /// списку задач, отозванный вебхук давал пустую выдачу — то есть
+    /// «в трекере ничего не нашлось» вместо «трекер нас не пустил».
+    @Test("отозванный вебхук — это ошибка, а не пустая выдача")
+    func revokedWebhookIsAnError() async {
+        let json = """
+        {"error": "INVALID_CREDENTIALS", "error_description": "Invalid request credentials"}
+        """
+        await #expect(throws: RussianTrackers.TrackerError.vendor(
+            .bitrix24, code: "INVALID_CREDENTIALS",
+            description: "Invalid request credentials")) {
+            _ = try await client(json: json).search("тарифы")
+        }
+    }
+
+    @Test("в тексте видно, что сказал сам сервис, и что проверить")
+    func messageCarriesVendorWords() async throws {
+        let json = """
+        {"error": "ACCESS_DENIED", "error_description": "Method not allowed for this webhook"}
+        """
+        do {
+            _ = try await client(json: json).search("тарифы")
+            Issue.record("ожидался отказ")
+        } catch let error as RussianTrackers.TrackerError {
+            let text = try #require(error.errorDescription)
+            #expect(text.contains("Method not allowed for this webhook"),
+                    "слова сервиса потерялись: \(text)")
+            #expect(text.contains("Задачи"), "не сказано, какое право проверить")
+        }
+    }
+
+    /// Без описания показывается код: пустая строка сообщила бы ещё меньше.
+    @Test("код показывается, если описания нет")
+    func codeShownWhenDescriptionMissing() async throws {
+        do {
+            _ = try await client(json: "{\"error\": \"QUERY_LIMIT_EXCEEDED\"}").search("q")
+            Issue.record("ожидался отказ")
+        } catch let error as RussianTrackers.TrackerError {
+            #expect(try #require(error.errorDescription).contains("QUERY_LIMIT_EXCEEDED"))
+        }
+    }
+
+    @Test("исправный ответ по-прежнему разбирается")
+    func healthyResponseStillParses() async throws {
+        let json = """
+        {"result": {"tasks": [{"ID": "7", "TITLE": "Проверить лимиты"}]}, "total": 1}
+        """
+        let issues = try await client(json: json).search("лимиты")
+        #expect(issues.map(\.key) == ["7"])
+    }
+}

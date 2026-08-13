@@ -136,7 +136,7 @@ the value of betting on any single one.
 | GitLab | `GET /api/v4/search?scope=issues&search=` | заголовок `PRIVATE-TOKEN` |
 | Gitea / Forgejo | `GET /api/v1/repos/issues/search?q=&type=issues` | `Authorization: token`, не `Bearer` |
 | Redmine | `GET /search.json?q=&issues=1` | единственный оборачивает выдачу в `results` |
-| Битрикс24 | `POST /rest/{id}/{код}/tasks.task.list` | ключ в адресе, а не в заголовке; список под `result.tasks`, поля прописными; страница всегда 50 |
+| Битрикс24 | `POST /rest/{id}/{код}/tasks.task.list` | ключ в адресе, а не в заголовке; список под `result.tasks`, поля прописными; страница всегда 50; **отказ приходит с HTTP 200** и полями `error`/`error_description` |
 | Outline | `POST /api/documents.search` | адрес НЕ обязателен — бывает облачным |
 
 Две детали закреплены тестами, потому что по тексту ошибки их не восстановить:
