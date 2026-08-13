@@ -951,6 +951,34 @@ describe('orakul landing (ru)', () => {
       'the model is no longer told the record is partial');
   });
 
+  test('the encoding promise covers both surfaces and still refuses binary', () => {
+    // Обещание про кодировки держится на двух разных читателях файлов —
+    // командной строке и импортёре контекста приложения. Правка, дошедшая до
+    // одного, оставляет второй портить текст молча; ровно это тут и было.
+    assert.match(text, /Кодировка файла — не проблема пользователя/,
+      'the page no longer promises non-UTF-8 transcripts are read');
+    assert.match(text, /тридцать управляющих символов/,
+      'the page no longer states how binary is told apart');
+
+    const decoder = stripComments(readFileSync(
+      resolve(here, '..', 'mvp', 'Sources', 'OrakulCore', 'TranscriptFile.swift'), 'utf8'));
+    assert.match(decoder, /windowsCP1251/, 'the CP1251 fallback is gone');
+    // Метка порядка байтов обязательна: без неё UTF-16 берётся за любые байты
+    // и возвращает иероглифы, которые выглядят как успех.
+    assert.match(decoder, /0xFF, 0xFE|0xFE, 0xFF/,
+      'UTF-16 is attempted without requiring a byte-order mark');
+    assert.match(decoder, /looksLikeText/,
+      'nothing checks the CP1251 result is text — an image would import as garbage');
+
+    // Импортёр приложения обязан ходить через тот же разбор.
+    const importer = stripComments(readFileSync(
+      resolve(here, '..', 'app', 'Sources', 'MeetGPT', 'Context', 'ContextImporter.swift'), 'utf8'));
+    assert.match(importer, /TranscriptFile\.decode/,
+      'the app importer decodes on its own again');
+    assert.doesNotMatch(importer, /encoding: \.utf16\)/,
+      'the app importer tries UTF-16 without a BOM again — that produced 샭Ｚ⃏⃯');
+  });
+
   test('the "writing is stricter than reading" promise is in the write path', () => {
     // Обещание про запись проверяемо только по коду записи. Тихая подстановка
     // нуля вместо номера доски — это не косметика: запись уходит в чужой

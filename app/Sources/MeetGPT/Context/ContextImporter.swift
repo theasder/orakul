@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import OrakulCore
 import PDFKit
 import UniformTypeIdentifiers
 
@@ -133,11 +134,34 @@ enum ContextImporter {
         }
     }
 
+    /// Кодировки в том порядке, в каком их стоит пробовать русскому продукту.
+    ///
+    /// Было: UTF-8 → UTF-16 → isoLatin1, и обе запасные молча портили русский
+    /// текст. Измерено на файле «Аня: По тарифам решили поднять.» в CP1251:
+    ///
+    ///   UTF-16 (без метки) → «샭Ｚ⃏⃯»   — иероглифы, и это «успех»
+    ///   isoLatin1          → «Àíÿ: Ïî òàðèôàì…» — классическая кракозябра
+    ///   CP1251             → «Аня: По тарифам решили поднять.»
+    ///
+    /// То есть до Latin-1 дело даже не доходило: UTF-16 без метки берётся за
+    /// любые байты и возвращает мусор, который потом уезжает в подсказку
+    /// модели как «контекст». Испорченный контекст хуже отсутствующего —
+    /// модель читает его всерьёз.
+    ///
+    /// `TranscriptFile` пробует UTF-8, затем UTF-16 ТОЛЬКО с меткой порядка
+    /// байтов, затем CP1251, и проверяет, что вышел текст, а не картинка.
+    /// Latin-1 остаётся последним — для честно западного файла.
     private static func extractPlainText(url: URL) throws -> String {
-        if let s = try? String(contentsOf: url, encoding: .utf8) { return s }
-        if let s = try? String(contentsOf: url, encoding: .utf16) { return s }
-        // Fallback: best-guess with isoLatin1 so bytes at least round-trip.
-        if let s = try? String(contentsOf: url, encoding: .isoLatin1) { return s }
+        guard let data = try? Data(contentsOf: url) else {
+            throw ImportError.unreadable("не удалось прочитать файл")
+        }
+        if let text = TranscriptFile.decode(data) { return text }
+        if let latin = String(data: data, encoding: .isoLatin1),
+           !latin.unicodeScalars.contains(where: {
+               $0.value < 32 && $0 != "\t" && $0 != "\n" && $0 != "\r"
+           }) {
+            return latin
+        }
         throw ImportError.unreadable("unknown text encoding")
     }
 }

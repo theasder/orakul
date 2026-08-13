@@ -8,6 +8,79 @@ import Testing
 @Suite("Командная строка")
 struct CommandLineAppTests {
 
+    // MARK: - Кодировка расшифровки
+
+    @Test("расшифровка в Windows-1251 читается, а не отвергается")
+    func cp1251TranscriptIsRead() throws {
+        // Продукт делается для русской команды, а в русском обиходе полно
+        // файлов в CP1251: выгрузка из старого инструмента, текст, сохранённый
+        // коллегой на Windows. `String(contentsOfFile:encoding: .utf8)` на
+        // таком файле возвращает nil, и человек получал «Не смог прочитать
+        // файл: <путь>» — сообщение, отправляющее проверять путь и права,
+        // тогда как файл на месте и прекрасно читается.
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("orakul-enc-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let path = root.appendingPathComponent("cp1251.txt")
+        let text = "Аня: По тарифам решили поднять месячный на пятнадцать процентов."
+        let data = try #require(text.data(using: .windowsCP1251), "нет кодировки CP1251")
+        try data.write(to: path)
+
+        let store = SessionStore(root: root.appendingPathComponent("архив", isDirectory: true))
+        let app = CommandLineApp(store: store, today: { "2026-07-24" },
+                                 makeIdentifier: { "1" })
+        let added = app.run(["добавить", path.path, "Планёрка"])
+        #expect(added.exitCode == 0, "CP1251 не прочитался: «\(added.output)»")
+
+        // И текст должен быть текстом, а не мусором из перепутанных байтов.
+        let found = app.run(["найти", "что", "решили", "по", "тарифам"])
+        #expect(found.output.contains("пятнадцать процентов"),
+                "текст расшифровки испорчен: «\(found.output)»")
+    }
+
+    @Test("расшифровка в UTF-16 тоже читается")
+    func utf16TranscriptIsRead() throws {
+        // «Юникод» в блокноте Windows — это UTF-16 с меткой порядка байтов.
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("orakul-enc-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let path = root.appendingPathComponent("utf16.txt")
+        let text = "Борис: Годовой тариф не трогаем до декабря."
+        try #require(text.data(using: .utf16)).write(to: path)
+
+        let store = SessionStore(root: root.appendingPathComponent("архив", isDirectory: true))
+        let app = CommandLineApp(store: store, today: { "2026-07-24" },
+                                 makeIdentifier: { "1" })
+        let added = app.run(["добавить", path.path, "Планёрка"])
+        #expect(added.exitCode == 0, "UTF-16 не прочитался: «\(added.output)»")
+        #expect(app.run(["найти", "годовой", "тариф"]).output.contains("до декабря"),
+                "текст UTF-16 испорчен")
+    }
+
+    @Test("картинка по-прежнему отвергается")
+    func binaryFileIsStillRefused() throws {
+        // Граница, без которой запасная кодировка опасна.
+        //
+        // Байты взяты не случайные, а заголовок PNG: измерено, что Foundation
+        // ОТКАЗЫВАЕТСЯ читать в CP1251 набор из всех 256 байт (там есть
+        // неопределённый байт), и проверка на таком файле прошла бы сама
+        // собой, ничего не проверив. А вот заголовок PNG в CP1251 читается
+        // прекрасно — и даёт тридцать управляющих символов. Настоящий русский
+        // текст в той же кодировке даёт ноль. Это и отличает их.
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("orakul-enc-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let path = root.appendingPathComponent("картинка.png")
+        try Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]
+                 + (0..<40).map { UInt8($0) }).write(to: path)
+
+        let store = SessionStore(root: root.appendingPathComponent("архив", isDirectory: true))
+        let app = CommandLineApp(store: store, today: { "2026-07-24" },
+                                 makeIdentifier: { "1" })
+        let added = app.run(["добавить", path.path, "Планёрка"])
+        #expect(added.exitCode != 0, "двоичный файл уехал в архив: «\(added.output)»")
+    }
+
     // MARK: - Нечитаемые файлы архива
 
     @Test("поиск признаётся, что часть архива не прочиталась")

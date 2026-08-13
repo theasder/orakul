@@ -35,7 +35,10 @@ public struct CommandLineApp {
                 today: @escaping @Sendable () -> String = MeetingPipeline.currentDay,
                 makeIdentifier: @escaping @Sendable () -> String = { UUID().uuidString },
                 readFile: @escaping @Sendable (String) -> String? = {
-                    try? String(contentsOfFile: $0, encoding: .utf8)
+                    // Не строго UTF-8: русский транскрипт часто приходит в
+                    // CP1251 или UTF-16, и отказ читать его выглядел как
+                    // «файла нет». Разбор — в TranscriptFile.
+                    TranscriptFile.read($0)
                 },
                 readAudio: @escaping @Sendable (String) -> Data? = {
                     try? Data(contentsOf: URL(fileURLWithPath: $0))
