@@ -1193,6 +1193,31 @@ describe('orakul landing (ru)', () => {
     }
   });
 
+  test('the "nothing to search for" answer is distinct from "not discussed"', () => {
+    // Тот же принцип, что и с пустым архивом: уверенная фраза о результате
+    // поиска, которого не было, отправляет человека с ложным выводом о
+    // собственных звонках.
+    assert.match(text, /искать не по чему/,
+      'the page no longer distinguishes an unsearchable question');
+    assert.match(text, /архив никто не открывал/,
+      'the page no longer says why the old answer was wrong');
+
+    const answer = stripComments(readFileSync(
+      resolve(here, '..', 'mvp', 'Sources', 'OrakulCore', 'RecallAnswer.swift'), 'utf8'));
+    // Только когда ничего не нашлось: находка означает, что вопрос был
+    // достаточно конкретным, и придираться к нему поздно.
+    assert.match(answer, /grounded\.isEmpty, RecallIndex\.tokens\(query\)\.isEmpty/,
+      'the complaint fires regardless of hits, or not at all');
+
+    // Держится на том, что указательные слова считаются служебными.
+    const index = stripComments(readFileSync(
+      resolve(here, '..', 'mvp', 'Sources', 'OrakulCore', 'RecallIndex.swift'), 'utf8'));
+    for (const word of ['"это"', '"там"', '"этому"']) {
+      assert.ok(index.includes(word),
+        `${word} is searchable again — «а что там по этому» would search for noise`);
+    }
+  });
+
   test('the page admits where the question-answer rule stops working', () => {
     // Правило простое и потому ограниченное: между вопросом и ответом на
     // живом звонке встревает «секунду, найду документ». Проверено прогоном.
