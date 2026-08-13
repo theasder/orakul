@@ -921,6 +921,16 @@ describe('orakul landing (ru)', () => {
       assert.match(source, /default:\s*throw/,
         `${file} stopped handling unexpected statuses`);
     }
+
+    // Вторая половина того же рейса: состояние не выдумывается.
+    assert.match(text, /Не сообщили — не пишем/,
+      'the page no longer promises an absent state stays absent');
+    const tracker = stripComments(readFileSync(resolve(core, 'SelfHostedTrackers.swift'), 'utf8'));
+    assert.doesNotMatch(tracker, /\?\? "unknown"/,
+      'the connector invents a state again — the page says it does not');
+    const label = stripComments(readFileSync(resolve(core, 'IssueLabel.swift'), 'utf8'));
+    assert.match(label, /isEmpty \? "\[/,
+      'the shared label lost the branch that omits an absent state');
   });
 
   test('the infrastructure-name promise is backed by a search-only table', () => {
