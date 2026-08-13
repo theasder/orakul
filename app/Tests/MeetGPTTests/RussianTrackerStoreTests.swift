@@ -109,3 +109,55 @@ struct RussianTrackerStoreTests {
         #expect(client.headers()["Authorization"] == "OAuth y0_synthetic")
     }
 }
+
+@Suite("Пустое поле стирает запись — у каждого поля")
+struct EveryCredentialSetterClearsTests {
+    /// CONTRIBUTING обещает это как правило, а не как свойство одного поля:
+    /// «Пустая строка убирает запись, а не сохраняет пустоту: иначе очищенное
+    /// поле оставляет мёртвый ключ, и сервис выглядит настроенным».
+    ///
+    /// Поведенчески проверен один сеттер из двенадцати. Остальные держатся на
+    /// том, что их писали подряд и одинаково. Главная просьба к участникам —
+    /// новый коннектор, то есть новые сеттеры; тринадцатый без проверки на
+    /// пустоту не сломает ни один существующий тест.
+    @Test("ни один сеттер в хранилище не сохраняет пустую строку")
+    func everySetterGuardsEmptyInput() throws {
+        let url = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/MeetGPT/MCP/RussianTrackerStore.swift")
+        let lines = try String(contentsOf: url, encoding: .utf8).split(
+            separator: "\n", omittingEmptySubsequences: false).map(String.init)
+
+        var checked = 0
+        var unguarded: [String] = []
+        for (index, line) in lines.enumerated() where line.contains("func set") {
+            let name = line.trimmingCharacters(in: .whitespaces)
+                .replacingOccurrences(of: "func ", with: "")
+                .components(separatedBy: "(").first ?? line
+
+            // Тело — до закрывающей скобки, по счётчику, а не по числу строк.
+            // Сначала здесь стояло окно в четырнадцать строк, и оно залезало
+            // в следующую функцию: снятая проверка находилась у соседа, и тест
+            // проходил. Проверка, которая ничего не проверяет, хуже её
+            // отсутствия — она закрывает вопрос.
+            var depth = 0
+            var body: [String] = []
+            for current in lines[index...] {
+                body.append(current)
+                depth += current.filter { $0 == "{" }.count
+                depth -= current.filter { $0 == "}" }.count
+                if depth == 0 && body.count > 1 { break }
+            }
+            let text = body.joined(separator: "\n")
+            checked += 1
+            let clears = text.contains("isEmpty")
+                && (text.contains("delete") || text.contains("remove"))
+            if !clears { unguarded.append(name) }
+        }
+
+        #expect(checked >= 12, "найдено \(checked) сеттеров — обход сломался")
+        #expect(unguarded.isEmpty,
+                "сеттер сохранит пустую строку, и сервис будет выглядеть настроенным: \(unguarded)")
+    }
+}

@@ -198,6 +198,12 @@ describe('orakul landing (ru)', () => {
     assert.match(readme, /У `mvp\/`[\s\S]{0,80}внешних зависимостей нет ни одной/,
       'README no longer scopes the "no dependencies" promise to mvp');
 
+    // CONTRIBUTING обещало то же самое и так же без оговорки. Участник,
+    // читающий его первым, собирает именно `app/` — шаг, который и качает.
+    const contributing = readFileSync(resolve(here, '..', 'CONTRIBUTING.md'), 'utf8');
+    assert.doesNotMatch(contributing, /зависимостей ставить не нужно ни для одного/,
+      'CONTRIBUTING promises no dependencies for every step, including the one that fetches four');
+
     const app = count('app');
     const words = { 2: 'две', 3: 'три', 4: 'четыре', 5: 'пять', 6: 'шесть' };
     const stated = words[app];
