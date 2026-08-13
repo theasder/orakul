@@ -892,6 +892,33 @@ describe('orakul landing (ru)', () => {
     }
   });
 
+  test('the parallel-suite hazard the page describes is actually closed', () => {
+    // Страница признаёт породу поломок, которая живёт в самом наборе, и
+    // называет лечение. Признание без лечения — просто текст, поэтому здесь
+    // проверяется, что общей изменяемой переменной больше нет.
+    assert.match(text, /подмена живёт внутри своей задачи/,
+      'the page no longer describes how the race is closed');
+    assert.match(text, /воспроизвести её не удалось/,
+      'the page dropped the honest note that the race was never reproduced');
+
+    const grounding = stripComments(readFileSync(
+      resolve(here, '..', 'app', 'Sources', 'MeetGPT', 'MCP', 'MCPGrounding.swift'), 'utf8'));
+    assert.match(grounding, /@TaskLocal static var deadlineOverrideForTesting/,
+      'the deadline override is not task-local — suites can race over it again');
+    assert.doesNotMatch(grounding, /static var groundingDeadline[^{]*=/,
+      'groundingDeadline is a stored mutable static again');
+
+    // И ни один тест не должен присваивать срок напрямую.
+    const suites = readdirSync(resolve(here, '..', 'app', 'Tests', 'MeetGPTTests'))
+      .filter((n) => n.endsWith('.swift'));
+    for (const name of suites) {
+      const source = readFileSync(
+        resolve(here, '..', 'app', 'Tests', 'MeetGPTTests', name), 'utf8');
+      assert.doesNotMatch(source, /groundingDeadline\s*=/,
+        `${name} assigns the deadline directly — that is the race`);
+    }
+  });
+
   test('the "server error names its number" promise holds in every connector', () => {
     // Обещание проверяемо только по коду: страница называет 502, а держится
     // это на том, что КАЖДЫЙ коннектор отличает ошибку сервера от мусора в
