@@ -1906,6 +1906,30 @@ describe('orakul landing (ru)', () => {
       'the command is not listed in the CLI help');
   });
 
+  test('the deletion-by-prefix promise carries the same threshold as the code', () => {
+    // Обещание разрушающей операции: если страница говорит «четырёх знаков», а
+    // в коде стоит другое число, человек узнает об этом, стерев чужой звонок.
+    const promise = /начало короче ([а-яё]+) знаков не принимается/.exec(text);
+    assert.ok(promise, 'the page no longer states the minimum prefix length');
+    const words = { двух: 2, трёх: 3, четырёх: 4, пяти: 5, шести: 6, восьми: 8 };
+    const stated = words[promise[1]];
+    assert.ok(stated, `unknown number word on the page: ${promise[1]}`);
+
+    const cli = stripComments(readFileSync(resolve(
+      here, '..', 'mvp', 'Sources', 'OrakulCore', 'CommandLineApp.swift'), 'utf8'));
+    const threshold = /needle\.count >= (\d+)/.exec(cli);
+    assert.ok(threshold, 'the minimum prefix length is gone from the code');
+    assert.equal(Number(threshold[1]), stated,
+      `the page promises ${stated} characters, the code requires ${threshold[1]}`);
+
+    // Вторая половина обещания: при неоднозначности не удаляется НИЧЕГО.
+    // Ветка обязана возвращать список совпадений, а не первое из них.
+    const resolveBody = bodyOf(cli, 'func resolveIdentifier');
+    assert.ok(resolveBody, 'resolveIdentifier is gone — the promise has no code behind it');
+    assert.match(resolveBody, /default:\s*return \.ambiguous/,
+      'ambiguous prefixes no longer refuse — the page promises they delete nothing');
+  });
+
   test('names the licence, because "open source" alone is not a licence', () => {
     assert.match(text, /Apache 2\.0/);
   });
