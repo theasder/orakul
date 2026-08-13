@@ -206,6 +206,32 @@ describe('orakul landing (ru)', () => {
     }
   });
 
+  test('the four silent-empty cases the page claims are the four the plan records', () => {
+    // Страница называет число закрытых мест. Число на странице устаревает
+    // первым: закроют пятое — здесь останется «четыре», и читатель решит, что
+    // обход шире, чем он есть.
+    const plan = readFileSync(resolve(here, '..', 'docs', 'RESEARCH-AND-PLAN.md'), 'utf8');
+
+    const words = { 3: 'три', 4: 'четыре', 5: 'пять', 6: 'шесть' };
+    // В плане каждое закрытое место названо своим кодом или файлом.
+    const closed = ['RussianTrackers', 'SessionStore', 'FirefliesPastCalls']
+      .filter((name) => plan.includes(name));
+    assert.equal(closed.length, 3, `plan names ${closed.length} of the three modules`);
+
+    // Битрикс — четвёртое: у него отдельная причина, не форма ответа.
+    assert.match(plan, /HTTP 200/,
+      'the plan no longer records the refusal that arrives with a success code');
+
+    const stated = words[4];
+    assert.ok(html.includes(`${stated} таких мест`),
+      `the page must state ${stated} closed cases while the plan records four`);
+
+    // И сама формулировка обещания обязана остаться на странице: без неё
+    // перечисление превращается в список правок без причины.
+    assert.match(html, /Пустота больше нигде не выдаётся за ответ/,
+      'the page dropped the claim these four cases are evidence for');
+  });
+
   test('every connector section lists its services from allCases, not by hand', () => {
     // Коннектор, которого нет в настройках, не существует для человека, даже
     // если код к нему написан и закрыт тестами. Проверить это по-настоящему
