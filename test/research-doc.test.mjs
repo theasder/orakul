@@ -89,6 +89,13 @@ describe('RESEARCH-AND-PLAN', () => {
         `${name} does not hash the core — a connector change leaves the stamp unmoved`);
     }
 
+    // Сборка обязана заставлять SwiftPM перечитать состав ядра. Кеш
+    // зависимости-по-пути живёт отдельно на каждую архитектуру и нового
+    // файла в ядре не видит: установщик падал с «cannot find X in scope»
+    // ровно тогда, когда обычный `swift build` в app/ уже собирался.
+    assert.match(build, /swift package "\$\{SWIFT_BUILD_ARGS\[@\]\}" clean/,
+      'the installer build reuses a stale scratch path — a new core file breaks it with "cannot find X in scope"');
+
     // Обе стороны обязаны считать ОДИНАКОВО, а не просто по одним папкам.
     // `shasum` печатает путь рядом с хешем, поэтому один и тот же файл,
     // записанный как `mvp/…` и как `app/../mvp/…`, даёт разный итог. Ровно на
