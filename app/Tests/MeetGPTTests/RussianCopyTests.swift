@@ -63,9 +63,37 @@ struct RussianCopyTests {
         where url.pathExtension == "swift" {
             guard !url.path.contains("/Paywall/"),
                   let text = try? String(contentsOf: url, encoding: .utf8) else { continue }
+            // Многострочные блоки считаются отдельно. Разбор по кавычкам
+            // на строке их не видит: у `\"\"\"`-текста кавычек внутри нет, и
+            // подсказки `.help(\"\"\"…\"\"\")` — самый видимый текст в
+            // интерфейсе — проходили мимо проверки целиком.
+            // Многострочный блок считается, только если он открыт вызовом,
+            // который показывает текст человеку: `.help(`, `Text(`, подписи
+            // доступности. Без этого сюда хлынут подсказки модели — их в
+            // приложении больше, чем интерфейса, и проверка утонет в них, как
+            // и предупреждает комментарий выше.
+            let uiOpeners = [".help(", "Text(", ".accessibilityLabel(", ".accessibilityHint("]
+            var insideBlock = false
+            var blockIsUI = false
             for line in text.split(separator: "\n") {
                 let trimmed = line.trimmingCharacters(in: .whitespaces)
+                if trimmed.contains("\"\"\"") {
+                    if insideBlock {
+                        insideBlock = false
+                        blockIsUI = false
+                    } else {
+                        insideBlock = true
+                        blockIsUI = uiOpeners.contains { trimmed.contains($0) }
+                    }
+                    continue
+                }
                 guard !trimmed.hasPrefix("//") else { continue }
+                if insideBlock {
+                    if blockIsUI, !trimmed.isEmpty {
+                        result.append((url.lastPathComponent, trimmed))
+                    }
+                    continue
+                }
                 for (index, chunk) in line.split(separator: "\"", omittingEmptySubsequences: false).enumerated()
                 where index % 2 == 1 {
                     result.append((url.lastPathComponent, String(chunk)))

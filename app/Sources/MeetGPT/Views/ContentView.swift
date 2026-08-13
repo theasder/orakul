@@ -388,10 +388,10 @@ private struct MeetingColumn: View {
                     // Free and offline, so it is offered without the cost
                     // warning the cloud pass carries.
                     .help("""
-                    Reads the whole recording again in one pass instead of the \
-                    six-second slices used live. Measured 32% more accurate on real \
-                    calls. Runs on this Mac — no upload, no credits — and takes about \
-                    a minute per eight minutes of audio.
+                    Читает запись целиком одним проходом, а не шестисекундными \
+                    кусками, как во время звонка. На настоящих звонках вышло на 32% \
+                    точнее. Работает на этом компьютере — ничего не уходит наружу — \
+                    и занимает около минуты на восемь минут записи.
                     """)
                     .accessibilityIdentifier("postcall.retranscribeLocal")
                 }
@@ -412,16 +412,16 @@ private struct MeetingColumn: View {
                     .buttonStyle(QuietButtonStyle(prominent: !state.firefliesEnhancePending))
                     .help(state.firefliesEnhancePending
                           ? """
-                          Fireflies is already merging its own transcript of this call, \
-                          automatically and at no extra cost. Use this only if you do not \
-                          want to wait — it re-uploads the audio to \
-                          \(state.diarizeDestination) and spends transcription credits.
+                          Fireflies уже подмешивает свою расшифровку этого звонка, \
+                          сам и без доплаты. Это нужно, только если ждать не хочется: \
+                          запись уйдёт повторно в \(state.diarizeDestination) и \
+                          израсходует там минуты расшифровки.
                           """
                           : """
-                          Re-transcribes the other side of the call in the cloud and labels \
-                          speakers. Much more accurate than on-device transcription, \
-                          especially for accented speech. Sends the retained remote audio to \
-                          \(state.diarizeDestination) and uses transcription credits.
+                          Расшифровывает вторую сторону звонка в облаке и подписывает \
+                          говорящих. Заметно точнее расшифровки на компьютере, особенно \
+                          на речи с акцентом. Сохранённый звук собеседника уйдёт в \
+                          \(state.diarizeDestination) и израсходует там минуты расшифровки.
                           """)
                 }
                 if let note = state.transcriptEnhanceNote, !note.isEmpty {
