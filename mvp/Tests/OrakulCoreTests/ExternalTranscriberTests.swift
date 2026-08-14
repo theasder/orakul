@@ -294,4 +294,59 @@ struct TranscriberErrorTextTests {
         let text = String(describing: ExternalTranscriber.TranscriberError.engineFailed("   "))
         #expect(text.contains("ничего не сказал"), "пустой вывод оставил пустое сообщение: «\(text)»")
     }
+
+    /// Пустой вывод продукт отвергал, а двоичный мусор — нет: «Расшифровано» и
+    /// запись в архив, где вместо разговора байты. В ORAKUL_ENGINE легко
+    /// указать не ту программу (путь к модели вместо распознавателя), и она
+    /// печатает в stdout что угодно.
+    @Test("двоичный вывод движка не выдаётся за расшифровку")
+    func binaryOutputIsRefused() throws {
+        let junk = String(decoding: (0..<200).map { UInt8(($0 * 37 + 11) % 256) }, as: UTF8.self)
+        #expect(throws: (any Error).self) {
+            try ExternalTranscriber.checkLooksLikeSpeech(junk)
+        }
+    }
+
+    /// И проверка должна стоять НА ПУТИ, а не рядом с ним. Мутация «убрать
+    /// вызов из transcribe» проходила зелёной, пока проверки звали
+    /// `checkLooksLikeSpeech` напрямую: сама она работала, а в расшифровке не
+    /// участвовала.
+    @Test("мусор отвергается на настоящем пути расшифровки")
+    func binaryOutputIsRefusedThroughTranscribe() async {
+        let junk = String(decoding: (0..<200).map { UInt8(($0 * 37 + 11) % 256) }, as: UTF8.self)
+        let transcriber = ExternalTranscriber(command: "engine -f {файл}",
+                                              run: { _, _, _ in junk })
+        await #expect(throws: (any Error).self) {
+            try await transcriber.transcribe(samples: [0.1])
+        }
+    }
+
+    /// Обратная сторона: порог не должен отвергать настоящую речь. Русскую,
+    /// английскую, с цифрами, со знаками — всё это расшифровки, которые
+    /// человек ждёт увидеть в архиве.
+    @Test("настоящая расшифровка проходит",
+          arguments: [
+            "Аня: по годовому тарифу решили не трогать до декабря",
+            "Bob: we ship the migration on Friday, CRX-42 stays open",
+            "Аня: поднимаем на 15%, это 1200 рублей в месяц — 14 400 в год",
+            "Борис: запусти `swift build -c release`, потом ./orakul найти тарифы",
+            "Аня: 1, 2, 3 — раз, два, три",
+          ])
+    func realTranscriptsPass(text: String) throws {
+        try ExternalTranscriber.checkLooksLikeSpeech(text)
+    }
+
+    /// Знак замены — не буква, и сплошные знаки замены проверку не проходят.
+    /// А вот один сбойный байт в короткой строке проходить обязан: продукт
+    /// это уже решил (см. «один битый байт не съедает всю расшифровку»), и
+    /// отдельное правило «не больше пяти процентов знаков замены» это ломало.
+    @Test("сплошные знаки замены не проходят, один сбойный байт проходит")
+    func replacementCharacters() throws {
+        try ExternalTranscriber.checkLooksLikeSpeech("Решили выкатить в прод.\u{FFFD}\u{FFFD}")
+        try ExternalTranscriber.checkLooksLikeSpeech(
+            "Аня: по тарифам решили\u{FFFD} не трогать годовой до декабря месяца")
+        #expect(throws: (any Error).self) {
+            try ExternalTranscriber.checkLooksLikeSpeech(String(repeating: "\u{FFFD}", count: 40))
+        }
+    }
 }

@@ -158,6 +158,8 @@ public struct ExternalTranscriber: Transcriber {
         case commandHasNoFilePlaceholder
         case engineFailed(String)
         case engineSaidNothing
+        /// Движок напечатал байты, но это не речь.
+        case engineSaidGibberish(letters: Int, total: Int)
 
         /// По-русски и с действием.
         ///
@@ -182,6 +184,11 @@ public struct ExternalTranscriber: Transcriber {
                 return "Движок отработал, но текста не вернул. Обычно это "
                     + "тишина в записи или неверные ключи запуска — проверьте "
                     + "команду в ORAKUL_ENGINE на этом же файле вручную."
+            case .engineSaidGibberish(let letters, let total):
+                return "Движок вернул не текст: букв \(letters) из \(total) знаков. "
+                    + "Обычно в ORAKUL_ENGINE стоит не та программа — например, "
+                    + "путь к модели вместо распознавателя, — и она печатает "
+                    + "двоичные данные. Проверьте команду на этом же файле вручную."
             }
         }
     }
@@ -216,7 +223,37 @@ public struct ExternalTranscriber: Transcriber {
         let output = try run(executable, arguments, audio)
         let text = output.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { throw TranscriberError.engineSaidNothing }
+        try Self.checkLooksLikeSpeech(text)
         return text
+    }
+
+    /// Похоже ли это на речь вообще.
+    ///
+    /// Пустой вывод продукт уже отвергал, а двоичный мусор — нет: сообщение
+    /// «Расшифровано» и запись в архив, где вместо разговора лежат байты.
+    /// Случай не выдуманный: в ORAKUL_ENGINE легко указать не ту программу —
+    /// скажем, путь к файлу модели вместо распознавателя, — и она напечатает
+    /// в stdout что угодно.
+    ///
+    /// Порог намеренно очень низкий: у настоящей расшифровки, русской или
+    /// английской, букв и пробелов свыше девяти десятых. Треть — это заведомо
+    /// не речь, и при этом не мешает диктовке кода или расшифровке, полной
+    /// цифр и знаков.
+    static func checkLooksLikeSpeech(_ text: String) throws {
+        let total = text.count
+        guard total > 0 else { return }
+        let letters = text.reduce(into: 0) { count, character in
+            if character.isLetter || character.isWhitespace { count += 1 }
+        }
+        // Считается только доля букв. Отдельного правила про знаки замены тут
+        // было: «не больше пяти процентов». Оно ломало то, что продукт уже
+        // решил терпеть — один сбойный байт в короткой строке: «Решили
+        // выкатить в прод.» плюс два таких знака давало 8%, и целая
+        // расшифровка отвергалась из-за одного байта. Знак замены и так не
+        // буква, доли букв достаточно.
+        guard letters * 3 >= total else {
+            throw TranscriberError.engineSaidGibberish(letters: letters, total: total)
+        }
     }
 
     /// Запуск настоящего процесса.
