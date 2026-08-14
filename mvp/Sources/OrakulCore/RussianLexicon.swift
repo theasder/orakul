@@ -182,6 +182,15 @@ public enum RussianLexicon {
         "сентри": "sentry", "sentry": "sentry",
         "кибана": "kibana", "kibana": "kibana",
         "тарантул": "tarantool", "tarantool": "tarantool",
+        // Добавлено 2026-08-14, найдено запуском поиска: ни одно из этих имён
+        // не находило разговор, где инструмент назвали по-английски.
+        "джира": "jira", "jira": "jira",
+        "битбакет": "bitbucket", "bitbucket": "bitbucket",
+        "вскод": "vscode", "вс-код": "vscode", "vscode": "vscode",
+        "джагер": "jaeger", "jaeger": "jaeger",
+        "опенапи": "openapi", "openapi": "openapi",
+        "линтер": "linter", "линт": "linter", "linter": "linter", "lint": "linter",
+        "билд": "build", "build": "build",
         "кубер": "кубернетес", "k8s": "кубернетес",
         // Эти три — обычные русские слова, и переписывать ими расшифровку
         // нельзя: «кролик» бывает зверем, «откат» — деньгами, «артефакт» —
