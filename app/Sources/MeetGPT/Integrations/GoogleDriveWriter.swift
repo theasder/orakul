@@ -34,7 +34,7 @@ enum GoogleDriveWriter {
             case .malformedResponse:
                 return "Google's response could not be read."
             case .notOurFile:
-                return "Cruxwing can only change files it created."
+                return "orakul может менять только те файлы, которые сам создал."
             }
         }
     }

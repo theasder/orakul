@@ -138,7 +138,7 @@ final class LoopbackRedirectServer: @unchecked Sendable {
         }
         respond(connection, status: "200 OK",
                 body: "<html><body style=\"font-family:-apple-system;padding:2em\">" +
-                      "<h2>Cruxwing is connected.</h2><p>You can close this tab and return to the app.</p></body></html>")
+                      "<h2>orakul подключён.</h2><p>Эту вкладку можно закрыть и вернуться в приложение.</p></body></html>")
         finish(.success(url))
     }
 

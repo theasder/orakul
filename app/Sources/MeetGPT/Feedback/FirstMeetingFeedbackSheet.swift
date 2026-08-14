@@ -22,7 +22,7 @@ struct FirstMeetingFeedbackSheet: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Как всё прошло?")
                     .font(.title3.weight(.semibold))
-                Text("Your first call with Cruxwing just ended. One tap tells us more than any download number.")
+                Text("Первый звонок с orakul только что закончился. Одно нажатие скажет нам больше, чем любое число скачиваний.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

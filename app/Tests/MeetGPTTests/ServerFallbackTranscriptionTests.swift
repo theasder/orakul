@@ -23,7 +23,7 @@ struct ServerFallbackTranscriptionTests {
     }
 
     private func capError(_ code: Int) -> NSError {
-        NSError(domain: "CruxwingWhisper", code: code,
+        NSError(domain: "OrakulWhisper", code: code,
                 userInfo: [NSLocalizedDescriptionKey: "err \(code)"])
     }
 
@@ -42,11 +42,11 @@ struct ServerFallbackTranscriptionTests {
         #expect(!ServerFallbackTranscription.shouldFallback(on: capError(413)))
     }
 
-    @Test("cap reasons name the plan limit; outages name the server")
+    @Test("причина отказа названа своими словами: ограничение, вход, недоступность")
     func reasons() {
-        #expect(ServerFallbackTranscription.reason(for: capError(429)).contains("Plan limit"))
-        #expect(ServerFallbackTranscription.reason(for: capError(401)).contains("Signed out"))
-        #expect(ServerFallbackTranscription.reason(for: capError(503)).contains("unreachable"))
+        #expect(ServerFallbackTranscription.reason(for: capError(429)).contains("ограничению"))
+        #expect(ServerFallbackTranscription.reason(for: capError(401)).contains("Вход не подтверждён"))
+        #expect(ServerFallbackTranscription.reason(for: capError(503)).contains("недоступен"))
     }
 
     @Test("degraded state is per-instance and sticky, and notifies exactly once")
@@ -69,6 +69,6 @@ struct ServerFallbackTranscriptionTests {
         _ = try await wrapper.transcribe(wav: Data([0x52]))
         #expect(fallback.calls == 2)
         #expect(notices.count == 1)
-        #expect(notices[0].contains("on-device"))
+        #expect(notices[0].contains("на вашем компьютере"))
     }
 }

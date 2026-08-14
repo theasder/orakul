@@ -211,8 +211,8 @@ struct GoogleFileExportTests {
     func emptyTitleGetsAName() {
         // A 400 from Drive on save reads as the export being broken rather than
         // the title being wrong.
-        #expect(GoogleFileExport.sanitisedTitle("   ") == "Cruxwing export")
-        #expect(GoogleFileExport.sanitisedTitle("///") == "Cruxwing export")
+        #expect(GoogleFileExport.sanitisedTitle("   ") == "Выгрузка orakul")
+        #expect(GoogleFileExport.sanitisedTitle("///") == "Выгрузка orakul")
     }
 
     @Test("a very long title is bounded")

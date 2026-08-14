@@ -55,19 +55,19 @@ final class ServerFallbackTranscription: TranscriptionService {
     static func shouldFallback(on error: Error) -> Bool {
         let ns = error as NSError
         if ns.domain == NSURLErrorDomain { return true }
-        guard ns.domain == "CruxwingWhisper" else { return false }
+        guard ns.domain == "OrakulWhisper" else { return false }
         return ns.code == 429 || ns.code == 401 || ns.code >= 500 || ns.code == -1
     }
 
     static func reason(for error: Error) -> String {
         let ns = error as NSError
-        if ns.domain == "CruxwingWhisper", ns.code == 429 {
-            return "Plan limit reached — switched to on-device transcription for this session."
+        if ns.domain == "OrakulWhisper", ns.code == 429 {
+            return "Сервер отказал по ограничению — этот звонок расшифровывается на вашем компьютере."
         }
-        if ns.domain == "CruxwingWhisper", ns.code == 401 {
-            return "Signed out — switched to on-device transcription for this session."
+        if ns.domain == "OrakulWhisper", ns.code == 401 {
+            return "Вход не подтверждён — этот звонок расшифровывается на вашем компьютере."
         }
-        return "Cruxwing Whisper is unreachable — switched to on-device transcription for this session."
+        return "Серверный Whisper недоступен — этот звонок расшифровывается на вашем компьютере."
     }
 
     // MARK: forwarded lifecycle (the heavy resources live in the fallback)

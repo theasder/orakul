@@ -58,7 +58,7 @@ struct MeetGPTApp: App {
     }
 
     var body: some Scene {
-        WindowGroup("Cruxwing", id: "main") {
+        WindowGroup("orakul", id: "main") {
             ContentView()
                 .environmentObject(state)
                 .environment(\.readingTextScale, state.readingTextScale)

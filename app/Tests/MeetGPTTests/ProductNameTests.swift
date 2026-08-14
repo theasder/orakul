@@ -65,8 +65,21 @@ struct ProductNameTests {
 
     @Test("ни один текст на экране не называет приложение чужим именем")
     func viewsNeverSayCruxwing() {
-        let files = swiftFiles(under: "Views")
-        #expect(files.count > 10, "не нашлись файлы интерфейса — проверка была бы фиктивной")
+        // Не только `Views/`. Заголовок окна живёт в `MeetGPTApp.swift`, лист
+        // отзыва — в `Feedback/`, страница «подключено», которую браузер
+        // показывает после входа, — в `MCP/`, подписи выгруженных документов —
+        // в `Export/` и `Integrations/`. Всё это человек видит, и во всём этом
+        // стояло чужое имя: проверка смотрела в одну папку из шести.
+        var files = swiftFiles(under: "Views")
+            + swiftFiles(under: "Feedback") + swiftFiles(under: "Export")
+            + swiftFiles(under: "Transcription")
+        files.append(sources.appendingPathComponent("MeetGPTApp.swift"))
+        for path in ["MCP/LoopbackRedirectServer.swift",
+                     "Integrations/GoogleFileExport.swift",
+                     "Integrations/GoogleDriveWriter.swift"] {
+            files.append(sources.appendingPathComponent(path))
+        }
+        #expect(files.count > 14, "не нашлись файлы интерфейса — проверка была бы фиктивной")
 
         var offenders: [String] = []
         for file in files {

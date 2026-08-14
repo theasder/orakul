@@ -93,14 +93,14 @@ enum AssistantAnswerTitle {
         let trimmed = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty,
               !trimmed.hasPrefix("Prompt unavailable for this older saved answer") else {
-            return "Cruxwing Assistant Answer"
+            return "Ответ orakul"
         }
         let firstLine = trimmed.components(separatedBy: .newlines).first ?? trimmed
         let words = firstLine
             .trimmingCharacters(in: CharacterSet(charactersIn: "#*_\"'“”‘’ .?!:;,-–—"))
             .split(whereSeparator: \.isWhitespace)
         let candidate = words.prefix(8).joined(separator: " ")
-        return candidate.isEmpty ? "Cruxwing Assistant Answer" : String(candidate.prefix(100))
+        return candidate.isEmpty ? "Ответ orakul" : String(candidate.prefix(100))
     }
 }
 
@@ -110,7 +110,7 @@ enum AssistantAnswerTitle {
 /// - preset: standard_business_brief
 /// - first-page pattern: memo_masthead
 /// - named overrides: 23 pt black title; shaded prompt paragraph; quiet
-///   Cruxwing running header and right-aligned page-number footer.
+///   Колонтитул с именем продукта и номером страницы справа.
 enum AssistantDOCXExporter {
     enum ExportError: LocalizedError {
         case archiveTooLarge
@@ -143,7 +143,7 @@ enum AssistantDOCXExporter {
             value = String(value.prefix(80))
                 .trimmingCharacters(in: CharacterSet(charactersIn: " ."))
         }
-        if value.isEmpty { value = "Cruxwing Assistant Answer" }
+        if value.isEmpty { value = "Ответ orakul" }
         // Elegant, sortable, collision-free: append the export date with an
         // em-dash ("Project Falcon Budget Review — 2026-07-23.docx"). No date
         // keeps the bare name (callers that don't need dating, and tests).
@@ -223,9 +223,9 @@ enum AssistantDOCXExporter {
           xmlns:dcmitype="http://purl.org/dc/dcmitype/"
           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
           <dc:title>\(xml(document.title))</dc:title>
-          <dc:subject>Cruxwing assistant answer export</dc:subject>
-          <dc:creator>Cruxwing</dc:creator>
-          <cp:lastModifiedBy>Cruxwing</cp:lastModifiedBy>
+          <dc:subject>Выгрузка ответа orakul</dc:subject>
+          <dc:creator>orakul</dc:creator>
+          <cp:lastModifiedBy>orakul</cp:lastModifiedBy>
           <dcterms:created xsi:type="dcterms:W3CDTF">\(timestamp)</dcterms:created>
           <dcterms:modified xsi:type="dcterms:W3CDTF">\(timestamp)</dcterms:modified>
         </cp:coreProperties>
@@ -236,9 +236,9 @@ enum AssistantDOCXExporter {
     <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
     <Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"
       xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">
-      <Application>Cruxwing</Application>
+      <Application>orakul</Application>
       <AppVersion>1.0</AppVersion>
-      <Company>Cruxwing</Company>
+      <Company>orakul</Company>
     </Properties>
     """
 
@@ -381,7 +381,7 @@ enum AssistantDOCXExporter {
     <w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
       <w:p>
         <w:pPr><w:pStyle w:val="Header"/><w:tabs><w:tab w:val="right" w:pos="9360"/></w:tabs></w:pPr>
-        <w:r><w:t>Cruxwing</w:t></w:r><w:r><w:tab/></w:r><w:r><w:t>Assistant export</w:t></w:r>
+        <w:r><w:t>orakul</w:t></w:r><w:r><w:tab/></w:r><w:r><w:t>Выгрузка ответа</w:t></w:r>
       </w:p>
     </w:hdr>
     """
