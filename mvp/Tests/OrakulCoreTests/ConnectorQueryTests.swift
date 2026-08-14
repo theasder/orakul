@@ -292,4 +292,43 @@ struct ConnectorQueryFailureTests {
             .init(service: "нетакого", token: "", host: nil, scope: nil), query: "   ")
         #expect(answer.text.contains("Пустой вопрос"))
     }
+
+    /// Два отказа TLS выглядят похоже, а чинятся по-разному, и раньше о них
+    /// сообщалось одной фразой про недоверенный сертификат. Внутренние серверы
+    /// часто стоят на http — такому человеку совет «поправьте сертификат»
+    /// отправлял чинить то, чего нет. Коды проверены на живых серверах:
+    /// сервер без TLS даёт -1200, самоподписанный — -1202.
+    @Test("сервер без TLS и недоверенный сертификат объясняются по-разному")
+    func tlsFailuresAreToldApart() async {
+        let http = await ConnectorQuery.ask(
+            .init(service: "kaiten", token: "t", host: "127.0.0.1:1", scope: nil),
+            query: "лимиты",
+            trackerRUHTTP: { _ in throw URLError(.secureConnectionFailed) })
+        #expect(http.failed)
+        #expect(http.text.contains("не принял защищённое соединение"))
+        #expect(http.text.contains("http, а не https"), "не сказано, что проверить")
+        #expect(!http.text.contains("сертификат"), "снова про сертификат: \(http.text)")
+
+        let cert = await ConnectorQuery.ask(
+            .init(service: "kaiten", token: "t", host: "127.0.0.1:1", scope: nil),
+            query: "лимиты",
+            trackerRUHTTP: { _ in throw URLError(.serverCertificateUntrusted) })
+        #expect(cert.failed)
+        #expect(cert.text.contains("которому система не доверяет"))
+        #expect(cert.text.contains("Связку ключей"), "не сказано, что делать")
+    }
+
+    /// Просроченный и с чужим корнем — тот же случай для человека.
+    @Test("остальные беды с сертификатом объясняются так же",
+          arguments: [URLError.Code.serverCertificateHasBadDate,
+                      .serverCertificateNotYetValid,
+                      .serverCertificateHasUnknownRoot])
+    func certificateVariantsShareTheMessage(code: URLError.Code) async {
+        let answer = await ConnectorQuery.ask(
+            .init(service: "kaiten", token: "t", host: "127.0.0.1:1", scope: nil),
+            query: "лимиты",
+            trackerRUHTTP: { _ in throw URLError(code) })
+        #expect(answer.failed)
+        #expect(answer.text.contains("которому система не доверяет"), "\(code): \(answer.text)")
+    }
 }

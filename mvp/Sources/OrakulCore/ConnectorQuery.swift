@@ -158,8 +158,22 @@ public enum ConnectorQuery {
             return "Сервис\(host) не ответил вовремя. Попробуйте ещё раз."
         case .cannotFindHost, .cannotConnectToHost, .dnsLookupFailed:
             return "Не достучались до сервиса\(host). Проверьте адрес в ORAKUL_HOST."
-        case .secureConnectionFailed, .serverCertificateUntrusted:
-            return "Сервис\(host) отвечает по недоверенному сертификату."
+        case .serverCertificateUntrusted, .serverCertificateHasBadDate,
+             .serverCertificateNotYetValid, .serverCertificateHasUnknownRoot:
+            return "Сервис\(host) отвечает сертификатом, которому система не доверяет "
+                + "(самоподписанный, просроченный или с чужим корнем). Добавьте его "
+                + "в Связку ключей как доверенный или поставьте сертификат от "
+                + "известного удостоверяющего центра."
+        case .secureConnectionFailed:
+            // Отдельно от недоверенного сертификата: причина другая и чинится
+            // по-другому. Проверено на живых серверах: самоподписанный даёт
+            // -1202, а сервер, который вовсе не говорит по TLS, — -1200.
+            // Внутренние серверы часто стоят на http, и совет «поправьте
+            // сертификат» отправил бы человека чинить то, чего нет.
+            return "Сервис\(host) не принял защищённое соединение. Обычно это "
+                + "значит, что он отвечает по http, а не https, или говорит на "
+                + "другой версии TLS. Проверьте, что адрес в ORAKUL_HOST начинается "
+                + "с того же, что вы открываете в браузере."
         default:
             return "Не получилось спросить сервис\(host): \(url.localizedDescription)"
         }
