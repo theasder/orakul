@@ -16,6 +16,40 @@ const repo = resolve(here, '..');
 const readme = readFileSync(resolve(repo, 'README.md'), 'utf8');
 
 describe('README', () => {
+  test('the dependency counts in the quick start are the real ones', () => {
+    // README обещает, сколько строк «Fetching» человек увидит при первой
+    // сборке. Число проверяемое: прямые зависимости — в Package.swift,
+    // полное — в Package.resolved. Сверять его глазами никто не будет.
+    const readme = readFileSync(resolve(repo, 'README.md'), 'utf8');
+    const words = { две: 2, три: 3, четыре: 4, пять: 5, шесть: 6,
+                    двадцать: 20, 'двадцать три': 23, 'двадцать четыре': 24 };
+
+    const direct = /У приложения в `app\/` их ([а-яё]+)/.exec(readme);
+    assert.ok(direct, 'README больше не говорит, сколько прямых зависимостей');
+    const manifest = readFileSync(resolve(repo, 'app', 'Package.swift'), 'utf8');
+    // `.package(path:)` — соседний каталог, его не скачивают: в «Fetching» он
+    // не появится, и считать его среди зависимостей значит соврать на единицу.
+    const remote = (manifest.match(/\.package\(url:/g) ?? []).length;
+    assert.equal(words[direct[1]], remote,
+      `README обещает ${direct[1]} (${words[direct[1]]}) прямых, в манифесте их ${remote}`);
+
+    const total = /всего (\d+) пакет/.exec(readme);
+    assert.ok(total, 'README больше не называет полное число пакетов');
+    const resolved = JSON.parse(readFileSync(resolve(repo, 'app', 'Package.resolved'), 'utf8'));
+    const pins = resolved.pins ?? resolved.object?.pins ?? [];
+    assert.ok(pins.length > 0, 'Package.resolved не разобрался — проверка бы прошла впустую');
+    assert.equal(Number(total[1]), pins.length,
+      `README обещает ${total[1]} пакетов, в Package.resolved их ${pins.length}`);
+
+    // И третье число — сколько тянут за собой: разница между ними.
+    const transitive = /Они тянут за собой ещё ([а-яё]+ ?[а-яё]*) —/.exec(readme);
+    assert.ok(transitive, 'README больше не говорит про непрямые зависимости');
+    const stated = words[transitive[1].trim()];
+    assert.ok(stated !== undefined, `непонятное число: ${transitive[1]}`);
+    assert.equal(stated, pins.length - remote,
+      `README обещает ${stated} непрямых, а их ${pins.length - remote}`);
+  });
+
   test('every repo file it links to exists', () => {
     // README-ссылки гниют тише всего: файл переименовали, README остался, и
     // гость упирается в 404 на первой же полезной ссылке. Внешние адреса не
