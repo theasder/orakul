@@ -133,8 +133,57 @@ public struct RecallIndex: Sendable {
     ///    «фичи» — не термины, но приводятся к своему термину.
     /// 3. Всё остальное — обычная обрезка окончаний.
     static func stem(_ word: String) -> String {
-        if let canonical = RussianLexicon.canonicalToken(for: word) { return canonical }
-        return stripEnding(RussianLexicon.normalized(word))
+        if let cached = stemCache.value(for: word) { return cached }
+        let result: String
+        if let canonical = RussianLexicon.canonicalToken(for: word) {
+            result = canonical
+        } else {
+            result = stripEnding(RussianLexicon.normalized(word))
+        }
+        stemCache.store(result, for: word)
+        return result
+    }
+
+    /// Слово → основа считается один раз на слово, а не на каждое вхождение.
+    ///
+    /// Речь повторяется: на месяце звонков (412 тыс. слов) разных слов
+    /// несколько тысяч. Разбор был чистой функцией, которую звали заново на
+    /// каждое вхождение, и указатель строился 3.5 секунды — это то, что человек
+    /// ждёт на каждый вопрос, потому что на диск указатель не пишется.
+    ///
+    /// Ограничение по размеру обязательно: без него долгий процесс приложения
+    /// накапливал бы каждое услышанное слово навсегда. При переполнении кэш
+    /// сбрасывается целиком — это дешевле учёта возрастов и здесь достаточно.
+    static let stemCache = StemCache()
+
+    final class StemCache: @unchecked Sendable {
+        private let lock = NSLock()
+        private var table: [String: String] = [:]
+        private let limit = 50_000
+
+        func value(for word: String) -> String? {
+            lock.lock(); defer { lock.unlock() }
+            return table[word]
+        }
+
+        func store(_ stem: String, for word: String) {
+            lock.lock(); defer { lock.unlock() }
+            if table.count >= limit { table.removeAll(keepingCapacity: true) }
+            table[word] = stem
+        }
+
+        func countForTesting() -> Int {
+            lock.lock(); defer { lock.unlock() }
+            return table.count
+        }
+
+        /// Замер обязан начинаться с холодного кэша: иначе он показывает не
+        /// стоимость разбора, а то, что успели разобрать соседние проверки в
+        /// том же процессе.
+        func resetForTesting() {
+            lock.lock(); defer { lock.unlock() }
+            table.removeAll(keepingCapacity: true)
+        }
     }
 
     /// Тот же шаг для приложения.
