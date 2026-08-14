@@ -2083,6 +2083,23 @@ describe('orakul landing (ru)', () => {
       '.findings-label больше не задаёт верхний отступ');
   });
 
+  test('the promise about cases is backed by the endings the code strips', () => {
+    // Страница обещает, что падеж вопроса сходится с падежом речи, и называет
+    // именно тот разряд, который был сломан. Обещание держится на списке
+    // окончаний: без семейства на «и» «развёртыванием» и «развёртывание»
+    // дают разные основы, и обещание становится неправдой.
+    const claim = /падеж вопроса и падеж речи сходятся/.test(text);
+    assert.ok(claim, 'страница больше не обещает падежи');
+    const source = readFileSync(resolve(
+      here, '..', 'mvp', 'Sources', 'OrakulCore', 'RecallIndex.swift'), 'utf8');
+    for (const ending of ['"ием"', '"ия"', '"ию"', '"ии"']) {
+      assert.ok(source.includes(ending),
+        `окончание ${ending} пропало — обещание про падежи перестало быть правдой`);
+    }
+    assert.match(source, /stride\(from: 4/,
+      'цикл снова начинается не с четырёх — четырёхбуквенные окончания не сработают');
+  });
+
   test('names the licence, because "open source" alone is not a licence', () => {
     assert.match(text, /Apache 2\.0/);
   });
