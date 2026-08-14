@@ -45,6 +45,31 @@ describe('RESEARCH-AND-PLAN', () => {
     assert.deepEqual(outOfOrder, [], outOfOrder.join('; '));
   });
 
+  test('the documents keep the word the product itself uses', () => {
+    // §6.6 объявляет словарь продукта: «звонок», а не «созвон». Документы его
+    // же и нарушали — README, CONTRIBUTING и сам разбор в трёх местах. Слово
+    // допустимо ровно там, где правило объясняется: в таблице «так» / «не так»
+    // и в фразе про то, почему разнобой путает человека.
+    const files = {
+      'README.md': readFileSync(resolve(repo, 'README.md'), 'utf8'),
+      'CONTRIBUTING.md': readFileSync(resolve(repo, 'CONTRIBUTING.md'), 'utf8'),
+      'docs/RESEARCH-AND-PLAN.md': doc,
+    };
+    for (const [name, text] of Object.entries(files)) {
+      const lines = text.split('\n')
+        .map((line, i) => [i + 1, line])
+        .filter(([, line]) => /созвон/i.test(line))
+        // Названия чужих статей не правим: это цитата, а не наш текст.
+        // «Созвоны, аватарки и немного треша» — так называется источник.
+        .filter(([, line]) => !line.includes('](http') && !line.trim().startsWith('[^'));
+      const allowed = name === 'docs/RESEARCH-AND-PLAN.md' ? 2 : 0;
+      assert.equal(lines.length, allowed,
+        `${name}: «созвон» в строках ${lines.map(([i]) => i).join(', ')}`);
+    }
+    // И само правило на месте — иначе допуск выше не на что опереть.
+    assert.match(doc, /\*\*звонок\*\*/, 'словарь продукта пропал из §6.6');
+  });
+
   test('every symbol it names still exists in the code', () => {
     // §5.1 states the no-backend rule and names what enforces it. Those names
     // are the doc's load-bearing part: rename one and the doc sends the next
