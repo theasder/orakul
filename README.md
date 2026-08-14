@@ -23,6 +23,9 @@ ViewInspector для тестов представлений. Они тянут 
 всего 27 пакетов в `app/Package.resolved`, и столько же вы увидите строками
 `Fetching` при первой сборке. Пять минут — это про `mvp/`.
 
+Страница проекта: <https://theasder.github.io/orakul/>. Домен orakul.ai
+зарегистрирован, но пока припаркован у регистратора — там ничего нашего нет.
+
 Готовую сборку под macOS — Apple Silicon и Intel, подписаны и заверены у
 Apple — можно взять в [выпусках](https://github.com/theasder/orakul/releases/latest).
 Дальше — про то, как собрать самому.
