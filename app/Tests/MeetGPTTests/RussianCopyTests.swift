@@ -401,6 +401,60 @@ struct RussianCopyTests {
         #expect(english.isEmpty, "по-английски в уведомлениях: \(english.joined(separator: " | "))")
     }
 
+    /// Разрешения и вход — те же слова, что уведомления, только в другом
+    /// файле. По-английски оставались «Microphone access denied. Open System
+    /// Settings → …, allow Cruxwing», такой же текст про запись экрана и два
+    /// сообщения о слетевшем входе, обещавшие «AI credits» — то, чего у orakul
+    /// нет вовсе. Первое из них человек видит при первом же запуске.
+    /// Строки, которые человек не читает: они уходят в модель или в поиск.
+    ///
+    /// Список короткий и с причиной у каждой — иначе он превратится в место,
+    /// куда сваливают непереведённое. Проверка выше нашла три; две оказались
+    /// такими, третья («Workflow: … → …») показывалась в двух представлениях
+    /// и переведена.
+    static let notForPeople: Set<String> = [
+        // Запрос к коннекторам, когда цель звонка не задана: слова ищутся в
+        // чужих сервисах, где всё по-английски.
+        "canonical project product people acronym API technical terminology",
+        // Заголовок куска запроса к модели, попадает в отладочный след.
+        // Разбор берёт строку как она написана в коде, вместе с \n и подстановкой.
+        #"Packed connector facts:\n\(packed)"#,
+    ]
+
+    @Test("разрешения и вход объясняются по-русски и без чужого имени")
+    func permissionAndSignInCopyIsRussian() throws {
+        let base = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/MeetGPT/AppState.swift")
+        let source = try String(contentsOf: base, encoding: .utf8)
+        var checked = 0
+        var problems: [String] = []
+        for line in source.split(separator: "\n") {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            guard !trimmed.hasPrefix("//") else { continue }
+            // Строки, которые кладут в `lastError`/`status`/`message` — это
+            // то, что человек читает, когда что-то не получилось.
+            guard trimmed.hasPrefix("let msg = \"") || trimmed.hasPrefix("return \"")
+            else { continue }
+            guard let open = trimmed.firstIndex(of: "\""),
+                  let close = trimmed.lastIndex(of: "\""), open < close else { continue }
+            let text = String(trimmed[trimmed.index(after: open)..<close])
+            guard text.count > 20, text.contains(" ") else { continue }
+            checked += 1
+            guard !Self.notForPeople.contains(text) else { continue }
+            if text.contains("Cruxwing") { problems.append("чужое имя: \(text)") }
+            if text.lowercased().contains("credits") { problems.append("кредиты: \(text)") }
+            let cyrillic = text.range(of: "[а-яё]", options: [.regularExpression, .caseInsensitive])
+            if cyrillic == nil {
+                let words = text.components(separatedBy: CharacterSet.letters.inverted)
+                    .filter { $0.count > 2 }
+                if words.count >= 4 { problems.append("по-английски: \(text)") }
+            }
+        }
+        #expect(checked > 5, "проверено всего \(checked) строк — смотрим не туда")
+        #expect(problems.isEmpty, "\(problems.joined(separator: " | "))")
+    }
+
     @Test("английских фраз на экране не становится больше")
     func englishProseOnlyShrinks() {
         // Берутся все литералы без кириллицы, похожие на речь: есть пробел и

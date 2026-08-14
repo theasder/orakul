@@ -506,11 +506,11 @@ final class AppState: ObservableObject {
         var errorDescription: String? {
             switch self {
             case .noAnswer:
-                return "There is no assistant answer to export."
+                return "Экспортировать нечего: ответа пока нет."
             case .answerStillStreaming:
-                return "Wait for the assistant to finish before exporting."
+                return "Ответ ещё пишется — дождитесь конца и повторите."
             case .answerChanged:
-                return "The assistant answer changed while its title was being created. Try exporting again."
+                return "Пока придумывалось название, ответ успел смениться. Повторите экспорт."
             }
         }
     }
@@ -1489,9 +1489,9 @@ final class AppState: ObservableObject {
         var message: String {
             switch self {
             case .sessionMissingAtLaunch:
-                return "You've been signed out of Cruxwing. Connected apps are unaffected — sign in again to restore AI credits and sync."
+                return "Вход в аккаунт слетел. Подключённые приложения это не затронуло. Войдите снова, если нужна синхронизация; запись и поиск по звонкам работают и без входа."
             case .expired:
-                return "Your Cruxwing session expired. Sign in again to restore AI credits and sync."
+                return "Вход в аккаунт истёк. Войдите снова, если нужна синхронизация; запись и поиск по звонкам работают и без входа."
             }
         }
     }
@@ -1503,7 +1503,7 @@ final class AppState: ObservableObject {
 
         var message: String {
             guard let email, !email.isEmpty else { return reason.message }
-            return "\(reason.message) Last signed in as \(email)."
+            return "\(reason.message) Последний вход — \(email)."
         }
     }
 
@@ -2695,8 +2695,8 @@ final class AppState: ObservableObject {
     func workflowSummary(for prompt: QuickPrompt) -> String {
         let sources = promptWorkflowSources[prompt.id] ?? designWorkflow(for: prompt).sources
         let names = sources.map(\.name)
-        if names.isEmpty { return "Workflow: transcript → \(workflowAIApp.name)" }
-        return "Workflow: \(names.joined(separator: " · ")) → \(workflowAIApp.name)"
+        if names.isEmpty { return "Источники: расшифровка → \(workflowAIApp.name)" }
+        return "Источники: \(names.joined(separator: " · ")) → \(workflowAIApp.name)"
     }
 
     func promptWorkflowCount(using sourceID: String) -> Int {
@@ -8099,12 +8099,12 @@ final class AppState: ObservableObject {
 
     private static func validationFooter(repaired: Bool, downgraded: Int) -> String {
         if downgraded > 0 {
-            return "\n\n_⚠️ \(downgraded) unverifiable detail\(downgraded == 1 ? "" : "s") downgraded (quote dropped / owner flagged) rather than kept unchecked._"
+            return "\n\n_⚠️ Понижено подробностей без опоры в расшифровке: \(downgraded). Цитата снята._"
         }
         if repaired {
-            return "\n\n_✓ Validated against the transcript (after one repair pass)._"
+            return "\n\n_✓ Сверено с расшифровкой (после одной правки)._"
         }
-        return "\n\n_✓ Validated against the transcript._"
+        return "\n\n_✓ Сверено с расшифровкой._"
     }
 
     /// The per-button pipeline: (1) ground from the button's connected work-apps
@@ -8664,7 +8664,7 @@ final class AppState: ObservableObject {
             mic = await Permissions.requestMicrophone()
         }
         if mic != .granted {
-            let msg = "Microphone access denied. Open System Settings → Privacy & Security → Microphone, allow Cruxwing, then quit and reopen the app."
+            let msg = "Нет доступа к микрофону. Откройте «Системные настройки → Конфиденциальность и безопасность → Микрофон», разрешите orakul, потом закройте приложение и откройте заново."
             lastError = msg
             status = .error(msg)
             return
@@ -8682,7 +8682,7 @@ final class AppState: ObservableObject {
             _ = Permissions.requestScreenRecording()
         }
         if await Permissions.screenRecordingAuthorized() == false {
-            let msg = "Screen Recording is required to capture system audio. Open System Settings → Privacy & Security → Screen Recording, enable Cruxwing, then quit and reopen the app. If Cruxwing is already in the list but still denied — remove it, relaunch, and add it again."
+            let msg = "Чтобы слышать собеседников, нужна запись экрана. Откройте «Системные настройки → Конфиденциальность и безопасность → Запись экрана», включите orakul, потом закройте приложение и откройте заново. Если orakul уже в списке, но доступа всё равно нет, — уберите его, перезапустите и добавьте снова."
             lastError = msg
             status = .error(msg)
             return
@@ -8897,7 +8897,7 @@ final class AppState: ObservableObject {
             stopTicking()
             audioMeter.reset()
             provisional.removeAll()
-            let msg = "Failed to start capture: \(error.localizedDescription)"
+            let msg = "Не удалось начать запись. \(Self.systemSaid(error))"
             lastError = msg
             status = .error(msg)
         }

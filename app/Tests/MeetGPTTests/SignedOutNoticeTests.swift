@@ -61,10 +61,10 @@ struct SignedOutNoticeTests {
         #expect(notice?.email == "dev@cruxwing.ai")
         let message = notice?.message ?? ""
         #expect(message.contains("dev@cruxwing.ai"))
-        // The two facts a reader needs: what to do, and that the connectors are
-        // fine — the absence of the second is what made this look like a
-        // billing failure.
-        #expect(message.lowercased().contains("sign in"))
+        // Человеку нужны два факта: что делать и что коннекторы целы —
+        // отсутствие второго и делало это похожим на отказ оплаты. Сам текст
+        // был английским и обещал «AI credits», которых у orakul нет.
+        #expect(message.lowercased().contains("войдите"))
         Config.lastSignedInEmail = nil
     }
 
@@ -108,11 +108,13 @@ struct SignedOutNoticeTests {
     func everyReasonReassuresAboutConnectors() {
         for reason in [AppState.SignedOutReason.sessionMissingAtLaunch, .expired] {
             let text = reason.message.lowercased()
-            #expect(text.contains("sign in"), "\(reason): \(text)")
+            #expect(text.contains("войдите"), "\(reason): \(text)")
+            #expect(!text.contains("credits"), "обещаны кредиты, которых нет: \(text)")
+            #expect(!text.contains("cruxwing"), "имя другого продукта: \(text)")
         }
         // Only the launch case can be mistaken for "the app lost my apps too",
         // because it is the one where the workspace still shows them attached.
         #expect(AppState.SignedOutReason.sessionMissingAtLaunch.message
-            .lowercased().contains("connected apps"))
+            .lowercased().contains("подключённые приложения"))
     }
 }
