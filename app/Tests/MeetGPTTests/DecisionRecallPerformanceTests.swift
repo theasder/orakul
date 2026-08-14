@@ -36,6 +36,30 @@ struct DecisionRecallPerformanceTests {
         ProcessInfo.processInfo.environment["CRUXWING_PERF"] != nil
     }
 
+    /// Тихая ли машина настолько, чтобы число что-то значило.
+    ///
+    /// Бюджет 2.5 с при замере 2.24 с — запас в одиннадцать процентов. Под
+    /// нагрузкой он не выдерживает: 14 августа `CRUXWING_PERF=1 swift test
+    /// --filter Performance` упал и тут же прошёл на той же сборке, при
+    /// средней нагрузке 11.6 на десяти ядрах. Такой замер меряет соседей по
+    /// процессору, а не наш код, и красный от него учит не смотреть на красное.
+    ///
+    /// Поэтому проверка не запускается на загруженной машине — и печатает
+    /// почему. Молчаливого «пройдено» здесь нет: Swift Testing показывает
+    /// «skipped», а причина уходит в вывод.
+    static var machineIsQuiet: Bool {
+        var loads = [Double](repeating: 0, count: 3)
+        guard getloadavg(&loads, 3) > 0 else { return true }
+        let cores = Double(ProcessInfo.processInfo.activeProcessorCount)
+        guard loads[0] < cores else {
+            print(String(format:
+                "пропуск замера: средняя нагрузка %.1f при %.0f ядрах — число мерило бы соседей",
+                loads[0], cores))
+            return false
+        }
+        return true
+    }
+
     /// Best of N, because a developer machine is never quiet: measured on this
     /// one during a notarization run the same call took 2.4 s and 4.6 s. The
     /// minimum is the least-contended sample and the only figure worth holding
@@ -109,7 +133,7 @@ struct DecisionRecallPerformanceTests {
     }
 
     @Test("a year of meetings still answers inside the interactive budget",
-          .enabled(if: Self.preciseRunEnabled))
+          .enabled(if: Self.preciseRunEnabled && Self.machineIsQuiet))
     func recallStaysInteractive() throws {
         let store = try populatedStore()
         var hits: [DecisionRecallService.RecallHit] = []
@@ -213,7 +237,7 @@ struct DecisionRecallPerformanceTests {
     }
 
     @Test("the brief's two builders are cheap enough to run before every meeting",
-          .enabled(if: Self.preciseRunEnabled))
+          .enabled(if: Self.preciseRunEnabled && Self.machineIsQuiet))
     func briefSourcesStayCheap() throws {
         let store = try populatedStore()
         let meeting = UpcomingMeeting(id: "evt", title: "Sync 7",
