@@ -16,6 +16,22 @@ const repo = resolve(here, '..');
 const readme = readFileSync(resolve(repo, 'README.md'), 'utf8');
 
 describe('README', () => {
+  test('the Bitrix24 caveat is in README, because the issue says it is', () => {
+    // Выпуск #1 зовёт помочь и ссылается на README со словами «так и написано».
+    // Написано не было: про Битрикс24 в README не стояло ни строки, а
+    // коннектор к нему сделан по документации, не по живому порталу. Обещание
+    // о собственных документах — такое же обещание, как любое другое.
+    const readme = readFileSync(resolve(repo, 'README.md'), 'utf8');
+    assert.match(readme, /Битрикс24/, 'README снова молчит про Битрикс24');
+    assert.match(readme, /по документации, а не проверен на живом\s*портале/,
+      'оговорка про живой портал пропала из README');
+    // И ссылка на разбор, который эту оговорку объясняет.
+    assert.match(readme, /RESEARCH-AND-PLAN\.md`, §2\.0\.1/,
+      'README не ведёт к разбору Битрикс24');
+    const doc = readFileSync(resolve(repo, 'docs', 'RESEARCH-AND-PLAN.md'), 'utf8');
+    assert.match(doc, /### 2\.0\.1 Битрикс24/, 'раздел §2.0.1 пропал из исследования');
+  });
+
   test('the dependency counts in the quick start are the real ones', () => {
     // README обещает, сколько строк «Fetching» человек увидит при первой
     // сборке. Число проверяемое: прямые зависимости — в Package.swift,
