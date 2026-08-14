@@ -255,8 +255,23 @@ describe('README', () => {
     // The headline is the sum of all three, checked last so a mismatch names
     // the parts. Checking it as a sum is what stops the number drifting when
     // a test only moves between suites.
-    const stated = Number(/(\d{3,5}) тестов проходят/.exec(readme)?.[1] ?? NaN);
+    // Числительное согласуется, а не приписывается: «3251 тестов проходят» —
+    // не по-русски, и на 3251 это выяснилось только потому, что образец с
+    // жёстким «тестов проходят» перестал совпадать. Форма проверяется здесь
+    // же, иначе следующий раз пройдёт молча.
+    const headline = /(\d{3,5}) (тест|теста|тестов) (проходит|проходят)/.exec(readme);
+    assert.ok(headline, 'в README пропало число проходящих тестов');
+    const stated = Number(headline[1]);
     assert.equal(stated, appTests + coreTests + nodeTests,
       `README claims ${stated} tests; suites declare ${appTests} + ${coreTests} + ${nodeTests}`);
+
+    const teen = stated % 100 >= 11 && stated % 100 <= 14;
+    const last = stated % 10;
+    const noun = teen ? 'тестов' : last === 1 ? 'тест' : last >= 2 && last <= 4 ? 'теста' : 'тестов';
+    const verb = !teen && last === 1 ? 'проходит' : 'проходят';
+    assert.equal(headline[2], noun,
+      `${stated} — по-русски «${noun}», а написано «${headline[2]}»`);
+    assert.equal(headline[3], verb,
+      `${stated} ${noun} «${verb}», а написано «${headline[3]}»`);
   });
 });

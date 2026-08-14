@@ -563,6 +563,47 @@ struct SearchPerformanceTests {
         #expect(elapsed < 12, "\(report)")
     }
 
+    /// Подсказка про опечатку не должна стоить второго разбора архива.
+    ///
+    /// Первая её редакция ради написаний слов заново разбирала весь архив на
+    /// слова: на 600 тыс. слов промах стоил лишних 1,8 секунды — столько же,
+    /// сколько построение указателя. Замерено запуском, а не выведено из кода.
+    /// Теперь похожее ищется по уже разобранным основам, а до текста дело
+    /// доходит только ради тех немногих основ, что нашлись.
+    ///
+    /// Сравнение идёт с построением указателя в том же прогоне, а не с
+    /// абсолютным потолком: занятость машины сдвигает оба числа разом, и
+    /// отношение переживает шумного соседа, а секунды — нет.
+    @Test("подсказка про опечатку не стоит второго разбора архива")
+    func suggestionDoesNotReparseTheArchive() {
+        let words = ["тарифы", "деплой", "релиз", "миграцию", "кеш", "промпт"]
+        let sessions = (0..<30).map { index -> RecallIndex.Session in
+            let body = (0..<1250).map { line in
+                "Спикер\(line % 4): Обсуждаем \(words[line % words.count]), "
+                    + "длинная реплика номер \(line) про то, что делать дальше."
+            }.joined(separator: "\n")
+            return RecallIndex.Session(id: "s\(index)", title: "Звонок \(index)",
+                                       date: "2026-08-14", digest: body)
+        }
+
+        RecallIndex.stemCache.resetForTesting()
+        let buildStarted = Date()
+        let index = RecallIndex(sessions: sessions)
+        let building = Date().timeIntervalSince(buildStarted)
+
+        let started = Date()
+        let подсказки = index.nearMisses(for: "тарифф")
+        let suggesting = Date().timeIntervalSince(started)
+        print(String(format: "подсказка на месяце звонков: %.3f с против разбора %.2f с",
+                     suggesting, building))
+
+        // Пустой ответ здесь означал бы, что замеряли работу, которой не было.
+        #expect(подсказки.contains("тарифы"), "подсказка не нашлась: \(подсказки)")
+        let отчёт = String(format: "подсказка заняла %.2f с при разборе %.2f с — "
+                           + "похоже на второй разбор архива", suggesting, building)
+        #expect(suggesting < building / 2, "\(отчёт)")
+    }
+
     @Test("повторные запросы не дорожают")
     func repeatedSearchesDoNotDegrade() {
         // Если таблицы строятся заново, стоимость растёт с числом слов в

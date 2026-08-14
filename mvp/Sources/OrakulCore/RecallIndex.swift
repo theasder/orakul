@@ -281,34 +281,40 @@ public struct RecallIndex: Sendable {
         let asked = Set(Self.tokens(query)).filter { $0.count >= Self.minimumTypoLength }
         guard !asked.isEmpty, !sessions.isEmpty else { return [] }
 
-        // Основа не годится в подсказку: у «раскатываем» она «раскатыва».
-        // Человеку показываем слово, которое в архиве вправду прозвучало, —
-        // поэтому считаем, каким написанием каждая основа встречалась чаще.
-        var spellings: [String: [String: Int]] = [:]
+        // Сначала — по основам, которые уже разобраны в `init`. Первая
+        // редакция вместо этого заново разбирала весь архив на слова: на
+        // архиве в 600 тысяч слов промах стоил лишних 1,8 секунды, и «на
+        // обычном пути ноль» скрывало, что на промахе не ноль.
+        var vocabulary: Set<String> = []
+        for tokens in sessionTokens { vocabulary.formUnion(tokens) }
+
+        var wanted: Set<String> = []
+        for token in asked where !vocabulary.contains(token) {
+            for stem in vocabulary where Self.isOneEditApart(token, stem) {
+                wanted.insert(stem)
+            }
+        }
+        guard !wanted.isEmpty else { return [] }
+
+        // И только теперь — по тексту, ради написания найденных основ:
+        // у «раскатываем» основа «раскатыва», а это не слово, и предлагать
+        // её значит выдать внутренний формат за русский язык. Проход
+        // обрывается, как только написание нашлось для каждой основы, —
+        // обычно на первом же звонке.
+        var spelling: [String: String] = [:]
         for session in sessions {
             for word in Self.surfaceTokens(session.title + " " + session.digest) {
-                spellings[Self.stem(word), default: [:]][word, default: 0] += 1
+                let stem = Self.stem(word)
+                guard wanted.contains(stem), spelling[stem] == nil else { continue }
+                spelling[stem] = word
             }
+            if spelling.count == wanted.count { break }
         }
 
-        var candidates: [(word: String, count: Int)] = []
-        for token in asked where spellings[token] == nil {
-            for (stem, forms) in spellings where Self.isOneEditApart(token, stem) {
-                // Чаще прозвучавшее написание вперёд; при равенстве — по
-                // алфавиту, иначе один и тот же архив подсказывал бы разное.
-                let ordered = forms.sorted {
-                    $0.value == $1.value ? $0.key < $1.key : $0.value > $1.value
-                }
-                guard let best = ordered.first else { continue }
-                candidates.append((best.key, best.value))
-            }
-        }
-
-        let ranked = candidates.sorted {
-            $0.count == $1.count ? $0.word < $1.word : $0.count > $1.count
-        }
-        var seen: Set<String> = []
-        return ranked.filter { seen.insert($0.word).inserted }.prefix(limit).map(\.word)
+        // Берётся написание, встретившееся первым, а не самое частое: считать
+        // частоты можно только обойдя архив целиком, то есть отказавшись от
+        // обрыва выше. Любая из форм — настоящая, звучавшая на звонке.
+        return spelling.values.sorted().prefix(limit).map { $0 }
     }
 
     /// Отличаются ли слова ровно на одну опечатку.
