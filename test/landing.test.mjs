@@ -2129,6 +2129,59 @@ describe('orakul landing (ru)', () => {
     assert.deepEqual(stack, [], `не закрыты: ${stack.join(', ')}`);
   });
 
+  test('the tracker census on the page matches the enum and the research table', () => {
+    // Центральное утверждение продукта для российской команды: сколько
+    // трекеров подключено. Сторожа у него не было вовсе — можно было
+    // подключить пятый и не заметить, что страница обещает четыре.
+    // `\w` здесь не годится: без флага u он только латиница, и рядом с
+    // кириллицей не совпадёт ни с чем. В репозитории на это есть отдельный
+    // сторож, и он меня поймал.
+    const census = /Обход трекеров закончен: ([А-Яа-яё]+) сервисов, ([А-Яа-яё]+) подключены, ([А-Яа-яё]+) нет/
+      .exec(text);
+    assert.ok(census, 'страница больше не подводит итог обхода трекеров');
+    const words = { два: 2, три: 3, четыре: 4, пять: 5, шесть: 6, семь: 7,
+                    восемь: 8, девять: 9, десять: 10 };
+    const [total, connected, missing] = census.slice(1, 4).map((w) => words[w.toLowerCase()]);
+    for (const [i, n] of [total, connected, missing].entries()) {
+      assert.ok(n !== undefined, `непонятное число в позиции ${i + 1}: ${census[i + 1]}`);
+    }
+    assert.equal(connected + missing, total, 'подключённые и нет не дают итога');
+
+    // Перечисление объявлено через запятую в одну строку — считать надо все
+    // имена, а не первое: ровно на этом уже спотыкалась проверка про GigaChat.
+    const source = stripComments(readFileSync(resolve(
+      here, '..', 'mvp', 'Sources', 'OrakulCore', 'RussianTrackers.swift'), 'utf8'));
+    const block = /public enum Service[^{]*\{([\s\S]*?)\n\s{8}public var title/.exec(source);
+    assert.ok(block, 'перечисление сервисов не читается');
+    const cases = (block[1].match(/case ([^\n]+)/g) ?? [])
+      .flatMap((line) => line.replace('case ', '').split(',').map((c) => c.trim()))
+      .filter(Boolean);
+    assert.ok(cases.length > 1, 'разбор поймал одно имя — перечисление идёт через запятую');
+    assert.equal(cases.length, connected,
+      `страница обещает ${connected} подключённых, в коде их ${cases.length}: ${cases.join(', ')}`);
+
+    // Итог обхода — таблица в исследовании; строк в ней столько же.
+    const doc = readFileSync(resolve(here, '..', 'docs', 'RESEARCH-AND-PLAN.md'), 'utf8');
+    const table = /### 2\.0\.3[\s\S]*?\n\n(\|[\s\S]*?)\n\n/.exec(doc);
+    assert.ok(table, 'перепись трекеров пропала из исследования');
+    // Считаем по столбцу состояния, а не по числу строк: заголовок и линейка
+    // тоже начинаются с «|», и вычитание их из счётчика уже дало ошибку на
+    // единицу — ровно ту, которую эта проверка и должна ловить в тексте.
+    const states = table[1].split('\n')
+      .map((l) => l.split('|').map((c) => c.trim()))
+      .filter((cells) => cells.length >= 4 && cells[2] && !/^-+$/.test(cells[2]))
+      .map((cells) => cells[2])
+      .filter((state) => state !== 'Состояние');
+    const connectedRows = states.filter((s) => s.startsWith('подключён')).length;
+    const missingRows = states.filter((s) => s === 'нет').length;
+    assert.equal(states.length, total,
+      `в переписи ${states.length} сервисов, страница говорит ${total}`);
+    assert.equal(connectedRows, connected,
+      `в переписи подключено ${connectedRows}, страница говорит ${connected}`);
+    assert.equal(missingRows, missing,
+      `в переписи не подключено ${missingRows}, страница говорит ${missing}`);
+  });
+
   test('names the licence, because "open source" alone is not a licence', () => {
     assert.match(text, /Apache 2\.0/);
   });
