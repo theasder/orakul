@@ -1384,7 +1384,7 @@ enum LiveTestHooks {
             aiResponseChars: state.aiResponse.count,
             aiResponseHead: String(state.aiResponse.prefix(400)),
             aiResponseFull: state.aiResponse,
-            aiResponseIsError: state.aiResponse.hasPrefix("Error:"),
+            aiResponseIsError: AnswerFailure.looksLikeFailure(state.aiResponse),
             aiResponsePrompt: state.aiResponsePrompt,
             aiResponseID: state.aiResponseID?.uuidString,
             aiResponsePromptID: state.aiResponsePromptID,

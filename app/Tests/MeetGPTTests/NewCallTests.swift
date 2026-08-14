@@ -121,22 +121,29 @@ struct BackendErrorMessageTests {
     func offlineIsDistinct() {
         let message = state().explain(URLError(.notConnectedToInternet))
         guard Config.llmViaBackend else { return }
-        #expect(message.lowercased().contains("network"))
+        #expect(message.lowercased().contains("сет"))
     }
 
     @Test("errors that are not connection failures keep their own text")
     func passesThroughOtherErrors() {
         struct Odd: LocalizedError { var errorDescription: String? { "Model refused the request." } }
         let message = state().explain(Odd())
-        #expect(message == "Error: Model refused the request.")
+        #expect(message == "Ошибка: Система ответила: Model refused the request.")
     }
 
     @Test("every explanation still reads as an error")
     func alwaysPrefixed() {
-        // canExportAssistantAnswer keys off the "Error:" prefix — an explanation
-        // that dropped it would offer to export a failure as a document.
+        // Экспорт ответа в документ отличает отказ от ответа по этому
+        // признаку. Объяснение, потерявшее его, предложило бы сохранить
+        // «не достучались до сервера» как результат работы — это и случилось,
+        // когда сообщения перевели на русский, а признак остался английским.
         for error in [URLError(.cannotConnectToHost), URLError(.timedOut), URLError(.notConnectedToInternet)] {
-            #expect(state().explain(error).hasPrefix("Error:"))
+            #expect(AnswerFailure.looksLikeFailure(state().explain(error)))
         }
+
+        // Английский признак остаётся понятным навсегда: он лежит в уже
+        // сохранённых звонках, и их читают.
+        #expect(AnswerFailure.looksLikeFailure("Error: old saved session"))
+        #expect(!AnswerFailure.looksLikeFailure("Ответ модели про ошибку в коде"))
     }
 }

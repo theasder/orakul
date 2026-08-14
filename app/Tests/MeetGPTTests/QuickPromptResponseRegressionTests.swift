@@ -189,7 +189,7 @@ struct QuickPromptResponseRegressionTests {
         await settle(state)
 
         #expect(state.aiStreaming == false)
-        #expect(state.aiResponse.hasPrefix("Error:"))
+        #expect(AnswerFailure.looksLikeFailure(state.aiResponse))
         #expect(state.aiResponse.contains("invalid response"))
         #expect(state.hasContent)
         #expect(!state.canExportAssistantAnswer)

@@ -2275,7 +2275,7 @@ final class AppState: ObservableObject {
             }
             connectedGlossarySuggestions = suggestions
             connectedGlossarySuggestionMetrics = cachedMetrics(cached.generation.metrics)
-            connectedGlossarySuggestionMessage = "Reused suggestions from the last five minutes."
+            connectedGlossarySuggestionMessage = "Показаны подсказки из последних пяти минут."
             connectedGlossarySuggestionStatus = suggestions.isEmpty ? .empty : .ready
             return
         }
@@ -2475,7 +2475,7 @@ final class AppState: ObservableObject {
             useFastModel: false) else { return false }
         connectedGlossarySuggestions = result.suggestions
         connectedGlossarySuggestionMetrics = result.metrics
-        connectedGlossarySuggestionMessage = "Synthetic connected-app fixture ready for review."
+        connectedGlossarySuggestionMessage = "Готов образец из подключённых приложений — посмотрите."
         connectedGlossarySuggestionStatus = result.suggestions.isEmpty ? .empty : .ready
         return !result.suggestions.isEmpty
     }
@@ -2846,7 +2846,7 @@ final class AppState: ObservableObject {
     /// assistant answer worth packaging as a Word document.
     var canExportAssistantAnswer: Bool {
         let answer = aiResponse.trimmingCharacters(in: .whitespacesAndNewlines)
-        return !aiStreaming && !answer.isEmpty && !answer.hasPrefix("Error:")
+        return !aiStreaming && !answer.isEmpty && !AnswerFailure.looksLikeFailure(answer)
     }
 
     /// Show the "Google Docs" export affordance when there's an answer and a
@@ -2885,7 +2885,7 @@ final class AppState: ObservableObject {
     func prepareCurrentAnswerExport(exportedAt: Date = Date()) async throws -> AssistantAnswerDocument {
         guard !aiStreaming else { throw AssistantAnswerExportError.answerStillStreaming }
         let answer = aiResponse.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !answer.isEmpty, !answer.hasPrefix("Error:") else {
+        guard !answer.isEmpty, !AnswerFailure.looksLikeFailure(answer) else {
             throw AssistantAnswerExportError.noAnswer
         }
 
@@ -2972,7 +2972,7 @@ final class AppState: ObservableObject {
         let status: AIExchangeStatus
         if let explicitStatus {
             status = explicitStatus
-        } else if answer.isEmpty || answer.hasPrefix("Error:") {
+        } else if answer.isEmpty || AnswerFailure.looksLikeFailure(answer) {
             status = .failed
         } else {
             status = .succeeded
@@ -4097,7 +4097,7 @@ final class AppState: ObservableObject {
         aiResponseStartedAt = nil
         aiResponseCompletedAt = nil
         aiResponseStatus = session.aiResponse.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            ? nil : session.aiResponse.hasPrefix("Error:") ? .failed : .succeeded
+            ? nil : AnswerFailure.looksLikeFailure(session.aiResponse) ? .failed : .succeeded
         aiResponseModelID = nil
         aiResponseExportTitle = session.aiResponseExportTitle
         aiHistory = session.aiHistory ?? []
@@ -4165,11 +4165,11 @@ final class AppState: ObservableObject {
             do {
                 firefliesMeetings = try await manager.firefliesRecentMeetings()
                 if firefliesMeetings.isEmpty {
-                    firefliesImportError = "Fireflies returned no meetings for this account."
+                    firefliesImportError = "Fireflies не отдал ни одной встречи для этого аккаунта."
                 }
             } catch {
                 firefliesMeetings = []
-                firefliesImportError = "Couldn't reach Fireflies: \(error.localizedDescription)"
+                firefliesImportError = "Не достучались до Fireflies. \(Self.systemSaid(error))"
             }
         }
     }
@@ -4198,7 +4198,7 @@ final class AppState: ObservableObject {
                 proposeGlossaryFromPastTranscript(session)
                 onFinished(true)
             } catch {
-                firefliesImportError = "Couldn't import that meeting: \(error.localizedDescription)"
+                firefliesImportError = "Не смог перенести эту встречу. \(Self.systemSaid(error))"
                 onFinished(false)
             }
         }
@@ -4227,6 +4227,15 @@ final class AppState: ObservableObject {
         savedSessions = sessionStore.list()
     }
 
+    /// Что сказала система — по-русски настолько, насколько она умеет.
+    ///
+    /// `localizedDescription` берёт язык системы: у русской macOS он русский,
+    /// у английской — английский. Наше дело — не выдавать его за наш текст и
+    /// не оставлять человека один на один со строкой без подлежащего.
+    static func systemSaid(_ error: Error) -> String {
+        "Система ответила: \(error.localizedDescription)"
+    }
+
     /// Turn a failed request into something the user can act on.
     ///
     /// URLSession's own text for a refused connection is "Could not connect to
@@ -4241,21 +4250,22 @@ final class AppState: ObservableObject {
             .notConnectedToInternet, .timedOut, .dnsLookupFailed
         ]
         guard let urlError, connectionFailed.contains(urlError.code) else {
-            return "Error: \(error.localizedDescription)"
+            return "Ошибка: \(Self.systemSaid(error))"
         }
 
         let host = Config.backendBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
         guard Config.llmViaBackend, !host.isEmpty else {
-            return "Error: \(error.localizedDescription)"
+            return "Ошибка: \(Self.systemSaid(error))"
         }
         if urlError.code == .notConnectedToInternet {
-            return "Error: no network connection — Cruxwing routes answers through its backend, so this needs one."
+            return "Ошибка: нет сети, а ответы модели идут через сервер — без сети он недоступен."
         }
         return """
-        Error: can't reach the Cruxwing backend at `\(host)`.
+        Ошибка: не достучались до сервера `\(host)`.
 
-        Answers route through it (`LLM_GATEWAY=backend`), so nothing can run until it responds. \
-        Either start the backend, or point `BACKEND_URL` at one that is running and rebuild.
+        Ответы модели настроены идти через него (`LLM_GATEWAY=backend`), и пока он молчит, \
+        ни один вопрос не выполнится. Либо запустите сервер, либо укажите в `BACKEND_URL` \
+        работающий и пересоберите. Ключ провайдера прямо в настройках сервера не требует.
         """
     }
 
@@ -8386,7 +8396,7 @@ final class AppState: ObservableObject {
     private func scheduleFollowUps(request: String, material: String, output: String,
                                    model: LLMModel? = nil) {
         let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, !trimmed.hasPrefix("Error:") else { return }
+        guard !trimmed.isEmpty, !AnswerFailure.looksLikeFailure(trimmed) else { return }
         // Same moment, but free: the action planner is pure and the tool lists
         // are already cached from each server's handshake.
         refreshAnswerActions()

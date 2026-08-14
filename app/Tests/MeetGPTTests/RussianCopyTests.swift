@@ -24,13 +24,18 @@ struct RussianCopyTests {
         let base = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
             .appendingPathComponent("Sources/MeetGPT")
-        // Три папки интерфейса — и один файл из AI: `LLMProvider.keyConsoleHint`
-        // показывается в настройках рядом с полем ключа, хотя лежит вместе с
-        // адресами запросов. Лежит намеренно: консоль и адрес — две половины
-        // одного факта, и порознь они уже разъезжались (китайская консоль
-        // против международного адреса, ключ на 401). Но переезд вынес шесть
-        // видимых строк из поля зрения этой проверки, и она замолчала — так
-        // что путь добавлен явно.
+        // Три папки интерфейса. `LLMProvider.keyConsoleHint` показывается в
+        // настройках рядом с полем ключа, но лежит в `AI/` вместе с адресами
+        // запросов — намеренно: консоль и адрес две половины одного факта, и
+        // порознь они уже разъезжались (китайская консоль против
+        // международного адреса, ключ на 401). Здесь его нет, и комментарий
+        // раньше утверждал обратное — «путь добавлен явно», хотя в списке
+        // всегда стояли те же три папки. Проверяет эти подсказки
+        // `ProviderConsoleMatchTests`, построчно и по существу.
+        //
+        // `AppState.swift` сюда тоже не входит: в нём сто тридцать четыре
+        // английские строки, и почти все — тела промптов и журнал. Видимую
+        // его часть проверяет `visibleStateIsRussian` — по имени поля.
         return ["Views", "Onboarding", "Models"].map(base.appendingPathComponent)
     }
 
@@ -294,6 +299,55 @@ struct RussianCopyTests {
             return false
         }
         return zip(letters, letters.dropFirst()).contains { $0 == $1 }
+    }
+
+    /// Текст, который человек читает, живёт не только в папках интерфейса.
+    ///
+    /// `AppState` держит состояние, а представления его показывают: строка,
+    /// присвоенная `firefliesImportError`, доходит до экрана через
+    /// `Text(error)`. Проверка выше туда не смотрит — и не должна: в том же
+    /// файле лежат тела промптов и строки журнала, их там сто тридцать четыре,
+    /// и счётчик утонул бы. Поэтому здесь правило узкое: литерал, присвоенный
+    /// полю с именем на `Error`, `Status`, `Message`, `Notice`, `Warning`, —
+    /// это текст для человека.
+    ///
+    /// Так нашлись пять английских строк: «Couldn't reach Fireflies»,
+    /// «Couldn't import that meeting», «Error: …», «Reused suggestions from
+    /// the last five minutes», «Synthetic connected-app fixture ready for
+    /// review». Первые три к тому же прятались от счётчика по другой причине:
+    /// он пропускает литералы с подстановкой, а в них она была.
+    @Test("состояние, которое показывают на экране, задаётся по-русски")
+    func visibleStateIsRussian() throws {
+        let base = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/MeetGPT")
+        var english: [String] = []
+        var checked = 0
+        for name in ["AppState.swift"] {
+            let source = try String(contentsOf: base.appendingPathComponent(name), encoding: .utf8)
+            for line in source.split(separator: "\n") {
+                let trimmed = line.trimmingCharacters(in: .whitespaces)
+                guard !trimmed.hasPrefix("//"),
+                      let range = trimmed.range(of:
+                        "\\w*(Error|Status|Message|Notice|Warning) = \"",
+                        options: .regularExpression) else { continue }
+                let rest = trimmed[range.upperBound...]
+                guard let end = rest.firstIndex(of: "\"") else { continue }
+                let text = String(rest[..<end])
+                checked += 1
+                guard text.range(of: "[а-яё]", options: [.regularExpression, .caseInsensitive]) == nil
+                else { continue }
+                let core = text.replacingOccurrences(
+                    of: "\\\\\\(.*?\\)", with: "", options: .regularExpression)
+                let words = core.components(separatedBy: CharacterSet.letters.inverted)
+                    .filter { $0.count > 2 }
+                guard words.count >= 2, core.rangeOfCharacter(from: .uppercaseLetters) != nil
+                else { continue }
+                english.append(text)
+            }
+        }
+        #expect(checked > 10, "нашлось всего \(checked) присваиваний — проверка смотрит не туда")
+        #expect(english.isEmpty, "по-английски на экране: \(english.joined(separator: " | "))")
     }
 
     @Test("английских фраз на экране не становится больше")

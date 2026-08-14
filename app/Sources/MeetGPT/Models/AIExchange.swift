@@ -1,3 +1,22 @@
+/// Ответ модели, который на самом деле отказ.
+///
+/// Раньше это проверялось в семи местах одинаковой строкой
+/// `hasPrefix("Error:")`. Английский префикс был не текстом для человека, а
+/// признаком для кода, и это выяснилось ровно тогда, когда сообщения перевели
+/// на русский: экспорт ответа в документ перестал отличать отказ от ответа и
+/// предложил бы сохранить «Не достучались до сервера» как результат работы.
+///
+/// Старый префикс остаётся в списке навсегда: он лежит в уже сохранённых
+/// звонках, и их читают.
+enum AnswerFailure {
+    static let prefixes = ["Ошибка:", "Error:"]
+
+    static func looksLikeFailure(_ text: String) -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return prefixes.contains { trimmed.hasPrefix($0) }
+    }
+}
+
 import Foundation
 
 /// Terminal state of one assistant request. `inProgress` is used only by the
@@ -119,7 +138,7 @@ struct AIExchange: Identifiable, Equatable, Codable {
         } else {
             let trimmed = answer.trimmingCharacters(in: .whitespacesAndNewlines)
             status = trimmed.isEmpty ? .cancelled
-                : trimmed.hasPrefix("Error:") ? .failed : .succeeded
+                : AnswerFailure.looksLikeFailure(trimmed) ? .failed : .succeeded
         }
     }
 }
