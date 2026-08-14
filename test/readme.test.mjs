@@ -16,6 +16,19 @@ const repo = resolve(here, '..');
 const readme = readFileSync(resolve(repo, 'README.md'), 'utf8');
 
 describe('README', () => {
+  test('README does not claim the images are unpublished', () => {
+    // Файл длинный, и утверждения в нём разъезжаются между собой: быстрый
+    // старт вёл в выпуск, а раздел «чего ещё нет» в это же время сообщал,
+    // что скачать неоткуда, — два противоположных факта в одном документе.
+    const readme = readFileSync(resolve(repo, 'README.md'), 'utf8');
+    for (const stale of ['на сайт не выложены', 'откуда скачать: DMG',
+                         'ссылки на них не будет']) {
+      assert.ok(!readme.includes(stale), `README всё ещё утверждает: «${stale}»`);
+    }
+    // И наоборот: раз выпуск есть, на него должна быть ссылка.
+    assert.match(readme, /releases\/latest/, 'README не ведёт в выпуск');
+  });
+
   test('the Bitrix24 caveat is in README, because the issue says it is', () => {
     // Выпуск #1 зовёт помочь и ссылается на README со словами «так и написано».
     // Написано не было: про Битрикс24 в README не стояло ни строки, а
