@@ -1934,14 +1934,34 @@ describe('orakul landing (ru)', () => {
     // Число прописью в подводке — ровно та мелочь, которая тихо разъезжается
     // с содержимым: восемнадцатую находку допишут, а слово останется прежним.
     const items = html.match(/<details class="finding">/g) ?? [];
-    const words = {
-      двенадцать: 12, тринадцать: 13, четырнадцать: 14, пятнадцать: 15,
-      шестнадцать: 16, семнадцать: 17, восемнадцать: 18, девятнадцать: 19, двадцать: 20,
+    // Числительное по-русски меняет и себя, и существительное: двадцать одна
+    // проверка, двадцать две проверки, двадцать пять проверок. Проверка,
+    // знавшая одну форму, падала на верной записи и пропускала неверную.
+    const units = {
+      одна: 1, две: 2, три: 3, четыре: 4, пять: 5, шесть: 6, семь: 7,
+      восемь: 8, девять: 9,
     };
-    const lead = /([А-Яа-я]+) проверок ниже/.exec(text);
+    const teens = {
+      десять: 10, одиннадцать: 11, двенадцать: 12, тринадцать: 13,
+      четырнадцать: 14, пятнадцать: 15, шестнадцать: 16, семнадцать: 17,
+      восемнадцать: 18, девятнадцать: 19,
+    };
+    const tens = { двадцать: 20, тридцать: 30, сорок: 40 };
+    const lead = /([А-Яа-я]+(?:\s+[А-Яа-я]+)?)\s+(проверка|проверки|проверок)\s+ниже/.exec(text);
     assert.ok(lead, 'the findings list lost its lead-in');
-    const stated = words[lead[1].toLowerCase()];
-    assert.ok(stated, `unknown number word: ${lead[1]}`);
+    const words = lead[1].toLowerCase().split(/\s+/);
+    const value = (w) => teens[w] ?? tens[w] ?? units[w];
+    const stated = words.reduce((sum, w) => {
+      const v = value(w);
+      assert.ok(v !== undefined, `unknown number word: ${w}`);
+      return sum + v;
+    }, 0);
+
+    const n = stated % 100;
+    const noun = (n >= 11 && n <= 14) ? 'проверок'
+      : [, 'проверка', 'проверки', 'проверки', 'проверки'][stated % 10] ?? 'проверок';
+    assert.equal(lead[2], noun,
+      `${stated} — по-русски «${noun}», а написано «${lead[2]}»`);
     assert.equal(items.length, stated,
       `the page says ${stated} findings, the list holds ${items.length}`);
 
