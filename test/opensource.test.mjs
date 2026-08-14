@@ -208,7 +208,10 @@ describe('open-source furniture', () => {
     for (const [name, file] of paths) {
       const code = readFileSync(resolve(repo, file), 'utf8')
         .split('\n').filter((l) => !l.trim().startsWith('//')).join('\n');
-      assert.match(code, /RussianLexicon\.canonicalToken\(for:/,
+      // Приложение зовёт общий разбор через `RecallIndex.searchToken`, а он
+      // уже идёт в словарь. Прямой вызов `canonicalToken` из приложения был
+      // как раз половиной разбора: словарь без обрезки окончаний.
+      assert.match(code, /RussianLexicon\.canonicalToken\(for:|RecallIndex\.searchToken\(for:/,
         `${name} no longer uses the shared canonical lookup`);
       assert.doesNotMatch(code, /canonicalForms\(\)\[|inflections\(\)\[/,
         `${name} reimplemented the canonical lookup inline again`);

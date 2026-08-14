@@ -223,7 +223,7 @@ enum DecisionRecallService {
             // Один и тот же шаг, что и в командной строке: сначала термин,
             // потом его падеж. Раньше он был написан здесь второй раз, и
             // кросс-алфавитный поиск с падежами чинились в обеих копиях.
-            .map { RussianLexicon.canonicalToken(for: $0) ?? $0 })
+            .map { RecallIndex.searchToken(for: $0) })
     }
 
     /// The recallable units of one session, best-first by information density:

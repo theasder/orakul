@@ -963,7 +963,7 @@ describe('orakul landing (ru)', () => {
     for (const file of ['mvp/Sources/OrakulCore/RecallIndex.swift',
                         'app/Sources/MeetGPT/AI/DecisionRecallService.swift']) {
       const code = stripComments(readFileSync(resolve(here, '..', file), 'utf8'));
-      assert.match(code, /canonicalToken\(for:/,
+      assert.match(code, /canonicalToken\(for:|RecallIndex\.searchToken\(for:/,
         `${file} stopped using the shared word lookup`);
     }
 
@@ -1226,10 +1226,18 @@ describe('orakul landing (ru)', () => {
     const app = readFileSync(resolve(here, '..', 'app', 'Sources', 'MeetGPT',
                                      'AI', 'DecisionRecallService.swift'), 'utf8');
     // Оба поиска зовут ОДИН общий разбор: шаг «термин → канон → падеж»
-    // написан один раз, в словаре ядра.
+    // написан один раз, в ядре. Приложение зовёт его через `searchToken`, а не
+    // напрямую `canonicalToken`: раньше оно звало только словарь, без обрезки
+    // окончаний, и «развёртыванием» не сходилось с «развёртывание».
     assert.equal(callsInside(app, 'static func tokens(in text: String)',
-                            'RussianLexicon.canonicalToken'), true,
+                            'RecallIndex.searchToken'), true,
       'the app search no longer folds spellings to one canonical token');
+    // А `searchToken` обязан вести в тот же словарь, иначе общий разбор общий
+    // только по названию.
+    const core = stripComments(readFileSync(resolve(
+      here, '..', 'mvp', 'Sources', 'OrakulCore', 'RecallIndex.swift'), 'utf8'));
+    assert.match(core, /public static func searchToken[\s\S]{0,120}stem\(word\)/,
+      'searchToken stopped routing through the shared stem');
 
     // Командная строка — то, что пробуют по README.
     const cli = readFileSync(resolve(here, '..', 'mvp', 'Sources', 'OrakulCore',
@@ -1254,7 +1262,8 @@ describe('orakul landing (ru)', () => {
     // Падежи входят в тот же общий разбор — отдельного вызова больше нет.
     assert.match(stripComments(cli), /canonicalToken/,
       'the CLI no longer resolves declined terms');
-    assert.match(stripComments(app), /canonicalToken/,
+    // Приложение доходит до таблицы падежей через общий разбор ядра.
+    assert.match(stripComments(app), /RecallIndex\.searchToken/,
       'the app no longer resolves declined terms');
   });
 
