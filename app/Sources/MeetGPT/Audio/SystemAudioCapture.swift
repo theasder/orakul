@@ -44,7 +44,7 @@ final class SystemAudioCapture: NSObject {
                                                                              onScreenWindowsOnly: true)
         guard let display = shareable.displays.first else {
             throw NSError(domain: "SystemAudioCapture", code: -1,
-                          userInfo: [NSLocalizedDescriptionKey: "No display available for capture."])
+                          userInfo: [NSLocalizedDescriptionKey: "Не нашёл экрана, с которого писать звук. Такое бывает, если все дисплеи отключены."])
         }
 
         // Display-scoped by design: a meeting can play through ANY app (Zoom,

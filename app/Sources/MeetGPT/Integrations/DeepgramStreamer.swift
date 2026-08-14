@@ -267,8 +267,8 @@ final class DeepgramStreamer {
 
     private func finishOpen(authHeader: String, isReconnect: Bool) {
         guard let url = Self.buildURL(language: language, diarize: diarize, keyterms: keyterms) else {
-            onTerminalFailure?("Could not build Deepgram URL.")
-            onError?("Could not build Deepgram URL.")
+            onTerminalFailure?("Не удалось собрать адрес Deepgram — проверьте настройки распознавания.")
+            onError?("Не удалось собрать адрес Deepgram — проверьте настройки распознавания.")
             return
         }
         var request = URLRequest(url: url)
@@ -492,7 +492,7 @@ final class DeepgramStreamer {
         // reconnected socket.
         onInterim?("")
         if attempt == Self.notifyAfterAttempts {
-            onError?("Reconnecting to Deepgram…")
+            onError?("Переподключаемся к Deepgram…")
         }
         scheduleReconnect(attempt: attempt)
     }
@@ -590,7 +590,7 @@ final class DeepgramStreamer {
         // and connect, and the reconnect path fetches a fresh one.
         if let http = socket.response as? HTTPURLResponse, http.statusCode == 401 || http.statusCode == 403 {
             if case .key = auth {
-                let message = "Invalid API key (check Settings → Integrations)."
+                let message = "Ключ не принят. Проверьте его в «Настройки → Подключённые приложения»."
                 onTerminalFailure?(message)
                 onError?(message)
                 finish()

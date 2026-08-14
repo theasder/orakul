@@ -455,6 +455,54 @@ struct RussianCopyTests {
         #expect(problems.isEmpty, "\(problems.joined(separator: " | "))")
     }
 
+    /// Последние углы: звук, хранилище, коннекторы, ИИ. Здесь текста для
+    /// человека мало, но он самый неприятный — приходит, когда что-то не
+    /// работает. По-английски оставались «No display available for capture» и
+    /// «Invalid API key (check Settings → Integrations)».
+    @Test("отказы в остальных папках тоже по-русски")
+    func failuresElsewhereAreRussian() throws {
+        let base = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/MeetGPT")
+        var english: [String] = []
+        var checked = 0
+        for folder in ["Audio", "Persistence", "AI", "MCP", "Integrations"] {
+            guard let walker = FileManager.default.enumerator(
+                at: base.appendingPathComponent(folder), includingPropertiesForKeys: nil)
+            else { continue }
+            for case let url as URL in walker where url.pathExtension == "swift" {
+                let source = (try? String(contentsOf: url, encoding: .utf8)) ?? ""
+                for line in source.split(separator: "\n") {
+                    let trimmed = line.trimmingCharacters(in: .whitespaces)
+                    guard !trimmed.hasPrefix("//") else { continue }
+                    // Только то, что уходит человеку: видимое состояние и
+                    // описание ошибки. Промпты и адреса сюда не попадают.
+                    guard trimmed.contains("NSLocalizedDescriptionKey: \"")
+                            || trimmed.contains("lastError = \"")
+                            || trimmed.contains("let message = \"")
+                            || trimmed.contains("onError?(\"")
+                            || trimmed.contains("onTerminalFailure?(\"") else { continue }
+                    for part in trimmed.split(separator: "\"", omittingEmptySubsequences: false)
+                        .enumerated().filter({ $0.offset % 2 == 1 }).map({ String($0.element) }) {
+                        guard part.count > 14 else { continue }
+                        checked += 1
+                        guard part.range(of: "[а-яё]", options: [.regularExpression,
+                                                                 .caseInsensitive]) == nil
+                        else { continue }
+                        let words = part.components(separatedBy: CharacterSet.letters.inverted)
+                            .filter { $0.count > 2 }
+                        if words.count >= 3 { english.append("\(url.lastPathComponent): \(part)") }
+                    }
+                }
+            }
+        }
+        // Порог низкий намеренно: таких строк в этих папках и правда мало —
+        // шесть. Он стоит не ради числа, а чтобы проверка не проходила молча,
+        // если шаблоны перестанут совпадать вовсе.
+        #expect(checked >= 5, "проверено всего \(checked) строк — смотрим не туда")
+        #expect(english.isEmpty, "\(english.joined(separator: " | "))")
+    }
+
     @Test("английских фраз на экране не становится больше")
     func englishProseOnlyShrinks() {
         // Берутся все литералы без кириллицы, похожие на речь: есть пробел и
