@@ -40,9 +40,35 @@ public enum TranscriptFile {
         return decode(data)
     }
 
+    /// Привести к виду, в котором текст можно искать и показывать.
+    ///
+    /// Две находки, обе прогоном на файлах из чужого редактора.
+    ///
+    /// **Метка порядка байтов** (U+FEFF) в файле UTF-8 оставалась первым
+    /// символом, и первое слово превращалось в «\u{FEFF}Вера»: на вопрос
+    /// «вера» продукт отвечал, что точных слов в расшифровке нет, стоя рядом
+    /// со строкой, где они есть. Она же вылезала в цитату — невидимо. Чистятся
+    /// все вхождения, а не только первое: внутри строки этот символ так же
+    /// разрывает слово, а видно его всё равно не будет.
+    ///
+    /// **Возврат каретки** доезжал до цитаты. В терминале он переводит курсор
+    /// в начало строки, и остаток затирается тем, что печатается следом.
+    /// Порядок замен важен: сначала пара, потом одиночный, иначе виндовый
+    /// перевод строки даст две пустые строки вместо одной.
+    private static func normalised(_ text: String) -> String {
+        text.replacingOccurrences(of: "\u{FEFF}", with: "")
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+    }
+
     /// Отдельно от чтения с диска, чтобы правило можно было проверить на
     /// байтах, не заводя файл.
     public static func decode(_ data: Data) -> String? {
+        guard let text = rawDecode(data) else { return nil }
+        return normalised(text)
+    }
+
+    private static func rawDecode(_ data: Data) -> String? {
         if let utf8 = String(data: data, encoding: .utf8) {
             return looksLikeText(utf8) ? utf8 : nil
         }

@@ -438,8 +438,17 @@ public struct RecallIndex: Sendable {
             // вопросом. `split` его выбрасывает, поэтому запоминаем отдельно.
             let sentences = splitSentences(body)
 
+            // Имя говорящего — тоже слово расшифровки, и спрашивают по нему
+            // чаще многого: «что говорила Вера». Раньше оно в совпадение не
+            // входило — `splitSpeaker` отрезал его до сравнения, — и продукт
+            // отвечал «точных слов по вашему вопросу в расшифровке нет» про
+            // человека, который на этом звонке говорил. Указатель имя знал и
+            // звонок находил: пустой оказывалась именно цитата.
+            let speakerTokens = speaker.map { Set(tokens($0)) } ?? []
+
             for (sentence, endedWithQuestion) in sentences {
-                let overlap = Set(tokens(sentence)).intersection(queryTokens).count
+                let overlap = Set(tokens(sentence)).union(speakerTokens)
+                    .intersection(queryTokens).count
                 guard overlap > 0 else { continue }
                 // При равном совпадении берётся более содержательное
                 // предложение. Найдено на живом прогоне: на вопрос «что решили

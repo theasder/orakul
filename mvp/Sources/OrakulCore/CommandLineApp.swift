@@ -75,6 +75,21 @@ public struct CommandLineApp {
     Расшифровка идёт вашим движком: ORAKUL_ENGINE="whisper-cli -l ru -otxt -f {файл}"
     """
 
+    /// Имена команд так, как их набирает человек.
+    ///
+    /// Список нужен подсказке про опечатку, и в нём есть команды, которых нет
+    /// в разборе ниже: `записать` и `спросить` выполняются в main.swift и до
+    /// `run` не доходят. Человеку всё равно, где внутри нас разложены ветки, —
+    /// подсказать «записать» на «записат» обязаны и мы.
+    ///
+    /// Список и справка разъезжаются молча, поэтому их сверяет проверка:
+    /// каждое имя отсюда есть в справке, и каждая команда из справки есть
+    /// здесь.
+    public static let commandNames = [
+        "добавить", "записать", "расшифровать", "найти", "список", "удалить",
+        "спросить",
+    ]
+
     /// Выполнить команду. Аргументы — без имени программы.
     public func run(_ arguments: [String]) -> Result {
         guard let command = arguments.first else {
@@ -97,8 +112,36 @@ public struct CommandLineApp {
         case "помощь", "help", "--help", "-h":
             return Result(output: Self.usage, exitCode: 0)
         default:
-            return Result(output: "Не знаю команду «\(command)».\n\n\(Self.usage)", exitCode: 2)
+            // Промах мимо одной клавиши — и в ответ полотно справки. Формально
+            // верно и бесполезно: расстояние в одну опечатку уже посчитано для
+            // поиска, тем же и лечится.
+            let similar = Self.commandNames.first { RecallIndex.isOneEditApart(command, $0) }
+            let hint = similar.map { "\nВозможно, «\($0)»?" } ?? ""
+            return Result(output: "Не знаю команду «\(command)».\(hint)\n\n\(Self.usage)",
+                          exitCode: 2)
         }
+    }
+
+    /// Почему файл не прочитался — разными словами для разных причин.
+    ///
+    /// «Не смог прочитать файл: /tmp» на каталоге — сообщение о следствии.
+    /// Причин три, и чинятся они по-разному: каталог вместо файла (укажите
+    /// файл внутри), файла нет вовсе (проверьте путь), файл есть, но не
+    /// открылся (права или двоичное содержимое). Тот же разбор, что у отказов
+    /// коннектора: одно сообщение на три причины отправляет чинить не то.
+    static func whyUnreadable(_ path: String) -> String {
+        var isDirectory: ObjCBool = false
+        let exists = FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory)
+        if exists && isDirectory.boolValue {
+            return "Это каталог, а не файл: \(path)\n"
+                + "Укажите файл с расшифровкой внутри него."
+        }
+        if !exists {
+            return "Файла нет: \(path)\nПроверьте путь."
+        }
+        return "Не смог прочитать файл: \(path)\n"
+            + "Он есть, но не открылся: проверьте права доступа, "
+            + "а если это запись звонка, её расшифровывают: orakul расшифровать <wav>"
     }
 
     // MARK: - Команды
@@ -108,7 +151,7 @@ public struct CommandLineApp {
             return Result(output: "Нужен файл с расшифровкой: orakul добавить <файл>", exitCode: 2)
         }
         guard let raw = readFile(path) else {
-            return Result(output: "Не смог прочитать файл: \(path)", exitCode: 1)
+            return Result(output: Self.whyUnreadable(path), exitCode: 1)
         }
 
         let text = RussianLexicon.restore(TranscriptCleanup.strip(raw))
