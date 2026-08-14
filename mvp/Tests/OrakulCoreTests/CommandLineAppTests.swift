@@ -821,4 +821,32 @@ struct DeleteByPrefixTests {
         #expect(text.contains("странное"))
         #expect(!text.contains("Нет прав"), "чужая ошибка выдана за отказ в правах")
     }
+
+    /// Список шёл в порядке имён файлов, то есть по случайному идентификатору.
+    /// На сорока звонках одного дня это выглядит как перемешанная колода:
+    /// «Планёрка 24», «Планёрка 11», «Планёрка 28». Найти вчерашний звонок
+    /// нечем, кроме глаз.
+    @Test("свежие звонки идут первыми, а внутри дня порядок устойчивый")
+    func listIsOrderedNewestFirst() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("orakul-порядок-\(UUID().uuidString)")
+        let store = SessionStore(root: root)
+        // Идентификаторы нарочно в порядке, обратном нужному: если сортировки
+        // нет, список выйдет именно в этом порядке, и проверка это поймает.
+        try store.save(.init(id: "AAAA1111-0000-0000-0000-000000000001",
+                             title: "Старая", date: "2026-08-10", digest: "тарифы"))
+        try store.save(.init(id: "BBBB2222-0000-0000-0000-000000000002",
+                             title: "Бета", date: "2026-08-14", digest: "тарифы"))
+        try store.save(.init(id: "CCCC3333-0000-0000-0000-000000000003",
+                             title: "Альфа", date: "2026-08-14", digest: "тарифы"))
+
+        let app = CommandLineApp(store: store, readFile: { _ in "" })
+        let lines = app.run(["список"]).output
+            .split(separator: "\n").map(String.init)
+            .filter { $0.contains("2026-") }
+        #expect(lines.count == 3)
+        #expect(lines[0].contains("Альфа"), "сверху не самый свежий: \(lines)")
+        #expect(lines[1].contains("Бета"), "внутри дня порядок не по названию: \(lines)")
+        #expect(lines[2].contains("Старая"), "старый звонок не внизу: \(lines)")
+    }
 }

@@ -308,7 +308,16 @@ public struct CommandLineApp {
             return Result(output: "Архив пуст. Добавьте расшифровку: orakul добавить <файл>",
                           exitCode: 0)
         }
-        var lines = archive.sessions.map { "\($0.date)  \($0.id)  \($0.title)" }
+        // Порядок — свежие сверху. Раньше список шёл в порядке имён файлов, то
+        // есть по случайному идентификатору: сорок звонков одного дня выпадали
+        // вперемешку, и найти вчерашний было нечем, кроме глаз. Внутри одного
+        // дня — по названию: времени в записи нет, а стабильный порядок лучше
+        // случайного.
+        let ordered = archive.sessions.sorted {
+            $0.date == $1.date ? $0.title.localizedCompare($1.title) == .orderedAscending
+                               : $0.date > $1.date
+        }
+        var lines = ordered.map { "\($0.date)  \($0.id)  \($0.title)" }
         if !archive.skipped.isEmpty {
             // Пропущенные файлы обязаны быть видны: молчание здесь означает
             // тихо потерянную встречу.
