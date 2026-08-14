@@ -1,0 +1,53 @@
+# Страница живёт в `public/`, а отдаётся с ветки `gh-pages`. Без этого шага
+# ветка — снимок на день публикации: правки в `public/` уходили бы в main, а
+# люди читали бы прошлогоднюю страницу и не знали об этом.
+name: Pages
+
+on:
+  push:
+    branches: [main]
+    paths: ['public/**', '.github/workflows/pages.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      # fetch-depth: 0 обязателен: `subtree split` идёт по всей истории
+      # каталога, а по умолчанию checkout берёт один коммит — ветка вышла бы
+      # пустой, и шаг всё равно отчитался бы об успехе.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Собрать ветку страницы из public/
+        run: |
+          set -euo pipefail
+          test -f public/index.html
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git subtree split --prefix=public -b gh-pages-build
+          git push --force origin gh-pages-build:gh-pages
+
+      - name: Убедиться, что отдаётся то же, что в public/
+        run: |
+          set -euo pipefail
+          # Страница обновляется не мгновенно; ждём до двух минут и сверяем
+          # заголовок. Молчаливый успех здесь означал бы «выложили» о том,
+          # чего никто не увидит.
+          want=$(grep -o '<title>[^<]*</title>' public/index.html)
+          for i in $(seq 1 12); do
+            got=$(curl -s --max-time 10 https://theasder.github.io/orakul/ \
+                  | grep -o '<title>[^<]*</title>' || true)
+            if [ "$got" = "$want" ]; then echo "отдаётся: $got"; exit 0; fi
+            sleep 10
+          done
+          echo "страница так и не обновилась; последнее, что отдавалось: ${got:-пусто}"
+          exit 1

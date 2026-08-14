@@ -2049,6 +2049,20 @@ describe('orakul landing (ru)', () => {
       'текст на главной кнопке не дотягивает до AA');
   });
 
+  test('the label spacing rule is not cancelled by the one it rides on', () => {
+    // `.eyebrow` задан сокращённой записью `margin: 0 0 14px`, и она обнуляет
+    // верхний отступ. `.findings-label` стоял ВЫШЕ по файлу, специфичность у
+    // них одинаковая — и правило не применялось вовсе: 46px превращались в 0.
+    // Глазами это не видно: подпись просто стоит чуть теснее, чем задумано.
+    const eyebrow = html.indexOf('.eyebrow {');
+    const label = html.indexOf('.findings-label {');
+    assert.ok(eyebrow > -1 && label > -1, 'одно из правил пропало');
+    assert.ok(label > eyebrow,
+      '.findings-label стоит выше .eyebrow — сокращённый margin его обнулит');
+    assert.match(html.slice(label, label + 120), /margin-top/,
+      '.findings-label больше не задаёт верхний отступ');
+  });
+
   test('names the licence, because "open source" alone is not a licence', () => {
     assert.match(text, /Apache 2\.0/);
   });
@@ -2149,7 +2163,16 @@ describe('orakul landing (ru)', () => {
     // checkable, unlike "мы уважаем вашу приватность".
     assert.doesNotMatch(html, /<script/i, 'no scripts');
     assert.doesNotMatch(html, /src="https?:\/\//i, 'nothing is fetched from another host');
-    assert.doesNotMatch(html, /<link[^>]+href="https?:\/\//i, 'no remote stylesheet or icon');
+    // `rel` решает, тянет ли <link> что-нибудь. canonical и alternate — это
+    // сведения о странице, они не загружают ничего; stylesheet, icon, preload
+    // и родня — загружают. Прежний запрет не различал их и валил честный
+    // canonical, из-за чего страница не могла назвать свой собственный адрес.
+    const loading = /(stylesheet|icon|preload|prefetch|preconnect|dns-prefetch|manifest)/i;
+    for (const tag of html.match(/<link[^>]*>/gi) ?? []) {
+      if (!/href="https?:\/\//i.test(tag)) continue;
+      const rel = /rel="([^"]+)"/i.exec(tag)?.[1] ?? '';
+      assert.ok(!loading.test(rel), `страница тянет ${rel} со стороны: ${tag}`);
+    }
     assert.doesNotMatch(html, /@import|url\(https?:/i, 'no remote CSS or fonts');
 
     // Ссылка — не загрузка: по ней переходят, её не тянут при открытии

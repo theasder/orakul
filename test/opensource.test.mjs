@@ -223,6 +223,41 @@ describe('open-source furniture', () => {
       'OrakulCore is declared as a dependency but never linked');
   });
 
+  describe('публикация страницы', () => {
+    const flow = resolve(here, '..', '.github', 'workflows', 'pages.yml');
+
+    test('страница выкладывается сама, а не один раз руками', () => {
+      assert.ok(existsSync(flow), 'нет рабочего процесса публикации');
+      const text = readFileSync(flow, 'utf8');
+      assert.match(text, /paths: \['public\/\*\*'/,
+        'публикация не привязана к правкам страницы — она устареет молча');
+      assert.match(text, /fetch-depth: 0/,
+        'без полной истории subtree split даст пустую ветку и отчитается успехом');
+      assert.match(text, /subtree split --prefix=public/,
+        'ветка страницы собирается не из public/');
+    });
+
+    test('после выкладки проверяется, что отдаётся именно она', () => {
+      const text = readFileSync(flow, 'utf8');
+      assert.match(text, /curl[\s\S]{0,120}github\.io/,
+        'никто не смотрит, что страница действительно обновилась');
+      assert.match(text, /exit 1/,
+        'шаг не умеет падать — «выложено» ничего не значит');
+    });
+
+    test('адрес на странице — тот же, куда её выкладывают', () => {
+      const page = readFileSync(resolve(here, '..', 'public', 'index.html'), 'utf8');
+      const canonical = /<link rel="canonical" href="([^"]+)"/.exec(page);
+      assert.ok(canonical, 'на странице нет канонического адреса');
+      const text = readFileSync(flow, 'utf8');
+      const host = new URL(canonical[1]).host;
+      assert.ok(text.includes(host),
+        `страница называет себя ${host}, а выкладывается не туда`);
+      const og = /<meta property="og:url" content="([^"]+)"/.exec(page);
+      assert.equal(og?.[1], canonical[1], 'og:url и canonical разошлись');
+    });
+  });
+
   describe('правила поведения', () => {
     const coc = resolve(here, '..', 'CODE_OF_CONDUCT.md');
 
