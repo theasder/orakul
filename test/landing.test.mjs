@@ -2186,6 +2186,26 @@ describe('orakul landing (ru)', () => {
       `в переписи не подключено ${missingRows}, страница говорит ${missing}`);
   });
 
+  test('the model numbers on the page match the ones the app test holds', () => {
+    // Страница говорит «открыты все, а не четыре из четырнадцати». Это не
+    // украшение: числа называют, от чего продукт отказался. В проверке
+    // приложения те же два числа стояли как «две из тринадцати» — оба
+    // устарели молча, потому что ничто не держало их вместе.
+    const claim = /открыты все, а не ([а-яё]+) из ([а-яё]+)/.exec(text);
+    assert.ok(claim, 'страница больше не называет, от чего отказались');
+    const words = { две: 2, три: 3, четыре: 4, пять: 5, шесть: 6, семь: 7,
+                    тринадцати: 13, четырнадцати: 14, двенадцати: 12, пятнадцати: 15 };
+    const onPage = [words[claim[1]], words[claim[2]]];
+    assert.ok(onPage.every((n) => n !== undefined), `непонятные числа: ${claim[1]}, ${claim[2]}`);
+
+    const swift = readFileSync(resolve(here, '..', 'app', 'Tests', 'MeetGPTTests',
+                                       'NoTariffsTests.swift'), 'utf8');
+    const held = /onFree == (\d+) && LLMCatalog\.all\.count == (\d+)/.exec(swift);
+    assert.ok(held, 'проверка приложения больше не держит эти числа');
+    assert.deepEqual(onPage, [Number(held[1]), Number(held[2])],
+      `страница: ${onPage.join(' из ')}, проверка приложения: ${held[1]} из ${held[2]}`);
+  });
+
   test('names the licence, because "open source" alone is not a licence', () => {
     assert.match(text, /Apache 2\.0/);
   });
