@@ -1958,8 +1958,12 @@ describe('orakul landing (ru)', () => {
     const tens = { двадцать: 20, тридцать: 30, сорок: 40 };
     const lead = /([А-Яа-я]+(?:\s+[А-Яа-я]+)?)\s+(проверка|проверки|проверок)\s+ниже/.exec(text);
     assert.ok(lead, 'the findings list lost its lead-in');
-    const words = lead[1].toLowerCase().split(/\s+/);
     const value = (w) => teens[w] ?? tens[w] ?? units[w];
+    // Захват берёт до двух слов, и при однословном числительном («Тридцать»)
+    // первым словом ему достаётся конец предыдущей фразы. Отбрасываем ведущее
+    // слово, если оно не числительное; всё, что осталось, обязано им быть.
+    const words = lead[1].toLowerCase().split(/\s+/)
+      .filter((w, i, all) => value(w) !== undefined || i === all.length - 1);
     const stated = words.reduce((sum, w) => {
       const v = value(w);
       assert.ok(v !== undefined, `unknown number word: ${w}`);
