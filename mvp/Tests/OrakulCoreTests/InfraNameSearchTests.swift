@@ -83,4 +83,35 @@ struct InfraNameSearchTests {
         #expect(RussianLexicon.restore("Сделали deploy в прод.").contains("деплой"),
                 "перестало работать переписывание заимствований")
     }
+
+    /// Добавлено 2026-08-14. Найдено запуском поиска на словах, которые на
+    /// созвоне произносят вслух: «стейджинг», «кролик», «артефакт», «откат»,
+    /// «ролбэк» не находили ничего.
+    @Test("сказанное вслух находится по английскому написанию",
+          arguments: [
+            ("подняли staging для проверки", ["стейджинг", "staging"]),
+            ("очередь в rabbitmq переполнена", ["кролик", "раббит", "rabbitmq"]),
+            ("собери artifact в ci", ["артефакт", "artifact"]),
+            ("сделали rollback выкатки", ["откат", "ролбэк", "rollback"]),
+          ])
+    func spokenFormsFindWrittenOnes(said: String, asked: [String]) {
+        let index = RecallIndex(sessions: [
+            .init(id: "A", title: "Выкатка", date: "2026-08-14", digest: said)])
+        for question in asked {
+            #expect(!index.search(question).isEmpty,
+                    "спросили «\(question)» — не нашли «\(said)»")
+        }
+    }
+
+    /// Обратная сторона, ради которой эти три слова лежат в таблице поиска, а
+    /// не в словаре терминов: расшифровку они не переписывают. «Кролик» бывает
+    /// зверем, «откат» — деньгами, «артефакт» — находкой, и подменять их в
+    /// чужом разговоре продукт права не имеет.
+    @Test("обычные русские слова не переписываются в расшифровке",
+          arguments: ["кролик", "откат", "артефакт"])
+    func ordinaryWordsSurviveInTheTranscript(word: String) {
+        let phrase = "на даче завёлся \(word), вот такая история"
+        #expect(RussianLexicon.restore(phrase).contains(word),
+                "слово подменили в расшифровке: \(RussianLexicon.restore(phrase))")
+    }
 }
