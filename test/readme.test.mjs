@@ -154,7 +154,18 @@ describe('README', () => {
     assert.ok(appTests > 20, 'the app suite count would be fake');
 
     // The per-suite numbers in the run command.
-    const inCommand = Number(/swift test` \((\d{3,5}) штук\)/.exec(readme)?.[1] ?? NaN);
+    // Форма слова зависит от числа: 2657 штук, 2663 штуки, 2661 штука.
+    // Раньше здесь стояло только «штук», и правильная по-русски запись роняла
+    // проверку — а неправильная проходила.
+    const counted = /swift test` \((\d{3,5}) (штук|штуки|штука)\)/.exec(readme);
+    const inCommand = Number(counted?.[1] ?? NaN);
+    if (counted) {
+      const n = inCommand % 100;
+      const tail = (n >= 11 && n <= 14) ? 'штук'
+        : [, 'штука', 'штуки', 'штуки', 'штуки'][inCommand % 10] ?? 'штук';
+      assert.equal(counted[2], tail,
+        `${inCommand} — по-русски «${tail}», а написано «${counted[2]}»`);
+    }
     assert.equal(inCommand, appTests,
       `README says ${inCommand} app tests, the suite declares ${appTests}`);
     const inCore = Number(/mvp — (\d{2,5})/.exec(readme)?.[1] ?? NaN);

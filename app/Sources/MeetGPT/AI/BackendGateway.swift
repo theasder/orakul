@@ -277,7 +277,17 @@ enum LLMGatewayFactory {
         return .direct
     }
 
+    /// Подмена для проверок. Собранный ниже конвейер ходит в сеть, и без этой
+    /// щели службы, которые зовут `make()` напрямую, проверить нечем: у них
+    /// нет ни одного шва, куда подставить свой шлюз. Так же сделано у
+    /// `ProviderKeyStore.overrideForTesting` и у срока в `MCPConnectionManager`.
+    ///
+    /// `@TaskLocal`, а не обычная переменная: наборы идут параллельно, и
+    /// присвоенное одним было бы видно другому.
+    @TaskLocal static var overrideForTesting: LLMGateway?
+
     static func make() -> LLMGateway {
+        if let overrideForTesting { return overrideForTesting }
         let base: LLMGateway
         switch selection {
         case .ensemble: base = EnsembleGateway()
