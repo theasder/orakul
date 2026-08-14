@@ -2368,4 +2368,40 @@ describe('orakul landing (ru)', () => {
     assert.match(html, /@media \(prefers-reduced-motion: reduce\)/);
     assert.match(html, /:focus-visible/);
   });
+
+  // Показанный вывод — единственное на странице, что человек может сверить с
+  // программой, не устанавливая её. Нарисованный от руки, он молча разойдётся
+  // с продуктом на первой же правке текста: README уже цитировал отказ,
+  // которого программа не печатала. Поэтому каждая строка ответа в блоке
+  // сверяется со строкой в исходнике.
+  test('the demo block shows what the program actually prints', () => {
+    const demo = /<figure class="demo[^"]*">([\s\S]*?)<\/figure>/.exec(html)?.[1];
+    assert.ok(demo, 'блок с показанным выводом пропал со страницы');
+
+    const answer = readFileSync(
+      resolve(here, '..', 'mvp', 'Sources', 'OrakulCore', 'RecallAnswer.swift'), 'utf8');
+    const refusal = /"(В сохранённых [^"]+)"/.exec(answer)?.[1];
+    assert.ok(refusal, 'отказ пропал из RecallAnswer.swift');
+    assert.ok(demo.includes(refusal),
+      `в блоке показан не тот отказ, что печатает программа: «${refusal}»`);
+
+    // Подсказка про опечатку собирается из куска строки и слова в кавычках,
+    // поэтому сверяется её постоянная часть.
+    // Без привязки к открывающей кавычке: строка начинается с переноса
+    // (`"\nПохоже на опечатку…`), и образец, ждавший кавычку вплотную, не
+    // совпадал ни с чем.
+    const hint = /(Похоже на опечатку[^"\\]*)/.exec(answer)?.[1];
+    assert.ok(hint, 'подсказка про опечатку пропала из RecallAnswer.swift');
+    assert.ok(demo.includes(hint.trim()),
+      `в блоке показана не та подсказка: «${hint}»`);
+
+    // Команды в блоке — те же, что человек наберёт: имя программы и глаголы
+    // разбираются командной строкой, а не придуманы для картинки.
+    const cli = readFileSync(
+      resolve(here, '..', 'mvp', 'Sources', 'OrakulCore', 'CommandLineApp.swift'), 'utf8');
+    for (const verb of ['найти']) {
+      assert.ok(cli.includes(`"${verb}"`),
+        `страница показывает «orakul ${verb}», а команда так не называется`);
+    }
+  });
 });
