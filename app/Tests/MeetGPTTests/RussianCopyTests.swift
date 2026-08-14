@@ -243,14 +243,16 @@ struct RussianCopyTests {
     /// шуме. Сами подсказки проверяет `ProviderConsoleMatchTests` — построчно
     /// и по существу, а не по числу.
     ///
-    /// Их восемь, и каждая — не недоделка перевода:
+    /// Их две, и каждая — не недоделка перевода:
     ///
     /// - `Google Calendar` — имя продукта, по-русски его не называют;
-    /// - пять строк вида `platform.openai.com → API keys` — это МАРШРУТ по
-    ///   чужому сайту, и сайт английский. «API keys» здесь надпись на кнопке,
-    ///   которую человек будет искать глазами. Перевести её значит отправить
-    ///   его искать то, чего на странице нет;
     /// - `orakul, RICE, ARR, Kubernetes…` — пример перечисления терминов.
+    ///
+    /// Было восемь: пять строк вида `platform.openai.com → API keys` уехали к
+    /// `LLMProvider.keyConsoleHint` (см. абзац выше), и список остался с
+    /// прежним числом — «восемь» при двух записях. Число в тексте, которое
+    /// нечем проверить, разъезжается с кодом первым; поэтому ниже стоит
+    /// проверка, сверяющая эту фразу с размером набора.
     ///
     /// Поэтому число проверяется на равенство: и рост, и «улучшение»
     /// переводом требуют объяснения.
@@ -260,6 +262,20 @@ struct RussianCopyTests {
     ]
 
     static let remainingEnglishPhrases = deliberateEnglish.count
+
+    /// Число прописью в комментарии выше — против размера набора.
+    @Test("список намеренно английских фраз совпадает со своим описанием")
+    func deliberateListMatchesItsDescription() throws {
+        let source = try String(contentsOfFile: #filePath, encoding: .utf8)
+        let words = ["одна": 1, "две": 2, "три": 3, "четыре": 4, "пять": 5,
+                     "шесть": 6, "семь": 7, "восемь": 8, "девять": 9, "десять": 10]
+        let line = try #require(
+            source.split(separator: "\n").first { $0.contains("/// Их ") },
+            "строка «Их …» пропала — число больше нечем сверить")
+        let stated = words.first { line.contains("Их \($0.key),") }?.value
+        #expect(stated == Self.deliberateEnglish.count,
+                "в описании «\(line.trimmingCharacters(in: .whitespaces))», а в наборе \(Self.deliberateEnglish.count)")
+    }
 
     /// Шаблон DateFormatter, а не текст для человека.
     ///
