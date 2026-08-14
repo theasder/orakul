@@ -350,6 +350,57 @@ struct RussianCopyTests {
         #expect(english.isEmpty, "по-английски на экране: \(english.joined(separator: " | "))")
     }
 
+    /// Уведомления — самая заметная поверхность приложения: они появляются
+    /// поверх всего посреди звонка. Ни счётчик английских фраз, ни проверка
+    /// видимого состояния сюда не смотрели: `Detection/` — не папка
+    /// интерфейса, и полей на `Error`/`Status` там нет. Так по-английски
+    /// оставались «Start recording», «Incoming call — Zoom», «Blind spot» и
+    /// «Starts in 5 min (…) — open Cruxwing to record», где вдобавок стоит имя
+    /// другого продукта.
+    @Test("уведомления написаны по-русски и называют наш продукт")
+    func notificationsAreRussian() throws {
+        let base = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/MeetGPT/Detection")
+        var english: [String] = []
+        var checked = 0
+        // Только те файлы, что составляют текст уведомления. `CallDetector`
+        // сюда не входит намеренно: в нём лежат имена чужих приложений и куски
+        // заголовков окон («Google Meet», «zoom meeting») — это не наш текст, и
+        // переводить их нельзя, иначе звонок перестанет опознаваться.
+        let notifiers = ["CallNotifier.swift", "MeetingReminderScheduler.swift",
+                         "BlindSpotNotifier.swift"]
+        let files = notifiers.map(base.appendingPathComponent)
+        for url in files where url.pathExtension == "swift" {
+            let source = try String(contentsOf: url, encoding: .utf8)
+            for line in source.split(separator: "\n") {
+                let trimmed = line.trimmingCharacters(in: .whitespaces)
+                guard !trimmed.hasPrefix("//") else { continue }
+                // Только то, что попадает в уведомление: заголовок, тело,
+                // подпись действия. Имена приложений («Google Meet») сюда не
+                // попадают — они не наш текст.
+                guard trimmed.contains("content.title") || trimmed.contains("content.body")
+                        || trimmed.contains("content.subtitle") || trimmed.contains("title: \"")
+                        || trimmed.contains("return (\"") || trimmed.contains("\", \"")
+                else { continue }
+                for part in trimmed.split(separator: "\"", omittingEmptySubsequences: false)
+                    .enumerated().filter({ $0.offset % 2 == 1 }).map({ String($0.element) }) {
+                    guard part.count > 7, part.contains(" ") else { continue }
+                    checked += 1
+                    #expect(!part.contains("Cruxwing"),
+                            "в уведомлении имя другого продукта: \(part)")
+                    guard part.range(of: "[а-яё]", options: [.regularExpression, .caseInsensitive])
+                            == nil else { continue }
+                    let words = part.components(separatedBy: CharacterSet.letters.inverted)
+                        .filter { $0.count > 2 }
+                    if words.count >= 2 { english.append(part) }
+                }
+            }
+        }
+        #expect(checked > 3, "проверено всего \(checked) строк — смотрим не туда")
+        #expect(english.isEmpty, "по-английски в уведомлениях: \(english.joined(separator: " | "))")
+    }
+
     @Test("английских фраз на экране не становится больше")
     func englishProseOnlyShrinks() {
         // Берутся все литералы без кириллицы, похожие на речь: есть пробел и

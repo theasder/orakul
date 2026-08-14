@@ -28,7 +28,7 @@ final class CallNotifier: NSObject, UNUserNotificationCenterDelegate {
         let center = UNUserNotificationCenter.current()
         center.delegate = self
         let start = UNNotificationAction(identifier: CallNotifierID.startAction,
-                                         title: "Start recording",
+                                         title: "Записать",
                                          options: [.foreground])
         let call = UNNotificationCategory(identifier: CallNotifierID.callCategory,
                                           actions: [start],
@@ -67,7 +67,7 @@ final class CallNotifier: NSObject, UNUserNotificationCenterDelegate {
     /// this as a call happening *now* — distinct from the scheduled reminder,
     /// which announces an *upcoming* one.
     nonisolated static func callPromptText(source: String) -> (title: String, body: String) {
-        ("Incoming call — \(source)", "Cruxwing can capture this meeting. Start recording?")
+        ("Звонок в \(source)", "orakul может записать этот звонок. Записывать?")
     }
 
     private func deliverCallPrompt(appName: String) async {

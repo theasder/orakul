@@ -58,7 +58,7 @@ enum BlindSpotNotifier {
         guard Bundle.main.bundleURL.pathExtension == "app" else { return }
         let center = UNUserNotificationCenter.current()
         let content = UNMutableNotificationContent()
-        content.title = meetingTitle.isEmpty ? "Blind spot" : meetingTitle
+        content.title = meetingTitle.isEmpty ? "Слепое пятно" : meetingTitle
         content.subtitle = body.title
         content.body = body.detail
         content.sound = nil                 // silent, by design
