@@ -59,8 +59,11 @@ final class ArchiveModel: ObservableObject {
         // «ответа» у продукта быть не должно.
         let index = self.index ?? RecallIndex(sessions: sessions)
         self.index = index
-        answer = RecallAnswer.compose(query: trimmed, hits: index.search(trimmed),
-                                      archiveIsEmpty: sessions.isEmpty)
+        let hits = index.search(trimmed)
+        answer = RecallAnswer.compose(query: trimmed, hits: hits,
+                                      archiveIsEmpty: sessions.isEmpty,
+                                      suggestions: hits.isEmpty
+                                          ? index.nearMisses(for: trimmed) : [])
     }
 }
 

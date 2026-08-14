@@ -224,12 +224,18 @@ public struct RecallIndex: Sendable {
         return word
     }
 
-    static func tokens(_ text: String) -> [String] {
+    static func tokens(_ text: String) -> [String] { surfaceTokens(text).map(stem) }
+
+    /// Те же слова, что уходят в указатель, но как они написаны в расшифровке.
+    ///
+    /// Отдельной функцией, а не копией правил разбора: подсказка про опечатку
+    /// обязана предлагать слово, которое поиск действительно найдёт. Разойдись
+    /// эти два разбора — и в подсказке окажется слово, по которому не ищется.
+    static func surfaceTokens(_ text: String) -> [String] {
         text.split(whereSeparator: { !$0.isLetter && !$0.isNumber && $0 != "-" })
             .map(String.init)
             .flatMap(splitCompound)
             .filter { !stopwords.contains(RussianLexicon.normalized($0)) && $0.count > 1 }
-            .map(stem)
     }
 
     /// Слово с дефисом — и целиком, и по частям.
@@ -249,6 +255,106 @@ public struct RecallIndex: Sendable {
         guard trimmed.contains("-") else { return trimmed.isEmpty ? [] : [trimmed] }
         let parts = trimmed.split(separator: "-").map(String.init).filter { $0.count > 1 }
         return [trimmed] + parts
+    }
+
+    // MARK: - Похожие слова
+
+    /// Наименьшая длина слова, для которого ищется опечатка.
+    ///
+    /// Для «код» одна буква — треть слова, и «кот» ему «похож» ровно так же,
+    /// как «код». Подсказка из трёхбуквенных слов — шум.
+    static let minimumTypoLength = 4
+
+    /// Слова из архива, отличающиеся от спрошенного на одну опечатку.
+    ///
+    /// Зачем. Поиск словарный: «тарифф» с лишней буквой не совпадает ни с чем,
+    /// и человек читает «в сохранённых звонках об этом не говорили» — то есть
+    /// утверждение о разговоре, который на самом деле был. Одна опечатка —
+    /// самый частый способ не найти лежащее на месте.
+    ///
+    /// Слово не подставляется молча: подменить вопрос — значит ответить не на
+    /// него. Возвращается подсказка, решает человек.
+    ///
+    /// Считается только когда не нашлось ничего, поэтому обход всего словаря
+    /// здесь ничего не стоит: на обычном пути этой работы нет.
+    public func nearMisses(for query: String, limit: Int = 3) -> [String] {
+        let asked = Set(Self.tokens(query)).filter { $0.count >= Self.minimumTypoLength }
+        guard !asked.isEmpty, !sessions.isEmpty else { return [] }
+
+        // Основа не годится в подсказку: у «раскатываем» она «раскатыва».
+        // Человеку показываем слово, которое в архиве вправду прозвучало, —
+        // поэтому считаем, каким написанием каждая основа встречалась чаще.
+        var spellings: [String: [String: Int]] = [:]
+        for session in sessions {
+            for word in Self.surfaceTokens(session.title + " " + session.digest) {
+                spellings[Self.stem(word), default: [:]][word, default: 0] += 1
+            }
+        }
+
+        var candidates: [(word: String, count: Int)] = []
+        for token in asked where spellings[token] == nil {
+            for (stem, forms) in spellings where Self.isOneEditApart(token, stem) {
+                // Чаще прозвучавшее написание вперёд; при равенстве — по
+                // алфавиту, иначе один и тот же архив подсказывал бы разное.
+                let ordered = forms.sorted {
+                    $0.value == $1.value ? $0.key < $1.key : $0.value > $1.value
+                }
+                guard let best = ordered.first else { continue }
+                candidates.append((best.key, best.value))
+            }
+        }
+
+        let ranked = candidates.sorted {
+            $0.count == $1.count ? $0.word < $1.word : $0.count > $1.count
+        }
+        var seen: Set<String> = []
+        return ranked.filter { seen.insert($0.word).inserted }.prefix(limit).map(\.word)
+    }
+
+    /// Отличаются ли слова ровно на одну опечатку.
+    ///
+    /// Четыре вида: лишняя буква, пропущенная, не та и переставленные соседние.
+    /// Перестановка здесь не роскошь: «таирфы» набирается не реже, чем
+    /// «тарифф», а через замены до «тарифы» расстояние два — без этой ветки
+    /// самая частая опечатка спешащего человека осталась бы не пойманной.
+    static func isOneEditApart(_ a: String, _ b: String) -> Bool {
+        let left = Array(a), right = Array(b)
+        // Быстрый выход, а не проверка: обе ветки ниже отсекают и одинаковые
+        // слова (ноль расхождений — не одна опечатка), и разницу длин в две
+        // буквы (проход умеет пропустить только одну). Строка стоит здесь
+        // потому, что при промахе эта функция зовётся на каждую основу
+        // словаря, а не потому, что без неё ответ был бы другим: мутация
+        // `<= 2` проверок не роняет — и не должна.
+        guard abs(left.count - right.count) <= 1, left != right else { return false }
+
+        if left.count == right.count {
+            var mismatches: [Int] = []
+            for position in left.indices where left[position] != right[position] {
+                mismatches.append(position)
+                if mismatches.count > 2 { return false }
+            }
+            if mismatches.count == 1 { return true }
+            guard mismatches.count == 2 else { return false }
+            let (first, second) = (mismatches[0], mismatches[1])
+            return second == first + 1
+                && left[first] == right[second] && left[second] == right[first]
+        }
+
+        // Длины разные: короткое должно получаться из длинного вычёркиванием
+        // одной буквы. Один проход, без таблицы расстояний.
+        let shorter = left.count < right.count ? left : right
+        let longer = left.count < right.count ? right : left
+        var matched = 0
+        var skipped = false
+        for position in longer.indices {
+            if matched < shorter.count, shorter[matched] == longer[position] {
+                matched += 1
+                continue
+            }
+            if skipped { return false }
+            skipped = true
+        }
+        return matched == shorter.count
     }
 
     // MARK: - Поиск

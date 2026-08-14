@@ -294,10 +294,16 @@ public struct CommandLineApp {
         // Архив читается ОДИН раз: и чтобы отличить пустой от непустого, и
         // чтобы узнать, что не открылось. Дважды — это дважды обойти папку.
         let archive = store.load()
+        let index = store.index()
+        let hits = index.search(query)
+        // Похожие слова ищутся, только когда не нашлось ничего: обход словаря
+        // на пути, где ответ уже есть, — работа впустую.
         let answer = RecallAnswer.compose(query: query,
-                                          hits: store.index().search(query),
+                                          hits: hits,
                                           archiveIsEmpty: archive.sessions.isEmpty,
-                                          unreadable: archive.skipped)
+                                          unreadable: archive.skipped,
+                                          suggestions: hits.isEmpty
+                                              ? index.nearMisses(for: query) : [])
         // Ничего не нашлось — это результат, а не сбой: код возврата нулевой.
         return Result(output: answer, exitCode: 0)
     }

@@ -156,7 +156,12 @@ describe('README', () => {
     // answers), so a paraphrase there costs more than anywhere else on the page.
     const source = readFileSync(
       resolve(repo, 'mvp', 'Sources', 'OrakulCore', 'RecallAnswer.swift'), 'utf8');
-    const refusal = /return "(В сохранённых [^"]+)"/.exec(source)?.[1];
+    // Строка ищется где угодно, а не только после `return`: отказ переехал в
+    // локальную переменную, когда к нему стала приписываться подсказка про
+    // опечатку, и привязанный к `return` образец перестал совпадать. Сторож
+    // тогда не промолчал — `assert.ok` ниже поймал исчезновение, — но чинить
+    // проверку после каждой перестановки строк незачем.
+    const refusal = /"(В сохранённых [^"]+)"/.exec(source)?.[1];
     assert.ok(refusal, 'the refusal string is gone from RecallAnswer.swift');
     assert.ok(readme.includes(refusal),
       `README quotes a refusal the program does not print; it prints: ${refusal}`);

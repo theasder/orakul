@@ -41,7 +41,8 @@ public enum RecallAnswer {
     /// что нашлось, могло быть не всем, что есть.
     public static func compose(query: String, hits: [RecallIndex.Hit],
                                archiveIsEmpty: Bool = false,
-                               unreadable: [String] = []) -> String {
+                               unreadable: [String] = [],
+                               suggestions: [String] = []) -> String {
         guard !archiveIsEmpty else {
             // Пусто и при этом что-то не прочиталось — это не пустой архив, а
             // архив, до которого мы не добрались. Разница решающая: в первом
@@ -75,7 +76,9 @@ public enum RecallAnswer {
             """, unreadable)
         }
 
-        guard !grounded.isEmpty else { return withWarning(notFound(hits: hits), unreadable) }
+        guard !grounded.isEmpty else {
+            return withWarning(notFound(hits: hits, suggestions: suggestions), unreadable)
+        }
 
         var lines: [String] = []
         for hit in grounded.prefix(maximumMeetings) {
@@ -118,9 +121,18 @@ public enum RecallAnswer {
     /// «встреча» в счёте ниже и «звонок» на странице и в README. Из-за этого же
     /// README цитировал отказ со словом «звонках» и расходился с тем, что
     /// программа печатает на самом деле.
-    static func notFound(hits: [RecallIndex.Hit]) -> String {
+    ///
+    /// `suggestions` — слова из архива, похожие на спрошенное с точностью до
+    /// опечатки. Без них «не говорили» звучит как итог проверки, хотя проверено
+    /// было слово с лишней буквой; человек уходит уверенным, что темы не было.
+    /// Подсказка не подменяет вопрос и не ищет за человека — она показывает,
+    /// какие слова в архиве есть, а решает он.
+    static func notFound(hits: [RecallIndex.Hit], suggestions: [String] = []) -> String {
         if hits.isEmpty {
-            return "В сохранённых звонках об этом не говорили. Ответ придумывать не буду."
+            let refusal = "В сохранённых звонках об этом не говорили. Ответ придумывать не буду."
+            guard !suggestions.isEmpty else { return refusal }
+            let words = suggestions.map { "«\($0)»" }.joined(separator: ", ")
+            return refusal + "\nПохоже на опечатку — в архиве есть \(words)."
         }
         let titles = hits.prefix(maximumMeetings)
             .map { "«\($0.session.title)»" }
