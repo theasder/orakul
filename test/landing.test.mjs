@@ -2206,6 +2206,30 @@ describe('orakul landing (ru)', () => {
       `страница: ${onPage.join(' из ')}, проверка приложения: ${held[1]} из ${held[2]}`);
   });
 
+  test('the speed on the page is the whole wait, not one step of it', () => {
+    // На странице стояло «450 тысяч слов ищется за 0,4 секунды». Это был
+    // только поиск, без разбора слов, и корпус в замере был вдвое меньше
+    // обещанного. Человек ждёт обе половины: указатель строится заново на
+    // каждый вопрос. Числа теперь берутся из того же замера, что и в проверке.
+    const claim = /(\d+) тысяч слов, \d+ тысяч реплик — отвечает за ([\d,]+) секунды/.exec(text);
+    assert.ok(claim, 'страница больше не называет, сколько ждать');
+    const [, words, seconds] = claim;
+    assert.ok(Number(words) >= 400, `корпус на странице меньше месяца звонков: ${words} тыс.`);
+
+    const test = readFileSync(resolve(here, '..', 'mvp', 'Tests', 'OrakulCoreTests',
+                                      'RecallIndexTests.swift'), 'utf8');
+    // Замер обязан строить корпус не меньше того, о котором говорит страница.
+    assert.match(test, /totalWords > 400_000/,
+      'проверка больше не требует корпуса в месяц звонков');
+    // И мерить обе половины, а не одну.
+    assert.match(test, /let elapsed = building \+ searching/,
+      'проверка снова меряет только поиск, без разбора слов');
+    const ceiling = /#expect\(elapsed < (\d+)/.exec(test);
+    assert.ok(ceiling, 'потолок пропал из проверки');
+    assert.ok(Number(seconds.replace(',', '.')) < Number(ceiling[1]),
+      `страница обещает ${seconds} с, а потолок проверки ${ceiling[1]} с`);
+  });
+
   test('names the licence, because "open source" alone is not a licence', () => {
     assert.match(text, /Apache 2\.0/);
   });
