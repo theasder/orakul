@@ -178,8 +178,28 @@ public struct RecallIndex: Sendable {
     static func tokens(_ text: String) -> [String] {
         text.split(whereSeparator: { !$0.isLetter && !$0.isNumber && $0 != "-" })
             .map(String.init)
+            .flatMap(splitCompound)
             .filter { !stopwords.contains(RussianLexicon.normalized($0)) && $0.count > 1 }
             .map(stem)
+    }
+
+    /// Слово с дефисом — и целиком, и по частям.
+    ///
+    /// Дефис оставлен разделителем нарочно: «код-свитчинг» и
+    /// «Kubernetes-кластер» — одно слово, и терять их нельзя. Но искали при
+    /// этом только целиком: вопрос «что там с кластером» не находил разговор
+    /// про «Kubernetes-кластер», хотя произнесли именно это. Части идут в
+    /// указатель рядом с целым; частое слово вроде «код» веса почти не имеет —
+    /// в поиске редкое весит больше частого.
+    ///
+    /// Дефис по краям — это не слово, а знак препинания: строка «- тарифы»,
+    /// вставленная из списка, давала токен «-тарифы», который не совпадал ни с
+    /// чем.
+    static func splitCompound(_ word: String) -> [String] {
+        let trimmed = word.trimmingCharacters(in: CharacterSet(charactersIn: "-"))
+        guard trimmed.contains("-") else { return trimmed.isEmpty ? [] : [trimmed] }
+        let parts = trimmed.split(separator: "-").map(String.init).filter { $0.count > 1 }
+        return [trimmed] + parts
     }
 
     // MARK: - Поиск
