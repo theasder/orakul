@@ -170,6 +170,15 @@ describe('README', () => {
     for (const wrong of ['созвон', 'встреч']) {
       assert.ok(!refusal.includes(wrong), `the refusal calls a call a "${wrong}"`);
     }
+
+    // Подсказка про опечатку показана в README отдельным примером — и она
+    // такая же цитата вывода, как отказ выше. Первый пример здесь однажды
+    // цитировал слова, которых программа не печатала; повторять это на втором
+    // примере незачем.
+    const hint = /(Похоже на опечатку[^"\\]*)/.exec(source)?.[1];
+    assert.ok(hint, 'подсказка про опечатку пропала из RecallAnswer.swift');
+    assert.ok(readme.includes(hint.trim()),
+      `README показывает не ту подсказку; программа печатает: ${hint.trim()}`);
   });
 
   test('the licence it names is the licence in the repo', () => {
