@@ -163,9 +163,37 @@ public struct CommandLineApp {
         do {
             try store.save(session)
         } catch {
-            return Result(output: "Не смог сохранить: \(error)", exitCode: 1)
+            return Result(output: "Не смог сохранить. \(Self.explain(error))", exitCode: 1)
         }
         return Result(output: "Добавлено: «\(session.title)» (\(session.id))", exitCode: 0)
+    }
+
+    /// Отказ файловой системы — по-русски и с действием.
+    ///
+    /// Было `"Не смог сохранить: \(error)"`, и человек получал
+    /// `Error Domain=NSCocoaErrorDomain Code=513 "You don\u{2019}t have permission
+    /// to save the file..."` — внутренности по-английски ровно там, где нужна
+    /// помощь. Ту же ошибку продукт уже исправлял в коннекторах; в командной
+    /// строке она осталась.
+    static func explain(_ error: Error) -> String {
+        let code = (error as NSError).code
+        let domain = (error as NSError).domain
+        guard domain == NSCocoaErrorDomain else {
+            return "Система ответила: \(error.localizedDescription)"
+        }
+        switch code {
+        case 513, 257:
+            return "Нет прав на запись в архив. Проверьте права на каталог "
+                + "или укажите другой в ORAKUL_HOME."
+        case 640:
+            return "На диске не осталось места."
+        case 4, 260:
+            return "Архив не найден. Проверьте ORAKUL_HOME."
+        case 642:
+            return "Каталог архива только для чтения."
+        default:
+            return "Система ответила: \(error.localizedDescription)"
+        }
     }
 
     /// Название встречи в том виде, в каком его можно печатать строкой.
@@ -330,7 +358,7 @@ public struct CommandLineApp {
                 """, exitCode: 1)
             }
         } catch {
-            return Result(output: "Не смог удалить: \(error)", exitCode: 1)
+            return Result(output: "Не смог удалить. \(Self.explain(error))", exitCode: 1)
         }
         return Result(output: "Удалено: \(resolved)", exitCode: 0)
     }

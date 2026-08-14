@@ -758,4 +758,67 @@ struct DeleteByPrefixTests {
         #expect(!result.output.contains("Не настроен движок"),
                 "человека послали настраивать движок из-за опечатки в имени файла")
     }
+
+    /// Отказ файловой системы человек читает ровно тогда, когда ему нужна
+    /// помощь. Было: «Не смог сохранить: Error Domain=NSCocoaErrorDomain
+    /// Code=513 "You don\u{2019}t have permission to save the file…"» — внутренности
+    /// по-английски. Ту же ошибку продукт уже исправлял в коннекторах.
+    @Test("отказ файловой системы объясняется по-русски и с действием")
+    func filesystemErrorsSpeakRussian() {
+        let cases: [(Int, [String])] = [
+            (513, ["Нет прав на запись", "ORAKUL_HOME"]),
+            (640, ["места"]),
+            (4, ["не найден", "ORAKUL_HOME"]),
+            (642, ["только для чтения"]),
+        ]
+        for (code, expected) in cases {
+            let text = CommandLineApp.explain(
+                NSError(domain: NSCocoaErrorDomain, code: code))
+            for fragment in expected {
+                #expect(text.contains(fragment), "в «\(text)» нет «\(fragment)»")
+            }
+            #expect(!text.contains("NSCocoaErrorDomain"), "наружу вылезло имя домена: \(text)")
+            #expect(!text.contains("Code="), "наружу вылез код ошибки: \(text)")
+        }
+    }
+
+    /// И объяснение должно стоять НА ПУТИ сохранения, а не рядом. Мутация
+    /// «вернуть сырую ошибку в `добавить`» проходила зелёной, пока проверки
+    /// звали `explain` напрямую.
+    @Test("на настоящем пути сохранения человек тоже видит русский текст")
+    func saveFailureIsExplainedThroughTheCommand() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("orakul-закрытый-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try FileManager.default.setAttributes([.posixPermissions: 0o500], ofItemAtPath: root.path)
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o700],
+                                                   ofItemAtPath: root.path)
+            try? FileManager.default.removeItem(at: root)
+        }
+
+        let app = CommandLineApp(store: SessionStore(root: root),
+                                 readFile: { _ in "Аня: по тарифам решили не трогать" })
+        let result = app.run(["добавить", "расшифровка.txt", "Планёрка"])
+        #expect(result.exitCode == 1)
+        #expect(result.output.contains("Нет прав на запись"),
+                "человеку показали не то: \(result.output)")
+        #expect(!result.output.contains("NSCocoaErrorDomain"),
+                "наружу вылезли внутренности: \(result.output)")
+    }
+
+    /// Чужую ошибку выдумывать не за что: её текст отдаётся как есть, но с
+    /// русской рамкой, чтобы было видно, что говорит система, а что мы.
+    @Test("незнакомая ошибка не выдаётся за знакомую")
+    func unknownErrorsAreNotInvented() {
+        // Код нарочно тот же, что у отказа в правах: без проверки домена
+        // чужая ошибка получила бы чужое объяснение, и мутация «убрать
+        // проверку домена» проходила бы зелёной.
+        let text = CommandLineApp.explain(
+            NSError(domain: "ЧужойДомен", code: 513,
+                    userInfo: [NSLocalizedDescriptionKey: "странное"]))
+        #expect(text.contains("Система ответила"))
+        #expect(text.contains("странное"))
+        #expect(!text.contains("Нет прав"), "чужая ошибка выдана за отказ в правах")
+    }
 }
