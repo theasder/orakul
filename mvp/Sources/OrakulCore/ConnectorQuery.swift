@@ -17,6 +17,11 @@ public enum ConnectorQuery {
     /// Российские трекеры стоят первыми не по алфавиту: с них начинали, и
     /// человек, пришедший за Яндекс Трекером, не должен искать его в конце
     /// списка из тринадцати строк.
+    /// Одна формулировка на оба места, где сервис оказался незнакомым.
+    static func unknownService(_ name: String) -> String {
+        "Не знаю сервис «\(name)». Есть: \(services.joined(separator: ", "))."
+    }
+
     public static let services: [String] =
         RussianTrackers.Service.allCases.map(\.rawValue)
         + ["pachca", "mattermost", "rocketChat", "zulip",
@@ -65,6 +70,15 @@ public enum ConnectorQuery {
                            githubHTTP: @escaping GitHubConnector.HTTP = RussianTrackers.live) async -> Answer {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return .init(text: "Пустой вопрос — спрашивать нечего.", failed: true) }
+        // Сначала имя сервиса, потом токен. Опечатка в названии — это то, что
+        // человек только что напечатал; токен — это настройка. Раньше проверка
+        // токена стояла первой, и на `orakul спросить нетакого вопрос` продукт
+        // отвечал «нет токена»: человек шёл заводить токен для сервиса,
+        // которого не существует. Нужное сообщение при этом уже было написано,
+        // но лежало в конце и до него не доходило.
+        guard services.contains(settings.service) else {
+            return .init(text: unknownService(settings.service), failed: true)
+        }
         guard !settings.token.isEmpty else {
             return .init(text: "Нет токена. Положите его в ORAKUL_TOKEN — он никуда не пишется.",
                          failed: true)
@@ -123,7 +137,7 @@ public enum ConnectorQuery {
         } catch {
             return .init(text: explain(error), failed: true)
         }
-        return .init(text: "Не знаю сервис «\(settings.service)». Есть: \(services.joined(separator: ", ")).",
+        return .init(text: unknownService(settings.service),
                      failed: true)
     }
 

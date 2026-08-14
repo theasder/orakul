@@ -196,6 +196,14 @@ public struct CommandLineApp {
         guard let path = arguments.first else {
             return Result(output: "Нужен файл записи: orakul расшифровать <wav>", exitCode: 2)
         }
+        // Файл проверяется раньше движка: имя файла — это то, что человек
+        // только что напечатал, а движок — настройка. При опечатке в имени и
+        // ненастроенном движке продукт рассказывал про движок, человек его
+        // настраивал и лишь потом узнавал, что файла нет. Два захода вместо
+        // одного, и первый — не про его ошибку.
+        guard let data = readAudio(path) else {
+            return Result(output: "Не смог прочитать запись: \(path)", exitCode: 1)
+        }
         guard let command = engineCommand, !command.isEmpty else {
             // Молча ничего не делать здесь нельзя: человек ждёт расшифровку и
             // должен узнать, чего именно не хватает.
@@ -205,9 +213,6 @@ public struct CommandLineApp {
 
               export ORAKUL_ENGINE="whisper-cli -m модель.bin -l ru -otxt -f {файл}"
             """, exitCode: 2)
-        }
-        guard let data = readAudio(path) else {
-            return Result(output: "Не смог прочитать запись: \(path)", exitCode: 1)
         }
 
         let samples: [Float]

@@ -743,4 +743,19 @@ struct DeleteByPrefixTests {
         #expect(result.exitCode == 1)
         #expect(result.output.contains("Такого звонка нет"))
     }
+
+    /// То же самое в расшифровке: имя файла — то, что человек напечатал,
+    /// движок — настройка. Раньше при опечатке и ненастроенном движке продукт
+    /// рассказывал про движок.
+    @Test("отсутствующий файл называется отсутствующим файлом, а не ненастроенным движком")
+    func missingFileBeatsMissingEngine() {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("orakul-транскрипт-\(UUID().uuidString)")
+        let app = CommandLineApp(store: SessionStore(root: root), readFile: { _ in nil })
+        let result = app.run(["расшифровать", "нетакого.wav"])
+        #expect(result.exitCode == 1)
+        #expect(result.output.contains("Не смог прочитать запись"))
+        #expect(!result.output.contains("Не настроен движок"),
+                "человека послали настраивать движок из-за опечатки в имени файла")
+    }
 }

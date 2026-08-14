@@ -261,4 +261,35 @@ struct ConnectorQueryFailureTests {
         #expect(answer.text.contains("ничего не нашлось"))
         #expect(!answer.failed, "пустой ответ выдан за сбой — скрипты встанут на ровном месте")
     }
+
+    /// Порядок проверок — это порядок, в котором человек узнаёт о своих
+    /// ошибках. Опечатка в имени сервиса раньше давала «нет токена»: человек
+    /// шёл заводить токен для сервиса, которого нет.
+    @Test("опечатка в имени сервиса называется опечаткой, а не отсутствием токена")
+    func unknownServiceBeatsMissingToken() async {
+        let answer = await ConnectorQuery.ask(
+            .init(service: "нетакого", token: "", host: nil, scope: nil),
+            query: "лимиты")
+        #expect(answer.failed)
+        #expect(answer.text.contains("Не знаю сервис «нетакого»"))
+        #expect(!answer.text.contains("Нет токена"), "продукт послал заводить токен впустую")
+        // И список настоящих сервисов рядом — иначе непонятно, что печатать.
+        #expect(answer.text.contains("kaiten"))
+    }
+
+    @Test("у настоящего сервиса без токена сообщение прежнее")
+    func knownServiceStillAsksForToken() async {
+        let answer = await ConnectorQuery.ask(
+            .init(service: "kaiten", token: "", host: nil, scope: nil),
+            query: "лимиты")
+        #expect(answer.failed)
+        #expect(answer.text.contains("Нет токена"))
+    }
+
+    @Test("пустой вопрос важнее незнакомого сервиса — спрашивать нечего в любом случае")
+    func emptyQuestionComesFirst() async {
+        let answer = await ConnectorQuery.ask(
+            .init(service: "нетакого", token: "", host: nil, scope: nil), query: "   ")
+        #expect(answer.text.contains("Пустой вопрос"))
+    }
 }
