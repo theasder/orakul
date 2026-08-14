@@ -2109,6 +2109,26 @@ describe('orakul landing (ru)', () => {
       'цикл снова начинается не с четырёх — четырёхбуквенные окончания не сработают');
   });
 
+  test('every tag on the page is closed, and closed in order', () => {
+    // Страница правится вставками десятки раз за ночь, и одна незакрытая
+    // <details> утащит за собой половину раздела — в браузере это выглядит как
+    // «пропал текст», а не как ошибка. Разбор простой: стек тегов.
+    const VOID = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img',
+      'input', 'link', 'meta', 'param', 'source', 'track', 'wbr']);
+    const stack = [];
+    const problems = [];
+    for (const m of html.matchAll(/<(\/?)([a-zA-Z][a-zA-Z0-9]*)\b[^>]*?(\/?)>/g)) {
+      const [, closing, tag, selfClosing] = m;
+      const name = tag.toLowerCase();
+      if (VOID.has(name) || selfClosing) continue;
+      if (!closing) { stack.push(name); continue; }
+      const open = stack.pop();
+      if (open !== name) problems.push(`</${name}> закрывает <${open ?? 'ничего'}>`);
+    }
+    assert.deepEqual(problems, [], problems.join('; '));
+    assert.deepEqual(stack, [], `не закрыты: ${stack.join(', ')}`);
+  });
+
   test('names the licence, because "open source" alone is not a licence', () => {
     assert.match(text, /Apache 2\.0/);
   });
