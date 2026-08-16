@@ -71,6 +71,55 @@ struct TranscriptionEngineLiveSwitchTests {
             displayedIsAvailable: false) == .local)
     }
 
+    @Test("fail-closed startup publishes the Local route without erasing the saved preference")
+    func failClosedStartupPublishesActualEngine() {
+        let defaults = UserDefaults.standard
+        let key = "transcription.engine"
+        let savedRaw = defaults.object(forKey: key)
+        defer {
+            if let savedRaw { defaults.set(savedRaw, forKey: key) }
+            else { defaults.removeObject(forKey: key) }
+        }
+        defaults.set(TranscriptionEngine.deepgram.rawValue, forKey: key)
+        let state = AppState(
+            credentialStore: InMemoryKeychain(),
+            transcriptionEngineAvailability: { $0 != .deepgram })
+        state.applyTestDisplayedTranscriptionEngine(.deepgram)
+
+        #expect(state.selectedTranscriptionEngine == .deepgram)
+        #expect(state.publishRecordingBoundaryEngine() == .local)
+        #expect(state.selectedTranscriptionEngine == .local)
+        #expect(defaults.string(forKey: key) == TranscriptionEngine.deepgram.rawValue,
+                "the unavailable saved preference should remain available for later hydration")
+    }
+
+    @Test("next-call cloud recommendation never relabels a live Private route")
+    func nextCallRecommendationDoesNotRelabelLiveRoute() {
+        let defaults = UserDefaults.standard
+        let key = "transcription.engine"
+        let savedRaw = defaults.object(forKey: key)
+        defer {
+            if let savedRaw { defaults.set(savedRaw, forKey: key) }
+            else { defaults.removeObject(forKey: key) }
+        }
+        defaults.set(TranscriptionEngine.local.rawValue, forKey: key)
+        let state = AppState(
+            credentialStore: InMemoryKeychain(),
+            transcriptionEngineAvailability: { _ in true })
+        state.applyTestActiveRecordingSettings(snapshot(engine: .local))
+        state.applyTestWorkspace(recording: true)
+
+        state.useRecommendedDeepgramForNextRecording()
+
+        #expect(defaults.string(forKey: key) == TranscriptionEngine.deepgram.rawValue)
+        #expect(state.selectedTranscriptionEngine == .local)
+        #expect(state.liveTranscriptionConfiguration().active?.engine == .local)
+
+        state.applyTestWorkspace(recording: false)
+        state.useRecommendedDeepgramForNextRecording()
+        #expect(state.selectedTranscriptionEngine == .deepgram)
+    }
+
     @Test("choosing Instant replaces the active Local engine during the call")
     func localToInstantUpdatesActiveRuntimeState() {
         let savedEngine = Config.transcriptionEngineValue

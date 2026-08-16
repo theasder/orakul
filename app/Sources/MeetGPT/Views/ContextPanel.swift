@@ -154,7 +154,9 @@ struct ContextSection: View {
                         systemImage: "flame"
                     )
                 }
-                .disabled(state.firefliesImporting || state.enhancingTranscript)
+                .disabled(state.status != .idle
+                          || state.firefliesImporting
+                          || state.enhancingTranscript)
             }
             if state.googleConnected {
                 Button { Task { await state.pullAgenda() } } label: {

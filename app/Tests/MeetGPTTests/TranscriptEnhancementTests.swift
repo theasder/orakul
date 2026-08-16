@@ -30,6 +30,17 @@ private actor FirefliesFetchGate {
     }
 }
 
+private actor FirefliesFetchCounter {
+    private var count = 0
+
+    func fetch() -> FirefliesTranscript {
+        count += 1
+        return FirefliesTranscript(title: "Fetched", text: "Speaker: words")
+    }
+
+    func value() -> Int { count }
+}
+
 @Suite("Transcript enhancement")
 struct TranscriptEnhancementTests {
 
@@ -48,6 +59,8 @@ struct TranscriptEnhancementTests {
         let fetch = Task { await state.importAndEnhanceWithFireflies() }
         await gate.waitUntilStarted()
         state.resetForNewRecording()
+        #expect(!state.firefliesImporting,
+                "the cancelled old fetch must not leave the new call busy")
         state.transcript = [TranscriptEntry(
             source: .system, text: "new call transcript", timestamp: Date())]
         await gate.release()
@@ -57,6 +70,25 @@ struct TranscriptEnhancementTests {
         #expect(state.transcript.map(\.text) == ["new call transcript"])
         #expect(!state.contextFiles.contains(where: { $0.name.hasPrefix("Fireflies ·") }))
         #expect(state.lastError == nil)
+    }
+
+    @MainActor
+    @Test("Fireflies import is refused unless the workspace is exactly idle")
+    func importRequiresIdle() async {
+        let counter = FirefliesFetchCounter()
+        let state = AppState(
+            llm: MockLLMGateway(response: "unused"),
+            credentialStore: InMemoryKeychain(),
+            firefliesTranscriptProvider: { _, _ in await counter.fetch() })
+        state.applyTestWorkspace(recording: true)
+        state.pauseRecording()
+
+        await state.importAndEnhanceWithFireflies()
+
+        #expect(await counter.value() == 0)
+        #expect(!state.firefliesImporting)
+        #expect(!state.enhancingTranscript)
+        #expect(state.contextFiles.allSatisfy { !$0.name.hasPrefix("Fireflies ·") })
     }
 
     @MainActor

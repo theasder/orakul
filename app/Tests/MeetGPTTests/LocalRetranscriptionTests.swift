@@ -102,6 +102,25 @@ struct LocalRetranscriptionTests {
         #expect(state.retainedAudioSampleCountForTesting == 0)
     }
 
+    @Test("pause also invalidates PCM reserved for cloud diarization")
+    func pauseInvalidatesDiarizationTimeline() {
+        let state = AppState(credentialStore: InMemoryKeychain())
+        let start = Date(timeIntervalSinceReferenceDate: 29_000)
+        state.applyTestLocalFinalPassRetention(
+            samples: AudioFixtures.voicedInt16(count: LocalFinalPass.sampleRate),
+            startedAt: start,
+            optedIn: false,
+            serverDiarizationEligible: true)
+        state.applyTestWorkspace(recording: true)
+
+        state.pauseRecording()
+
+        #expect(state.retainedAudioSampleCountForTesting == 0)
+        #expect(state.retainedAudioOriginsForTesting.full == nil)
+        #expect(state.retainedAudioOriginsForTesting.local == nil)
+        #expect(!state.retainedAudioTimelineValidForTesting)
+    }
+
     @Test("accepted refinement keeps PCM needed by opted-in diarization")
     func assemblyConsumerKeepsAudio() {
         #expect(!AppState.shouldReleaseRetainedAudioAfterLocalFinalPass(

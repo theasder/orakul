@@ -432,6 +432,72 @@ struct DeepgramHandoffIntegrationTests {
         #expect(state.retainedAudioSampleCountForTesting == 3)
     }
 
+    @Test("every non-Local to Private route starts a fresh retained suffix")
+    func chunkedCloudToPrivateRetainsAudio() {
+        let savedToggle = Config.transcriptionPostStopFinalPassEnabled
+        defer { Config.transcriptionPostStopFinalPassEnabled = savedToggle }
+        Config.transcriptionPostStopFinalPassEnabled = true
+
+        let state = makeState(
+            auth: .key("unit-key"),
+            previous: HandoffTranscriber(text: "private suffix"),
+            placeholder: HandoffTranscriber(text: "cloud words"),
+            nextLocal: HandoffTranscriber(text: "later private"),
+            transport: InertDeepgramTransport(),
+            streamers: StreamerCapture())
+        let systemChunker = AudioChunkBuffer(
+            chunkSeconds: 1, overlapSeconds: 0) { _, _ in }
+        let micChunker = AudioChunkBuffer(
+            chunkSeconds: 1, overlapSeconds: 0) { _, _ in }
+        state.installTestLiveTranscriptionRuntime(
+            settings: handoffSnapshot(.server),
+            systemChunker: systemChunker,
+            micChunker: micChunker,
+            generation: 391)
+
+        #expect(state.selectTranscriptionEngine(.local))
+        systemChunker.onSamples?([4, 5, 6, 7])
+
+        #expect(state.retainedAudioSampleCountForTesting == 4)
+        #expect(state.retainedAudioOriginsForTesting.full != nil)
+        #expect(state.retainedAudioOriginsForTesting.local != nil)
+    }
+
+    @Test("Private to cloud detaches and releases final-pass-only PCM")
+    func privateToCloudStopsUnownedRetention() {
+        let savedToggle = Config.transcriptionPostStopFinalPassEnabled
+        defer { Config.transcriptionPostStopFinalPassEnabled = savedToggle }
+        Config.transcriptionPostStopFinalPassEnabled = true
+
+        let state = makeState(
+            auth: .key("unit-key"),
+            previous: HandoffTranscriber(text: "private words"),
+            placeholder: HandoffTranscriber(text: "cloud words"),
+            nextLocal: HandoffTranscriber(text: "future private"),
+            transport: InertDeepgramTransport(),
+            streamers: StreamerCapture())
+        let start = Date(timeIntervalSinceReferenceDate: 12_400)
+        state.applyTestLocalFinalPassRetention(
+            samples: [1, 2, 3], startedAt: start)
+        let systemChunker = AudioChunkBuffer(
+            chunkSeconds: 1, overlapSeconds: 0) { _, _ in }
+        let micChunker = AudioChunkBuffer(
+            chunkSeconds: 1, overlapSeconds: 0) { _, _ in }
+        state.installTestLiveTranscriptionRuntime(
+            settings: handoffSnapshot(.local),
+            systemChunker: systemChunker,
+            micChunker: micChunker,
+            generation: 392)
+
+        #expect(state.selectTranscriptionEngine(.server))
+        #expect(state.retainedAudioSampleCountForTesting == 0)
+        #expect(state.retainedAudioOriginsForTesting.full == nil)
+        #expect(systemChunker.onSamples == nil)
+
+        systemChunker.onSamples?([8, 9])
+        #expect(state.retainedAudioSampleCountForTesting == 0)
+    }
+
     @Test("a Private suffix keeps the whole-call origin for server diarization")
     func privateSuffixPreservesDiarizationOrigin() {
         let savedToggle = Config.transcriptionPostStopFinalPassEnabled
@@ -550,6 +616,7 @@ struct DeepgramHandoffIntegrationTests {
             #expect(await waitFor {
                 state.liveTranscriptionConfiguration().active?.engine == .local
             })
+            #expect(state.selectedTranscriptionEngine == .local)
             pair[0].onFallback?("late test compute cap")
             systemChunker.append(AudioFixtures.voicedBuffer(sampleRate: 16_000, seconds: 0.05))
             micChunker.append(AudioFixtures.voicedBuffer(sampleRate: 16_000, seconds: 0.05))
@@ -564,6 +631,80 @@ struct DeepgramHandoffIntegrationTests {
             #expect(state.selectTranscriptionEngine(.local))
             #expect(state.liveTranscriptionConfiguration().active?.engine == .local)
             #expect(state.selectedTranscriptionEngine == .local)
+        }
+    }
+
+    @Test("Instant failure during capture startup applies Private only after capture succeeds")
+    func startupInstantFailureIsStagedUntilRecording() async throws {
+        try await withUnhurriedReadiness {
+            let savedEngine = Config.transcriptionEngineValue
+            let savedFinalPass = Config.transcriptionPostStopFinalPassEnabled
+            defer {
+                Config.transcriptionEngineValue = savedEngine
+                Config.transcriptionPostStopFinalPassEnabled = savedFinalPass
+            }
+            Config.transcriptionEngineValue = .local
+            Config.transcriptionPostStopFinalPassEnabled = true
+
+            let previous = HandoffTranscriber(text: "old private")
+            let placeholder = HandoffTranscriber(text: "instant placeholder")
+            let nextLocal = HandoffTranscriber(text: "startup fallback private")
+            let transport = InertDeepgramTransport()
+            let streamers = StreamerCapture()
+            let state = makeState(
+                auth: .grant { "unit-grant" }, previous: previous,
+                placeholder: placeholder, nextLocal: nextLocal,
+                transport: transport, streamers: streamers)
+            let systemChunker = AudioChunkBuffer(
+                chunkSeconds: 0.02, overlapSeconds: 0) { _, _ in }
+            let micChunker = AudioChunkBuffer(
+                chunkSeconds: 0.02, overlapSeconds: 0) { _, _ in }
+            state.installTestLiveTranscriptionRuntime(
+                settings: handoffSnapshot(.local),
+                systemChunker: systemChunker,
+                micChunker: micChunker,
+                generation: 41)
+
+            #expect(state.selectTranscriptionEngine(.deepgram))
+            let pair = streamers.snapshot()
+            try #require(pair.count == 2)
+            #expect(await waitFor { transport.snapshot().requests.count == 2 })
+            #expect(pair[0].markCurrentSocketHealthyForTesting())
+            #expect(pair[1].markCurrentSocketHealthyForTesting())
+            await drainMainActor()
+            #expect(state.liveTranscriptionConfiguration().active?.engine == .deepgram)
+
+            // A fresh recording opens its Deepgram sockets while capture is
+            // still starting. A terminal response here must be remembered,
+            // not publish/configure Local state that capture-success reset will
+            // erase moments later.
+            state.status = .starting
+            pair[0].onTerminalFailure?("test startup grant failure")
+            await drainMainActor()
+            #expect(state.liveTranscriptionConfiguration().active?.engine == .deepgram)
+            #expect(state.selectedTranscriptionEngine == .deepgram)
+            #expect(state.retainedAudioOriginsForTesting.local == nil)
+
+            // This is the production post-reset boundary in startRecording.
+            // Applying the staged failure once must now move both runtime and
+            // Settings to Private and start future-only retained PCM.
+            state.status = .recording
+            state.applyPendingStartupLocalFallbackIfNeeded()
+            #expect(state.liveTranscriptionConfiguration().active?.engine == .local)
+            #expect(state.selectedTranscriptionEngine == .local)
+            #expect(state.retainedAudioOriginsForTesting.local != nil)
+
+            systemChunker.onSamples?([1, 2, 3, 4])
+            #expect(state.retainedAudioSampleCountForTesting == 4)
+            systemChunker.append(
+                AudioFixtures.voicedBuffer(sampleRate: 16_000, seconds: 0.05))
+            #expect(await waitFor {
+                await nextLocal.snapshot().transcriptions > 0
+                    && state.transcript.contains(where: {
+                        $0.text == "startup fallback private"
+                            && $0.transcriptionEngine == .local
+                    })
+            })
         }
     }
 
