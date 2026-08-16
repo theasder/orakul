@@ -95,9 +95,15 @@ final class AudioTrackDiagnostics: @unchecked Sendable {
 final class RecordingGenerationToken: @unchecked Sendable {
     private let lock = NSLock()
     private var generation: Int
+    /// Audio on this route cannot predate route installation. Clamping avoids
+    /// placing a newly routed large buffer before an earlier route's final.
+    private let routeStartedAt: Date
     private var streamingRetiredAt: Date?
 
-    init(_ generation: Int) { self.generation = generation }
+    init(_ generation: Int, routeStartedAt: Date = Date()) {
+        self.generation = generation
+        self.routeStartedAt = routeStartedAt
+    }
 
     func read() -> Int {
         lock.lock(); defer { lock.unlock() }
@@ -122,6 +128,10 @@ final class RecordingGenerationToken: @unchecked Sendable {
         guard let streamingRetiredAt else { return timestamp }
         return min(timestamp, streamingRetiredAt)
     }
+
+    func captureStart(duration: TimeInterval, completedAt: Date = Date()) -> Date {
+        max(routeStartedAt, completedAt.addingTimeInterval(-max(0, duration)))
+    }
 }
 
 /// Counts work emitted by one chunked transcription route. An engine handoff
@@ -134,6 +144,7 @@ final class TranscriptionRouteLease: @unchecked Sendable {
     private var accepting = true
     private var inFlight = 0
     private var onDrained: (() -> Void)?
+    private var drainWaiters: [CheckedContinuation<Void, Never>] = []
 
     func begin() -> Bool {
         lock.lock(); defer { lock.unlock() }
@@ -144,6 +155,7 @@ final class TranscriptionRouteLease: @unchecked Sendable {
 
     func finish() {
         let completion: (() -> Void)?
+        let waiters: [CheckedContinuation<Void, Never>]
         lock.lock()
         inFlight = max(0, inFlight - 1)
         if !accepting, inFlight == 0 {
@@ -152,8 +164,30 @@ final class TranscriptionRouteLease: @unchecked Sendable {
         } else {
             completion = nil
         }
+        if inFlight == 0 {
+            waiters = drainWaiters
+            drainWaiters.removeAll(keepingCapacity: false)
+        } else {
+            waiters = []
+        }
         lock.unlock()
         completion?()
+        waiters.forEach { $0.resume() }
+    }
+
+    /// Wait for work emitted before Stop. Call only after both audio buffers
+    /// have synchronously flushed, so no new lease belongs to this route.
+    func waitUntilDrained() async {
+        await withCheckedContinuation { continuation in
+            lock.lock()
+            if inFlight == 0 {
+                lock.unlock()
+                continuation.resume()
+            } else {
+                drainWaiters.append(continuation)
+                lock.unlock()
+            }
+        }
     }
 
     @discardableResult
@@ -3064,6 +3098,9 @@ final class AppState: ObservableObject {
     /// language mode selected when this recording began.
     private var activeSessionLanguage: String?
     private var activeRecordingSettings: RecordingSettingsSnapshot?
+    /// Non-nil only when this Local call actually prepared Whisper. A Parakeet
+    /// live session must not trigger a surprise Whisper download after Stop.
+    private var activeSessionPreparedLocalWhisperModel: String?
     private let googleAuth = GoogleAuth()
     private let sessionRecorder = SessionAudioRecorder()
     private var sessionAudioStart: Date?
@@ -3128,6 +3165,7 @@ final class AppState: ObservableObject {
     /// generation are dropped instead of resurrecting cleared lines.
     private var chunkGeneration = 0
     private var recordingGenerationToken: RecordingGenerationToken?
+    private var automaticLocalFinalPassTask: Task<Void, Never>?
     private var tickTask: Task<Void, Never>?
     private var brainstormTask: Task<Void, Never>?
     private var blindSpotRefreshDebounce: Task<Void, Never>?
@@ -3254,8 +3292,10 @@ final class AppState: ObservableObject {
     /// substituting only hardware/network edges. Shipped initializers use the
     /// same concrete factories and availability checks as before.
     private let transcriptionServiceFactory: (
-        TranscriptionEngine, String, String, String
+        TranscriptionEngine, String, String, String, String?
     ) -> TranscriptionService
+    /// One bounded post-call pipeline, injectable so tests never load Core ML.
+    private let localFinalPassServiceFactory: (String, String) -> TranscriptionService
     private let deepgramStreamerFactory: (
         DeepgramAuth, Bool, String, [String]
     ) -> DeepgramStreamer
@@ -3290,11 +3330,16 @@ final class AppState: ObservableObject {
          answerActionDispatcher: (any AnswerActionDispatching)? = nil,
          transcriptionEngineSwitchOverride: ((TranscriptionEngine) -> Bool)? = nil,
          transcriptionServiceFactory: @escaping (
-             TranscriptionEngine, String, String, String
-         ) -> TranscriptionService = { engine, language, glossary, localModel in
+             TranscriptionEngine, String, String, String, String?
+         ) -> TranscriptionService = { engine, language, glossary, localModel, autoLanguageHint in
              TranscriptionFactory.make(
                  engine: engine, language: language, glossary: glossary,
-                 localModel: localModel)
+                 localModel: localModel, autoLanguageHint: autoLanguageHint)
+         },
+         localFinalPassServiceFactory: @escaping (
+             String, String
+         ) -> TranscriptionService = { model, language in
+             LocalWhisperTranscription(model: model, language: language, glossary: "")
          },
          deepgramStreamerFactory: @escaping (
              DeepgramAuth, Bool, String, [String]
@@ -3346,6 +3391,7 @@ final class AppState: ObservableObject {
         self.answerActionDispatcher = answerActionDispatcher
         self.transcriptionEngineSwitchOverride = transcriptionEngineSwitchOverride
         self.transcriptionServiceFactory = transcriptionServiceFactory
+        self.localFinalPassServiceFactory = localFinalPassServiceFactory
         self.deepgramStreamerFactory = deepgramStreamerFactory
         self.transcriptionEngineAvailability = transcriptionEngineAvailability
         self.deepgramAuthOverride = deepgramAuthOverride
@@ -3361,7 +3407,7 @@ final class AppState: ObservableObject {
         let configuredGlossary = Config.transcriptionGlossary
         let resolvedTranscriber = transcriber ?? transcriptionServiceFactory(
             configuredEngine, configuredLanguage, configuredGlossary,
-            Config.localWhisperModel)
+            Config.localWhisperModel, nil)
         self.transcriber = resolvedTranscriber
         self.dictation = PromptDictation(transcriber: resolvedTranscriber)
         self.managesTranscriberLifecycle = transcriber == nil
@@ -3455,6 +3501,13 @@ final class AppState: ObservableObject {
             // still records an account. Without this the app just comes up
             // looking like a fresh install with the connectors still attached.
             if !wheesprConnected { noteSignedOut(.sessionMissingAtLaunch) }
+        }
+        // Account hydration can make a saved managed engine runnable. Publish
+        // that only while idle/error; a call already started keeps the engine
+        // the user saw at its recording boundary. The raw preference remains
+        // saved and is reconciled after Stop.
+        if shouldInstallProcessCredentialCache {
+            reconcileDisplayedTranscriptionEngineIfIdle()
         }
         rebuildPromptWorkflows()
         guard !AppState.isUnderTest else { return }
@@ -4047,6 +4100,8 @@ final class AppState: ObservableObject {
     /// Load a saved session back into the workspace (blocked while recording).
     func restoreSession(_ session: SavedSession) {
         guard !isRecording, status == .idle else { return }
+        automaticLocalFinalPassTask?.cancel()
+        automaticLocalFinalPassTask = nil
         // Save the call being navigated AWAY from before its workspace is
         // overwritten. Without this, anything changed since the last automatic
         // write — assistant answers, imported documents, notes — was discarded
@@ -4069,6 +4124,7 @@ final class AppState: ObservableObject {
         // doing so could upload old audio from the new workspace's Diarize UI.
         sessionRecorder.reset()
         sessionAudioStart = nil
+        activeSessionPreparedLocalWhisperModel = nil
         currentSessionID = session.id      // further saves update the same file
         // The workspace is now showing a PAST meeting rather than the one being
         // worked on. This is what puts the "New call" affordance on screen: it
@@ -4326,6 +4382,37 @@ final class AppState: ObservableObject {
     /// Settings' selected row. Unlike a view-local `@State`, this follows an
     /// asynchronous pre-ready Deepgram rollback immediately.
     @Published private(set) var selectedTranscriptionEngine = Config.transcriptionEngineValue
+
+    /// Pure startup-race policy. Hydration may republish a newly available
+    /// saved engine only when no recording boundary is active.
+    static func transcriptionEngineAfterCredentialHydration(
+        displayed: TranscriptionEngine,
+        resolvedAfterHydration: TranscriptionEngine,
+        callInFlight: Bool
+    ) -> TranscriptionEngine {
+        callInFlight ? displayed : resolvedAfterHydration
+    }
+
+    /// The engine used at Record must be the published Settings row, not a
+    /// freshly re-resolved preference that could change during Keychain load.
+    static func recordingBoundaryEngine(
+        displayed: TranscriptionEngine,
+        displayedIsAvailable: Bool
+    ) -> TranscriptionEngine {
+        displayedIsAvailable ? displayed : .local
+    }
+
+    private func reconcileDisplayedTranscriptionEngineIfIdle() {
+        let canRepublish: Bool
+        switch status {
+        case .idle, .error: canRepublish = true
+        default: canRepublish = false
+        }
+        selectedTranscriptionEngine = Self.transcriptionEngineAfterCredentialHydration(
+            displayed: selectedTranscriptionEngine,
+            resolvedAfterHydration: Config.transcriptionEngineValue,
+            callInFlight: !canRepublish)
+    }
 
     /// Persist an engine choice and, when audio is already flowing, move the
     /// active call to it immediately. A failed handoff restores both the saved
@@ -5779,6 +5866,8 @@ final class AppState: ObservableObject {
     var isSessionLive: Bool { status == .recording || status == .paused }
 
     func clearAll() {
+        automaticLocalFinalPassTask?.cancel()
+        automaticLocalFinalPassTask = nil
         supersedeActiveAI()
         aiResponse = ""
         aiResponsePrompt = ""
@@ -5801,6 +5890,7 @@ final class AppState: ObservableObject {
         provisional.removeAll()
         sessionRecorder.reset()
         sessionAudioStart = nil
+        activeSessionPreparedLocalWhisperModel = nil
         // This is session provenance as well as the live timer origin. Clear it
         // only when the workspace becomes a genuinely fresh meeting; Stop keeps
         // it so the initial save and a late final-partial save remain valid.
@@ -6173,6 +6263,7 @@ final class AppState: ObservableObject {
         // Bumping the revision forces a server fetch on every session apply;
         // the server's per-account ledger is the memory.
         computeUsageRevision &+= 1
+        reconcileDisplayedTranscriptionEngineIfIdle()
         guard !AppState.isUnderTest else { return }
         Task { [weak self] in
             await PaywallAPI.refreshEntitlement()
@@ -6229,6 +6320,7 @@ final class AppState: ObservableObject {
         // surprise sign-out.
         Config.lastSignedInEmail = nil
         signedOutNotice = nil
+        reconcileDisplayedTranscriptionEngineIfIdle()
     }
 
     /// UI-only sign-out after a 401 refresh (Keychain already cleared).
@@ -6244,6 +6336,7 @@ final class AppState: ObservableObject {
         // sign-out cannot be missed by looking away for a moment.
         noteSignedOut(.expired)
         lastError = "Сессия истекла — войдите снова"
+        reconcileDisplayedTranscriptionEngineIfIdle()
     }
 
     private func installSessionLifecycleObservers() {
@@ -8689,9 +8782,17 @@ final class AppState: ObservableObject {
         }
 
         let chunkSeconds = Config.transcriptionChunkSeconds
-        let sessionSettings = RecordingSettingsSnapshot.configured()
-        let sessionEngine = sessionSettings.engine
+        let configuredSettings = RecordingSettingsSnapshot.configured()
+        let sessionEngine = Self.recordingBoundaryEngine(
+            displayed: selectedTranscriptionEngine,
+            displayedIsAvailable: transcriptionEngineAvailability(
+                selectedTranscriptionEngine))
+        let sessionSettings = configuredSettings.replacingEngine(with: sessionEngine)
         let sessionLanguage = sessionSettings.language
+        let retainSessionAudio = Self.shouldRetainSessionAudio(
+            engine: sessionEngine,
+            hasAssemblyAI: hasAssemblyAI,
+            assemblyDiarization: sessionSettings.assemblyDiarization)
         // Publish the immutable in-flight snapshot before the potentially slow
         // model preparation await. Settings changes during `.starting` can then
         // be identified honestly as pending for the following recording.
@@ -8706,6 +8807,9 @@ final class AppState: ObservableObject {
         speechQualityIsPoor = false
         activeSessionLanguage = sessionLanguage
         let recordingTranscriber = transcriber
+        activeSessionPreparedLocalWhisperModel = sessionEngine == .local
+            && recordingTranscriber is LocalWhisperTranscription
+            ? sessionSettings.localModel : nil
 
         // Warm the transcription engine so the first chunk isn't blocked on a
         // silent, unbounded model download — the on-device Whisper model pulls
@@ -8752,13 +8856,6 @@ final class AppState: ObservableObject {
                     source: .mic, transcriber: recordingTranscriber,
                     engine: sessionEngine, generationToken: generationToken,
                     routeLease: routeLease))
-            // Record the remote (system) audio so it can be diarized at stop.
-            if hasAssemblyAI, sessionSettings.assemblyDiarization {
-                sessionAudioStart = Date()
-                systemChunker?.onSamples = { [weak self] samples in
-                    self?.sessionRecorder.append(samples)
-                }
-            }
         }
 
         do {
@@ -8808,7 +8905,14 @@ final class AppState: ObservableObject {
             // Runs only after capture actually started, so a failed start keeps
             // the current workspace intact.
             resetForNewRecording()
-            recordingStartedAt = Date()
+            let startedAt = Date()
+            recordingStartedAt = startedAt
+            // The reset above clears the old recorder and provenance. Attach
+            // the new observer afterwards so Local always retains its private
+            // remote track for a safe manual/opt-in final pass.
+            if retainSessionAudio {
+                beginSessionAudioRetention(on: systemChunker, at: startedAt)
+            }
             sessionUsedAI = false
             recordingElapsed.start(at: recordingStartedAt ?? Date())
             // Флаг с прошлого звонка не должен встречать следующий.
@@ -8893,6 +8997,7 @@ final class AppState: ObservableObject {
             activeSessionEngine = nil
             activeSessionLanguage = nil
             activeRecordingSettings = nil
+            activeSessionPreparedLocalWhisperModel = nil
             copilotActiveTimeMeter.reset()
             stopTicking()
             audioMeter.reset()
@@ -8927,6 +9032,9 @@ final class AppState: ObservableObject {
         // Stamp BEFORE any await: the grace window must start at the moment the
         // user pressed Stop, not whenever this task happens to resume.
         recordingStoppedAt = Date()
+        // Capture callbacks queued behind Stop cannot extend retained audio
+        // beyond the privacy boundary used by a destructive final pass.
+        sessionRecorder.seal()
         // Pairs with the start-side reading: if muted/volume differ across the
         // recording, capture changed playback and the diff says how.
         Log.audio.notice("record stop — \(AudioRoute.describeOutputLevel(), privacy: .public)")
@@ -8974,6 +9082,9 @@ final class AppState: ObservableObject {
         }
         systemChunker?.flush()
         micChunker?.flush()
+        // Flush registers final local work synchronously. Snapshot the route
+        // before clearing it so opt-in refinement waits for those live rows.
+        let stoppedChunkRouteLease = activeChunkRouteLease
         recordingGenerationToken = nil
         activeChunkRouteLease = nil
         systemChunker = nil
@@ -8993,6 +9104,7 @@ final class AppState: ObservableObject {
         audioMeter.reset()
         provisional.removeAll()
         status = .idle
+        reconcileDisplayedTranscriptionEngineIfIdle()
         persistCurrentSession()   // nothing dies on quit (M3)
         devCallDiagnostics.endCall(fields: [
             "recordingStoppedAt": recordingStoppedAt?.timeIntervalSince1970 ?? 0,
@@ -9004,6 +9116,8 @@ final class AppState: ObservableObject {
             "blindSpotAttempts": blindSpotAttempts,
             "blindSpotSuccesses": blindSpotSuccesses,
         ])
+
+        scheduleAutomaticLocalFinalPass(after: stoppedChunkRouteLease)
 
         // Speaker labeling is intentionally manual. Even with a configured key,
         // a Local recording is never uploaded to AssemblyAI just because it ended.
@@ -9202,126 +9316,266 @@ final class AppState: ObservableObject {
         Task { await diarizeSession() }
     }
 
-    /// Replace the live remote-side transcript with AssemblyAI's diarized
-    /// utterances, keep the local ("You") lines, and merge by time. Non-
-    /// destructive: the existing transcript is kept if diarization fails.
-    /// Re-transcribe the finished recording locally, in ONE pass.
-    ///
-    /// Measured across twelve real recordings, a single whole-file decode beat
-    /// the live 6-second pipeline on every one of them — mean WER 0.2541 to
-    /// 0.1731, a 32% cut — and did it at 0.12-0.16x realtime, so an hour-long
-    /// call takes about eight minutes. `small` in one pass even beats
-    /// `large-v3` chunked.
-    ///
-    /// The live path cuts at 6 seconds because a caption has to appear while
-    /// people are still talking. Once the call is over that constraint is gone
-    /// and the only reason to keep the slices is that nothing re-reads the
-    /// audio — which it now does.
-    ///
-    /// Costs nothing and reveals nothing: no upload, no credits, no vendor, and
-    /// the audio is already in memory for the diarize path, so this adds no
-    /// retention.
+    /// Private post-call refinement. It uses bounded overlapping windows; a
+    /// measured five-minute whole-file call returned only 92 words from 611,
+    /// so a successful single decoder call is not proof of complete coverage.
     @Published var localRetranscribing = false
 
+    static func shouldRetainSessionAudio(
+        engine: TranscriptionEngine,
+        hasAssemblyAI: Bool,
+        assemblyDiarization: Bool
+    ) -> Bool {
+        engine == .local || (hasAssemblyAI && assemblyDiarization)
+    }
+
+    /// Attach only after `resetForNewRecording`; otherwise the reset erases the
+    /// timestamp while the observer keeps appending provenance-free audio.
+    func beginSessionAudioRetention(on chunker: AudioChunkBuffer?, at startedAt: Date) {
+        sessionAudioStart = startedAt
+        let recorder = sessionRecorder
+        chunker?.addSampleObserver { samples in recorder.append(samples) }
+    }
+
     var canRetranscribeLocally: Bool {
-        !localRetranscribing
+        guard let retainedAudioStart = sessionAudioStart else { return false }
+        let localSuffix = LocalFinalPass.localSystemSuffix(
+            in: transcript, retainedAudioStart: retainedAudioStart)
+        return !localRetranscribing
             && !diarizing
             && !sessionRecorder.isEmpty
+            && activeSessionPreparedLocalWhisperModel != nil
             && !isSessionLive
-            // Only when the local engine is the one in use: re-running Whisper over
-            // a call transcribed by Deepgram or the server would replace a
-            // better transcript with a worse one.
-            && Config.transcriptionEngineValue == .local
+            && !localSuffix.isEmpty
+            && !LocalFinalPass.retainedSuffixHasNonLocalSystemRows(
+                transcript, retainedAudioStart: retainedAudioStart)
+    }
+
+    @discardableResult
+    func scheduleAutomaticLocalFinalPass(
+        after routeLease: TranscriptionRouteLease?,
+        enabled: Bool = Config.transcriptionPostStopFinalPassEnabled
+    ) -> Task<Void, Never>? {
+        automaticLocalFinalPassTask?.cancel()
+        automaticLocalFinalPassTask = nil
+        guard let retainedAudioStart = sessionAudioStart else { return nil }
+        let unsafeRetainedSuffix = LocalFinalPass.retainedSuffixHasNonLocalSystemRows(
+            transcript, retainedAudioStart: retainedAudioStart)
+        guard LocalFinalPass.shouldRunAutomatically(
+            enabled: enabled,
+            sessionEngine: activeSessionPreparedLocalWhisperModel == nil ? nil : .local,
+            hasEngineTransitions: unsafeRetainedSuffix) else { return nil }
+
+        let requestedSessionID = currentSessionID
+        let requestedGeneration = chunkGeneration
+        let task = Task { @MainActor [weak self] in
+            guard let self,
+                  !Task.isCancelled,
+                  self.currentSessionID == requestedSessionID,
+                  self.chunkGeneration == requestedGeneration else { return }
+            if let routeLease { await routeLease.waitUntilDrained() }
+            guard !Task.isCancelled,
+                  self.currentSessionID == requestedSessionID,
+                  self.chunkGeneration == requestedGeneration,
+                  !self.isSessionLive else { return }
+            await self.retranscribeSessionLocally(trigger: .automatic)
+        }
+        automaticLocalFinalPassTask = task
+        return task
     }
 
     func retranscribeLocallyNow() {
         guard canRetranscribeLocally else { return }
         analytics(.featureUsed(.retranscribeLocal))
-        Task { await retranscribeSessionLocally() }
+        Task { await retranscribeSessionLocally(trigger: .manual) }
     }
 
-    private func retranscribeSessionLocally() async {
-        guard canRetranscribeLocally else { return }
-        let wav = sessionRecorder.makeWAV()
-        guard !wav.isEmpty, let start = sessionAudioStart else { return }
-        let requestedSessionID = currentSessionID
-        let requestedGeneration = chunkGeneration
-
+    func retranscribeSessionLocally(trigger: LocalFinalPass.Trigger = .manual) async {
+        if localRetranscribing {
+            recordLocalFinalPass(trigger: trigger, reason: .alreadyRunning)
+            return
+        }
+        guard canRetranscribeLocally else {
+            recordLocalFinalPass(trigger: trigger, reason: .notEligible)
+            return
+        }
         localRetranscribing = true
         defer { localRetranscribing = false }
 
-        // NO glossary here, deliberately, and against the obvious instinct.
-        //
-        // In the LIVE chunked path a glossary is the largest accuracy lever
-        // measured — term recall 0.53 to 0.93. In this whole-file pass it is a
-        // bad trade: measured on the two IETF fixtures it bought 5 terms and
-        // cost 14 points of RECALL, with the output falling from 467 words to
-        // 372 against a 588-word reference. That is real speech disappearing,
-        // and a fuller transcript is exactly what this pass exists to produce.
-        //
-        // The plausible mechanism is the same one that made a glossary hurt
-        // large-v3: a decoder prompt competes with a long, self-consistent
-        // context, and in one pass over a whole recording there is far more of
-        // that context than in a six-second window.
-        let service = LocalWhisperTranscription(
-            model: Config.localWhisperModel,
-            language: Config.transcriptionLanguage,
-            glossary: "")
-        do {
-            let text = try await service.transcribe(wav: wav)
-            guard currentSessionID == requestedSessionID,
-                  chunkGeneration == requestedGeneration else { return }
-            let cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
-            // A pass that produced nothing must not erase a transcript that
-            // took the whole meeting to build.
-            guard !cleaned.isEmpty else { return }
+        let requestedSessionID = currentSessionID
+        let requestedGeneration = chunkGeneration
+        let requestedTranscript = transcript
+        let settings = activeRecordingSettings
+        let liveModel = activeSessionPreparedLocalWhisperModel
+            ?? settings?.localModel
+            ?? Config.localWhisperModel
+        // A Local Whisper call has just prepared its selected model. Keep the
+        // post-call selector inside that known set so it never triggers a new
+        // background model download merely because Stop was pressed.
+        let model = LocalWhisperModel.postCallRefinementModel(
+            liveModel: liveModel,
+            availableModels: [LocalWhisperModel.migrated(liveModel)],
+            isAppleSilicon: Hardware.isAppleSilicon)
+        let language = settings?.language ?? Config.transcriptionLanguage
+        let glossary = settings?.glossary ?? Config.transcriptionGlossary
+        let goal = effectiveCallGoal
+        let theme = activeCallTheme
+        let retainedDuration = sessionRecorder.retainedDuration
+        guard let start = sessionAudioStart else {
+            recordLocalFinalPass(
+                trigger: trigger, reason: .missingRetainedAudio,
+                retainedDuration: retainedDuration)
+            return
+        }
+        let liveLocalSuffix = LocalFinalPass.localSystemSuffix(
+            in: requestedTranscript, retainedAudioStart: start)
 
-            // The glossary re-enters HERE, as text. The decode above runs
-            // bare because prompt biasing was measured to delete speech on
-            // every tier of the whole-file pass; a text restoration can fix
-            // casing and repair non-word garbles, and can never make words
-            // disappear. The user's terms may repair garbles; the shipped
-            // lexicon is casing-only — fuzzy at 230 generic terms rewrote
-            // out-of-lexicon acronyms into their one-edit neighbours.
+        guard !sessionRecorder.isTruncated else {
+            if trigger == .manual {
+                lastError = "Сохранённый звук охватывает только первый час. Полная живая расшифровка оставлена без изменений."
+            }
+            recordLocalFinalPass(
+                trigger: trigger, reason: .truncatedRetainedAudio,
+                retainedDuration: retainedDuration)
+            return
+        }
+        guard let recordingStop = recordingStoppedAt else {
+            recordLocalFinalPass(
+                trigger: trigger, reason: .invalidRecordingDuration,
+                retainedDuration: retainedDuration)
+            return
+        }
+        let recordingDuration = recordingStop.timeIntervalSince(start)
+        if let refusal = LocalFinalPass.audioCoverageRefusal(
+            recordingDurationSeconds: recordingDuration,
+            retainedAudioSeconds: retainedDuration,
+            retainedAudioWasTruncated: false) {
+            recordLocalFinalPass(
+                trigger: trigger, reason: refusal,
+                recordingDuration: recordingDuration,
+                retainedDuration: retainedDuration)
+            return
+        }
+        let samples = sessionRecorder.sampleSnapshot()
+        guard !samples.isEmpty else {
+            recordLocalFinalPass(
+                trigger: trigger, reason: .missingRetainedAudio,
+                recordingDuration: recordingDuration,
+                retainedDuration: retainedDuration)
+            return
+        }
+
+        let service = localFinalPassServiceFactory(model, language)
+        let decoded: Result<String, any Error>
+        do {
+            decoded = .success(try await LocalFinalPass.decode(
+                samples: samples, using: service))
+        } catch {
+            decoded = .failure(error)
+        }
+        await service.shutdown()
+
+        guard currentSessionID == requestedSessionID else {
+            recordLocalFinalPass(
+                trigger: trigger, reason: .staleSession,
+                recordingDuration: recordingDuration,
+                retainedDuration: retainedDuration)
+            return
+        }
+        guard chunkGeneration == requestedGeneration else {
+            recordLocalFinalPass(
+                trigger: trigger, reason: .staleGeneration,
+                recordingDuration: recordingDuration,
+                retainedDuration: retainedDuration)
+            return
+        }
+        guard transcript == requestedTranscript else {
+            recordLocalFinalPass(
+                trigger: trigger, reason: .staleTranscript,
+                recordingDuration: recordingDuration,
+                retainedDuration: retainedDuration)
+            return
+        }
+
+        switch decoded {
+        case .failure(let error):
+            if trigger == .manual { lastError = error.localizedDescription }
+            recordLocalFinalPass(
+                trigger: trigger, reason: .decoderFailed,
+                recordingDuration: recordingDuration,
+                retainedDuration: retainedDuration)
+        case .success(let text):
+            let cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
             let restored = GlossaryRestore.restore(
                 transcript: cleaned,
-                glossary: Config.glossaryTerms,
-                // PM default plus the call's topic-specific vocabulary, routed by
-                // the theme already inferred from goal + transcript — so a legal /
-                // engineering / fundraising call repairs its own jargon, not just
-                // the ICP terms. Superset, restore-actionable, collision-audited.
-                // …plus the VERTICAL pack this meeting signalled (F7): a
-                // payments call gets KYC/PCI/interchange spelled correctly, a
-                // clinical one gets SNOMED/FHIR, and a call that signals
-                // neither carries neither — vocabulary that cannot appear can
-                // only misfire. Routed off goal + transcript, casing-only.
+                glossary: Glossary.terms(from: glossary),
                 casingOnlyGlossary: DomainLexicon.casingOnlyTerms(
-                    for: effectiveCallGoal + " " + cleaned)
-                    + ThemeGlossary.terms(for: activeCallTheme))
-
-            // Русская добавка поверх общей починки. Измерено на живой русской
-            // речи: три движка разошлись на 29% терминов, и расходятся они не в
-            // слухе, а в АЛФАВИТЕ — Whisper пишет «Prompt», Parakeet «Промпт».
-            // Приведение к одному написанию подняло согласие с 71% до 89%.
-            // Английские расшифровки не трогаются: проверка языка внутри.
+                    for: goal + " " + cleaned)
+                    + ThemeGlossary.terms(for: theme))
             let localised = RussianLexicon.restoreIfRussian(restored)
-
-            // Replaces the REMOTE side only, exactly as diarization does: the
-            // mic track is this user's own speech and is already the better
-            // recording of it.
-            let mine = transcript.filter { $0.source == .mic }
-            let rebuilt = TranscriptEntry(source: .system, text: localised,
-                                          timestamp: start, speaker: nil)
-            transcript = ([rebuilt] + mine).sorted { $0.timestamp < $1.timestamp }
+            let decision = LocalFinalPass.evaluate(
+                live: liveLocalSuffix,
+                refinedText: localised,
+                recordingDurationSeconds: recordingDuration,
+                retainedAudioSeconds: retainedDuration,
+                retainedAudioWasTruncated: false)
+            guard decision.replace else {
+                recordLocalFinalPass(
+                    trigger: trigger, decision: decision,
+                    recordingDuration: recordingDuration,
+                    retainedDuration: retainedDuration)
+                return
+            }
+            guard currentSessionID == requestedSessionID,
+                  chunkGeneration == requestedGeneration,
+                  transcript == requestedTranscript else {
+                recordLocalFinalPass(
+                    trigger: trigger, reason: .staleTranscript,
+                    recordingDuration: recordingDuration,
+                    retainedDuration: retainedDuration)
+                return
+            }
+            transcript = LocalFinalPass.replacingLocalSystemSuffix(
+                live: requestedTranscript,
+                refinedText: localised,
+                retainedAudioStart: start)
             lastError = nil
             persistCurrentSession()
-            devCallDiagnostics.record(event: "local_retranscribe",
-                                      fields: ["chars": "\(restored.count)"])
-        } catch {
-            guard currentSessionID == requestedSessionID else { return }
-            // Non-destructive: the existing transcript stands.
-            lastError = error.localizedDescription
+            recordLocalFinalPass(
+                trigger: trigger, decision: decision,
+                recordingDuration: recordingDuration,
+                retainedDuration: retainedDuration,
+                refinedCharacters: localised.count)
         }
+    }
+
+    private func recordLocalFinalPass(
+        trigger: LocalFinalPass.Trigger,
+        reason: LocalFinalPass.Reason? = nil,
+        decision: LocalFinalPass.Decision? = nil,
+        recordingDuration: TimeInterval = 0,
+        retainedDuration: TimeInterval = 0,
+        refinedCharacters: Int = 0
+    ) {
+        let resolvedReason = decision?.reason ?? reason ?? .notEligible
+        let outcome = resolvedReason == .accepted ? "replaced" : "preserved"
+        Log.transcribe.notice(
+            "Local final pass trigger=\(trigger.rawValue, privacy: .public) outcome=\(outcome, privacy: .public) reason=\(resolvedReason.rawValue, privacy: .public) recordingSeconds=\(recordingDuration, privacy: .public) retainedSeconds=\(retainedDuration, privacy: .public)")
+        devCallDiagnostics.record(event: "local_final_pass", fields: [
+            "trigger": trigger.rawValue,
+            "outcome": outcome,
+            "reason": resolvedReason.rawValue,
+            "recordingDurationSeconds": recordingDuration,
+            "retainedDurationSeconds": retainedDuration,
+            "audioCoverage": decision?.audioCoverage ?? 0,
+            "liveWords": decision?.liveWordCount ?? 0,
+            "refinedWords": decision?.refinedWordCount ?? 0,
+            "liveTokenRecall": decision?.liveTokenRecall ?? 0,
+            "orderedTokenRecall": decision?.orderedTokenRecall ?? 0,
+            "refinedCharacters": refinedCharacters,
+            "windowSeconds": LocalFinalPass.windowSeconds,
+            "overlapSeconds": LocalFinalPass.overlapSeconds,
+        ])
     }
 
     /// On-device speaker labels for the lines already captured (roadmap F5).
@@ -9687,7 +9941,7 @@ final class AppState: ObservableObject {
             activeChunkRouteLease = nil
             let placeholder = transcriptionServiceFactory(
                 engine, previousSettings.language, previousSettings.glossary,
-                previousSettings.localModel)
+                previousSettings.localModel, nil)
             transcriber = placeholder
             transcriberEngine = engine
             transcriberLocalModel = nil
@@ -9713,7 +9967,7 @@ final class AppState: ObservableObject {
 
             let nextTranscriber = transcriptionServiceFactory(
                 engine, previousSettings.language, previousSettings.glossary,
-                previousSettings.localModel)
+                previousSettings.localModel, nil)
             let nextRouteLease = TranscriptionRouteLease()
             let systemHandler = liveChunkHandler(
                 source: .system, transcriber: nextTranscriber,
@@ -9724,6 +9978,11 @@ final class AppState: ObservableObject {
                 engine: engine, generationToken: generationToken,
                 routeLease: nextRouteLease)
             let recorder = sessionRecorder
+            if engine == .local, sessionAudioStart == nil {
+                // This is the first private/local byte of a mixed call. Retain
+                // from this route boundary, never from the earlier cloud prefix.
+                sessionAudioStart = Date()
+            }
             let keepRecordingForDiarization = sessionAudioStart != nil
             systemChunker.reconfigure(
                 onChunk: systemHandler,
@@ -9737,6 +9996,9 @@ final class AppState: ObservableObject {
             activeChunkRouteLease = nextRouteLease
             transcriberEngine = engine
             transcriberLocalModel = engine == .local ? previousSettings.localModel : nil
+            if engine == .local {
+                activeSessionPreparedLocalWhisperModel = previousSettings.localModel
+            }
             transcriberLanguage = previousSettings.language
             transcriberGlossary = previousSettings.glossary
             transcriptionState = engine == .local ? .idle : .ready
@@ -9758,10 +10020,11 @@ final class AppState: ObservableObject {
         generationToken: RecordingGenerationToken,
         routeLease: TranscriptionRouteLease
     ) -> AudioChunkBuffer.ChunkHandler {
-        { [weak self, transcriber] wav, _ in
+        { [weak self, transcriber] wav, timing in
             guard routeLease.begin() else { return }
             let generation = generationToken.read()
-            let capturedAt = Date()
+            let capturedAt = generationToken.captureStart(
+                duration: timing.captureSpan)
             Task(priority: .utility) {
                 defer { routeLease.finish() }
                 await self?.dispatchTranscription(
@@ -9866,7 +10129,7 @@ final class AppState: ObservableObject {
                 || transcriberGlossary != glossary else { return }
         await transcriber.shutdown()
         transcriber = transcriptionServiceFactory(
-            engine, language, glossary, localModel)
+            engine, language, glossary, localModel, nil)
         transcriberEngine = engine
         transcriberLocalModel = desiredLocalModel
         transcriberLanguage = language
@@ -9881,6 +10144,7 @@ final class AppState: ObservableObject {
         case .lighterLocalModel(let current, let recommended):
             guard Config.transcriptionEngineValue == .local,
                   Config.localWhisperModel == current else { return }
+            Config.localModelSelectionProvenance = .adaptive
             Config.localWhisperModel = recommended
             transcriptionPerformanceNotice = TranscriptionPerformanceNotice(
                 message: "On-device captions are falling behind. Cruxwing will use \(LocalWhisperModel.title(for: recommended)) (\(recommended)) instead of \(current) for the next recording; audio stays on this Mac.",
@@ -9889,6 +10153,7 @@ final class AppState: ObservableObject {
         case .coolerLocalModel(let current, let recommended):
             guard Config.transcriptionEngineValue == .local,
                   Config.localWhisperModel == current else { return }
+            Config.localModelSelectionProvenance = .adaptive
             Config.localWhisperModel = recommended
             transcriptionPerformanceNotice = TranscriptionPerformanceNotice(
                 message: "Your Mac is running hot while transcribing. Cruxwing will use the lighter \(LocalWhisperModel.title(for: recommended)) (\(recommended)) model for the next recording to keep it cool; audio stays on this Mac.",
@@ -10124,10 +10389,11 @@ final class AppState: ObservableObject {
         // transcript; after a credit-cap degrade they feed the same chunks to
         // on-device Whisper — the taps keep their chunker references, nothing
         // is rebuilt mid-recording.
-        let systemFallbackHandler: AudioChunkBuffer.ChunkHandler = { [weak self] wav, duration in
-            let capturedAt = Date().addingTimeInterval(-duration)
+        let systemFallbackHandler: AudioChunkBuffer.ChunkHandler = { [weak self] wav, timing in
+            let capturedAt = generationToken.captureStart(
+                duration: timing.captureSpan)
             if preReadyBuffer?.capture(
-                wav: wav, duration: duration, source: .system,
+                wav: wav, duration: timing.audioDuration, source: .system,
                 capturedAt: capturedAt) == true { return }
             guard let transcriber = degrade.activeTranscriber() else { return }
             guard degradeRouteLease.begin() else { return }
@@ -10157,10 +10423,11 @@ final class AppState: ObservableObject {
             flushBufferedSamplesToPreviousHandler: reusingSystemChunker != nil)
         liveSystemChunker.vadThreshold = VoiceActivity.systemAudioThreshold
 
-        let micFallbackHandler: AudioChunkBuffer.ChunkHandler = { [weak self] wav, duration in
-            let capturedAt = Date().addingTimeInterval(-duration)
+        let micFallbackHandler: AudioChunkBuffer.ChunkHandler = { [weak self] wav, timing in
+            let capturedAt = generationToken.captureStart(
+                duration: timing.captureSpan)
             if preReadyBuffer?.capture(
-                wav: wav, duration: duration, source: .mic,
+                wav: wav, duration: timing.audioDuration, source: .mic,
                 capturedAt: capturedAt) == true { return }
             guard let transcriber = degrade.activeTranscriber() else { return }
             guard degradeRouteLease.begin() else { return }
@@ -10206,25 +10473,59 @@ final class AppState: ObservableObject {
         systemStreamer?.finish()
         micStreamer?.finish()
 
+        if sessionAudioStart == nil {
+            // Drop the unfinished cloud window, then retain only PCM captured
+            // after the private fallback boundary. Cloud transcript rows stay
+            // intact; the final pass may refine only this Local suffix.
+            systemChunker?.discardBufferedSamples()
+            micChunker?.discardBufferedSamples()
+            sessionAudioStart = Date()
+            let recorder = sessionRecorder
+            systemChunker?.addSampleObserver { samples in recorder.append(samples) }
+        }
+
+        // Preserve the immutable recording snapshot. A Settings edit during a
+        // call must not silently change fallback language, glossary, or model.
+        // In Auto, a clearly Cyrillic accepted transcript may seed the first
+        // local generation while `multi` stays active for real code-switches.
+        let settings = activeRecordingSettings
+        let configuredLanguage = settings?.language
+            ?? activeSessionLanguage
+            ?? transcriberLanguage
+            ?? Config.transcriptionLanguage
+        let recentText = transcript.suffix(40).map(\.text).joined(separator: " ")
+        let autoLanguageHint = LocalWhisperTranscription.fallbackAutoLanguageHint(
+            configured: configuredLanguage, recentText: recentText)
+        let fallbackGlossary = settings?.glossary
+            ?? transcriberGlossary
+            ?? Config.transcriptionGlossary
+        let fallbackModel = settings?.localModel
+            ?? transcriberLocalModel
+            ?? Config.localWhisperModel
         let local = transcriptionServiceFactory(
             .local,
-            activeSessionLanguage ?? Config.transcriptionLanguage,
-            Config.transcriptionGlossary,
-            Config.localWhisperModel)
+            configuredLanguage,
+            fallbackGlossary,
+            fallbackModel,
+            autoLanguageHint)
         state.activate(local)
         let previousTranscriber = transcriber
         transcriber = local
         transcriberEngine = .local
-        transcriberLocalModel = activeRecordingSettings?.localModel ?? Config.localWhisperModel
-        transcriberLanguage = activeRecordingSettings?.language ?? Config.transcriptionLanguage
-        transcriberGlossary = activeRecordingSettings?.glossary ?? Config.transcriptionGlossary
+        transcriberLocalModel = fallbackModel
+        transcriberLanguage = configuredLanguage
+        transcriberGlossary = fallbackGlossary
         activeSessionEngine = .local
+        activeSessionPreparedLocalWhisperModel = fallbackModel
         activeRecordingSettings = activeRecordingSettings?.replacingEngine(with: .local)
         activeChunkRouteLease = routeLease
         pendingEngineChange = nil
         // First chunks may wait on the model load; the service queues them.
         Task { try? await local.prewarm() }
         Task { await previousTranscriber.shutdown() }
+
+        Log.transcribe.notice(
+            "live fallback uses local model=\(fallbackModel, privacy: .public) language=\(configuredLanguage, privacy: .public) autoHint=\(autoLanguageHint ?? "none", privacy: .public)")
 
         transcriptionPerformanceNotice = TranscriptionPerformanceNotice(
             message: message + " Transcription continues on-device for the rest of this call.",
@@ -10364,6 +10665,13 @@ final class AppState: ObservableObject {
     /// later in the call is genuine and kept.
     private func isDuplicateTranscriptLine(_ entry: TranscriptEntry) -> Bool {
         guard Config.transcriptDeduplicationEnabled else { return false }
+        // Reject self-evident decoder noise before neighbour comparison: a
+        // bare connective, or a line made solely of prompt-biased glossary
+        // terms. Real one-word replies are excluded by the closed list.
+        if TranscriptDeduplicator.isNoiseArtifact(entry, glossary: Config.glossaryTerms) {
+            Log.transcribe.debug("dropped noise artifact (\(entry.source == .mic ? "mic" : "system", privacy: .public))")
+            return true
+        }
         // Tail selected BY TIME, not by a fixed count. The deduplicator's window
         // is 14s, but this passed `suffix(12)`: when chunks fragment into many
         // short lines, the true duplicate can sit inside the time window and yet

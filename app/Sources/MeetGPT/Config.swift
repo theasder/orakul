@@ -1001,9 +1001,13 @@ enum Config {
     /// non-default baked value (self-host escape hatch); otherwise a
     /// hardware-aware default (Apple Silicon steps up from the blanket "base").
     /// Applies on the next app launch — the transcriber captures it at init.
+    static let localModelHardwareDefaultMigrationKey =
+        "transcription.localModelHardwareDefaultV2"
+
     static var localWhisperModel: String {
         get {
-            if let stored = UserDefaults.standard.string(forKey: "transcription.localModel"),
+            let defaults = UserDefaults.standard
+            if let stored = defaults.string(forKey: "transcription.localModel"),
                // Older installs saved the ambiguous "large-v3". Map it to the
                // explicit build rather than treating it as unknown, which would
                // silently drop the user back to the hardware default.
@@ -1014,19 +1018,40 @@ enum Config {
                 // which cooked M1/M2 Pro laptops under two-stream load. A value
                 // that was WRITTEN BY THAT DEFAULT (not chosen in Settings) is
                 // rewritten once to what this Mac can actually sustain.
-                if saved == LocalWhisperModel.largeVariant, !localModelChosenByUser,
+                if saved == LocalWhisperModel.largeVariant,
+                   localModelSelectionProvenance != .user,
+                   localModelSelectionProvenance != .adaptive,
                    LocalWhisperModel.recommendedDefault(
                        isAppleSilicon: Hardware.isAppleSilicon)
                        != LocalWhisperModel.largeVariant {
                     let corrected = LocalWhisperModel.recommendedDefault(
                         isAppleSilicon: Hardware.isAppleSilicon)
-                    UserDefaults.standard.set(corrected, forKey: "transcription.localModel")
+                    defaults.set(corrected, forKey: "transcription.localModel")
+                    defaults.set(true, forKey: localModelHardwareDefaultMigrationKey)
                     return corrected
+                }
+                let recommended = LocalWhisperModel.recommendedDefault(
+                    isAppleSilicon: Hardware.isAppleSilicon)
+                if let corrected = LocalWhisperModel.legacyAutomaticDefaultReplacement(
+                    saved: saved,
+                    provenance: localModelSelectionProvenance,
+                    migrationCompleted: defaults.bool(
+                        forKey: localModelHardwareDefaultMigrationKey),
+                    recommended: recommended
+                ) {
+                    defaults.set(corrected, forKey: "transcription.localModel")
+                    defaults.set(true, forKey: localModelHardwareDefaultMigrationKey)
+                    return corrected
+                }
+                if localModelSelectionProvenance != .legacyUnknown {
+                    defaults.set(true, forKey: localModelHardwareDefaultMigrationKey)
                 }
                 return saved
             }
             let baked = Secrets.localWhisperModel.trimmingCharacters(in: .whitespacesAndNewlines)
             if !baked.isEmpty, baked != "base" { return baked }
+            defaults.set(true, forKey: localModelHardwareDefaultMigrationKey)
+            localModelSelectionProvenance = .automatic
             return LocalWhisperModel.recommendedDefault(isAppleSilicon: Hardware.isAppleSilicon)
         }
         set { UserDefaults.standard.set(newValue, forKey: "transcription.localModel") }
@@ -1037,7 +1062,27 @@ enum Config {
     /// thermal/overload watchdog) deliberately does NOT set this.
     static var localModelChosenByUser: Bool {
         get { UserDefaults.standard.bool(forKey: "transcription.localModelUserChosen") }
-        set { UserDefaults.standard.set(newValue, forKey: "transcription.localModelUserChosen") }
+        set {
+            UserDefaults.standard.set(newValue, forKey: "transcription.localModelUserChosen")
+            if newValue { localModelSelectionProvenance = .user }
+        }
+    }
+
+    /// Why the saved model was selected. A runtime safety downgrade must not
+    /// be mistaken for an obsolete automatic default during migration.
+    static var localModelSelectionProvenance: LocalWhisperModelProvenance {
+        get {
+            if let raw = UserDefaults.standard.string(
+                forKey: "transcription.localModelProvenance"),
+               let value = LocalWhisperModelProvenance(rawValue: raw) {
+                return value
+            }
+            return localModelChosenByUser ? .user : .legacyUnknown
+        }
+        set {
+            UserDefaults.standard.set(
+                newValue.rawValue, forKey: "transcription.localModelProvenance")
+        }
     }
 
     /// Persisted only after Core ML's Neural Engine execution stream fails.
@@ -1061,6 +1106,13 @@ enum Config {
     static var adaptiveLocalWhisperEnabled: Bool {
         get { UserDefaults.standard.object(forKey: "transcription.localAdaptive") as? Bool ?? true }
         set { UserDefaults.standard.set(newValue, forKey: "transcription.localAdaptive") }
+    }
+
+    /// Optional private post-call refinement. Dark by default until the
+    /// conservative replacement gate has passed more whole-call corpus checks.
+    static var transcriptionPostStopFinalPassEnabled: Bool {
+        get { UserDefaults.standard.bool(forKey: "transcription.postStopFinalPass") }
+        set { UserDefaults.standard.set(newValue, forKey: "transcription.postStopFinalPass") }
     }
 
     /// AssemblyAI is post-call diarization, not a live fallback. Default off:

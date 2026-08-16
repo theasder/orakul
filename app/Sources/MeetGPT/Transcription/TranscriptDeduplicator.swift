@@ -84,6 +84,43 @@ enum TranscriptDeduplicator {
     ///
     /// `recent` is the tail of the transcript, newest last; only entries inside
     /// the window are considered.
+    // MARK: - Noise artifacts
+
+    /// Whole-line connectives produced when a chunk contains too little speech.
+    /// The list is deliberately closed: real one-word replies such as
+    /// "Да", "Нет", and "Окей" must survive.
+    static let fillerSingletons: Set<String> = [
+        "и", "в", "а", "с", "у", "ну", "вот", "э", "мм",
+        "the", "so", "and", "o", "uh", "um",
+    ]
+
+    /// A custom glossary biases the decoder toward those words. On noise this
+    /// can produce a line made entirely from the glossary itself; with no
+    /// glossary configured this gate remains inactive.
+    static func isNoiseArtifact(_ entry: TranscriptEntry, glossary: [String]) -> Bool {
+        let entryTokens = tokens(entry.text)
+        if entryTokens.count == 1, fillerSingletons.contains(entryTokens[0]) {
+            return true
+        }
+        guard !entryTokens.isEmpty, !glossary.isEmpty else { return false }
+        let glossaryTokens = Set(glossary.flatMap { tokens($0) })
+        guard !glossaryTokens.isEmpty else { return false }
+        return entryTokens.allSatisfy { glossaryTokens.contains($0) }
+    }
+
+    /// A short same-track result may be a garbled re-emission of the previous
+    /// line's tail. Suffix anchoring and the short time window distinguish it
+    /// from a genuine repeat later in the call.
+    static let sameTrackStutterWindow: TimeInterval = 6
+    static let sameTrackStutterThreshold = 0.66
+
+    static func isGarbledTailStutter(_ fragment: String, previous: String) -> Bool {
+        guard fragment.count >= fragmentMinimumCharacters else { return false }
+        guard fragment.count <= previous.count else { return false }
+        let tail = String(previous.suffix(fragment.count + 4))
+        return characterSimilarity(fragment, tail) >= sameTrackStutterThreshold
+    }
+
     static func isDuplicate(_ candidate: TranscriptEntry,
                             of recent: [TranscriptEntry],
                             window: TimeInterval = window) -> Bool {
@@ -100,6 +137,35 @@ enum TranscriptDeduplicator {
             let existingTokens = tokens(existing.text)
             if existingTokens.isEmpty { continue }
             if existingTokens == candidateTokens { return true }
+
+            // Echo through two acoustic paths changes word boundaries and even
+            // scripts, so exact-token rules miss it. Character comparison is
+            // cross-track only and tightly time-bounded; same-track dialogue
+            // keeps the stricter token rules.
+            if existing.source != candidate.source,
+               abs(candidate.timestamp.timeIntervalSince(existing.timestamp))
+                   <= crossTrackWindow {
+                let candidateCharacters = normalizedCharacters(candidate.text)
+                let existingCharacters = normalizedCharacters(existing.text)
+                if candidateTokens.count >= fuzzyMinimumTokens,
+                   candidateCharacters.count >= fullLineMinimumCharacters,
+                   characterSimilarity(candidateCharacters, existingCharacters)
+                       >= crossTrackCharacterThreshold {
+                    return true
+                }
+                if candidateTokens.count <= fragmentMaximumTokens,
+                   fragmentIsEcho(candidateCharacters, host: existingCharacters) {
+                    return true
+                }
+            }
+
+            if existing.source == candidate.source,
+               abs(age) <= sameTrackStutterWindow,
+               candidateTokens.count <= fragmentMaximumTokens,
+               isGarbledTailStutter(normalizedCharacters(candidate.text),
+                                    previous: normalizedCharacters(existing.text)) {
+                return true
+            }
 
             guard candidateTokens.count >= fuzzyMinimumTokens,
                   existingTokens.count >= fuzzyMinimumTokens else { continue }
@@ -149,6 +215,116 @@ enum TranscriptDeduplicator {
             }
         }
         return nil
+    }
+
+    // MARK: - Character-level echo detection
+
+    /// Full-line cross-track threshold measured on a Russian call where the
+    /// microphone captured a garbled copy of the system track. Token overlap
+    /// missed the copies; transliterated character runs survived them.
+    static let crossTrackCharacterThreshold = 0.62
+
+    /// Short echo fragments must both start like a contiguous part of the host
+    /// and be mostly contained in it. Head anchoring keeps a genuine reply that
+    /// merely quotes the question's verb.
+    static let fragmentHeadCharacters = 6
+    static let fragmentHeadThreshold = 0.8
+    static let fragmentContainmentThreshold = 0.75
+    static let fragmentMinimumCharacters = 5
+    static let fullLineMinimumCharacters = 8
+    static let fragmentMaximumTokens = 3
+
+    /// Lowercase, fixed Cyrillic-to-Latin transliteration, ASCII alphanumerics,
+    /// and no spaces. Removing spaces is intentional because acoustic garble
+    /// often fuses words; the fixed table keeps tuned thresholds deterministic.
+    static func normalizedCharacters(_ text: String) -> String {
+        var output = String.UnicodeScalarView()
+        for scalar in text.lowercased().unicodeScalars {
+            if let mapped = cyrillicToLatin[scalar] {
+                output.append(contentsOf: mapped.unicodeScalars)
+            } else if scalar.isASCII,
+                      scalar.properties.isAlphabetic
+                        || ("0"..."9").contains(Character(scalar)) {
+                output.append(scalar)
+            }
+            if output.count >= 400 { break }
+        }
+        return String(output)
+    }
+
+    private static let cyrillicToLatin: [Unicode.Scalar: String] = {
+        let pairs: [(String, String)] = [
+            ("а", "a"), ("б", "b"), ("в", "v"), ("г", "g"), ("д", "d"),
+            ("е", "e"), ("ё", "e"), ("ж", "zh"), ("з", "z"), ("и", "i"),
+            ("й", "i"), ("к", "k"), ("л", "l"), ("м", "m"), ("н", "n"),
+            ("о", "o"), ("п", "p"), ("р", "r"), ("с", "s"), ("т", "t"),
+            ("у", "u"), ("ф", "f"), ("х", "kh"), ("ц", "ts"), ("ч", "ch"),
+            ("ш", "sh"), ("щ", "shch"), ("ъ", ""), ("ы", "y"), ("ь", ""),
+            ("э", "e"), ("ю", "iu"), ("я", "ia"),
+        ]
+        var table: [Unicode.Scalar: String] = [:]
+        for (cyrillic, latin) in pairs {
+            table[cyrillic.unicodeScalars.first!] = latin
+        }
+        return table
+    }()
+
+    /// Symmetric LCS ratio: 2·LCS / (|a| + |b|).
+    static func characterSimilarity(_ a: String, _ b: String) -> Double {
+        guard !a.isEmpty, !b.isEmpty else { return 0 }
+        let lcs = longestCommonSubsequence(Array(a.utf8), Array(b.utf8))
+        return Double(2 * lcs) / Double(a.utf8.count + b.utf8.count)
+    }
+
+    /// Share of the fragment that appears in the host in the same order.
+    static func characterContainment(fragment: String, in host: String) -> Double {
+        guard !fragment.isEmpty, !host.isEmpty else { return 0 }
+        return Double(longestCommonSubsequence(Array(fragment.utf8), Array(host.utf8)))
+            / Double(fragment.utf8.count)
+    }
+
+    /// Best similarity against a contiguous host window. Free subsequence
+    /// matching across a long host would make almost any short fragment match.
+    static func bestWindowSimilarity(of needle: String, in host: String) -> Double {
+        let needleBytes = Array(needle.utf8)
+        let hostBytes = Array(host.utf8)
+        guard !needleBytes.isEmpty, !hostBytes.isEmpty else { return 0 }
+        var best = 0.0
+        for width in max(1, needleBytes.count - 2)...(needleBytes.count + 2) {
+            guard width <= hostBytes.count else { break }
+            for start in 0...(hostBytes.count - width) {
+                let window = Array(hostBytes[start..<(start + width)])
+                let lcs = longestCommonSubsequence(needleBytes, window)
+                best = max(
+                    best,
+                    Double(2 * lcs) / Double(needleBytes.count + width))
+            }
+        }
+        return best
+    }
+
+    static func fragmentIsEcho(_ fragment: String, host: String) -> Bool {
+        guard fragment.utf8.count >= fragmentMinimumCharacters else { return false }
+        let head = String(fragment.prefix(fragmentHeadCharacters))
+        return bestWindowSimilarity(of: head, in: host) >= fragmentHeadThreshold
+            && characterContainment(fragment: fragment, in: host)
+                >= fragmentContainmentThreshold
+    }
+
+    private static func longestCommonSubsequence(_ a: [UInt8], _ b: [UInt8]) -> Int {
+        guard !a.isEmpty, !b.isEmpty else { return 0 }
+        var previous = [Int](repeating: 0, count: b.count + 1)
+        var current = previous
+        for i in 0..<a.count {
+            for j in 0..<b.count {
+                current[j + 1] = a[i] == b[j]
+                    ? previous[j] + 1
+                    : max(previous[j + 1], current[j])
+            }
+            swap(&previous, &current)
+            current[0] = 0
+        }
+        return previous[b.count]
     }
 
     /// Words, lowercased, stripped of punctuation. Comparing on tokens rather
@@ -242,6 +418,9 @@ enum TranscriptDeduplicator {
         }
         let echoed = similarity(micTokens, systemTokens) >= crossTrackSimilarityThreshold
             || isClippedRepeat(micTokens, systemTokens)
+            || characterSimilarity(normalizedCharacters(lines[mic].text),
+                                   normalizedCharacters(system.text))
+                >= crossTrackCharacterThreshold
         guard echoed else { return lines }
         var kept = lines
         kept.remove(at: mic)

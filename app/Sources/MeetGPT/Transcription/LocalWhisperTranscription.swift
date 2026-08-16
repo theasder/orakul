@@ -58,6 +58,19 @@ actor LocalWhisperTranscription: TranscriptionService {
         var lastSeen: TimeInterval
     }
     private var sourceActivity: [String: SourceActivity] = [:]
+    /// A provider handoff may seed Auto from the accepted transcript that
+    /// immediately preceded it without changing the user's snapshotted mode.
+    private var pendingAutoLanguageHint: String?
+    private var generationAutoLanguageHint: String?
+    struct AutoLanguageState: Equatable {
+        var stable: String?
+        var conflictingCandidate: String?
+        var conflictingCount: Int
+    }
+    /// Stable reliable Auto detection per capture route. One supported blip
+    /// cannot replace it; two consecutive reliable chunks can, preserving real
+    /// sustained code-switching.
+    private var autoLanguageStates: [String: AutoLanguageState] = [:]
     private var performanceRecommendation: TranscriptionPerformanceRecommendation?
     private var performanceRecommendationIssued = false
     private var thermalStreak = 0
@@ -118,6 +131,7 @@ actor LocalWhisperTranscription: TranscriptionService {
     init(model: String = Config.localWhisperModel,
          language: String = Config.transcriptionLanguage,
          glossary: String = Config.transcriptionGlossary,
+         autoLanguageHint: String? = nil,
          temperatureFallbackCount: Int = 0,
          chunkingStrategy: ChunkingStrategy? = nil,
          logProbabilityFloor: Float = LocalWhisperTranscription.defaultLogProbabilityFloor,
@@ -129,6 +143,9 @@ actor LocalWhisperTranscription: TranscriptionService {
         self.modelName = model
         self.configuredLanguage = language
         self.configuredGlossary = glossary
+        self.pendingAutoLanguageHint = autoLanguageHint.flatMap {
+            Self.acceptedAutoLanguage($0)
+        }
         self.compatibilityMode = Self.shouldUseCompatibilityCompute(
             savedMode: Config.localWhisperCompatibilityMode,
             isIntel: Self.isIntelBuild
@@ -139,6 +156,12 @@ actor LocalWhisperTranscription: TranscriptionService {
     /// captured at construction even if Settings changes mid-stream.
     func languageSnapshot() -> String { configuredLanguage }
     func glossarySnapshot() -> String { configuredGlossary }
+    func registerGenerationForTesting(_ generation: Int) {
+        registerGeneration(from: "\(generation):mic")
+    }
+    func stableAutoLanguageForTesting(route: String = "mic") -> String? {
+        autoLanguageStates[route]?.stable ?? generationAutoLanguageHint
+    }
 
     /// Download + load the model ahead of the first chunk. Lets the UI show a
     /// "preparing" state instead of a blank transcript during the first-use
@@ -195,8 +218,8 @@ actor LocalWhisperTranscription: TranscriptionService {
             )
         }
         guard let batch else { return "" }
-        let candidates = batch.results.flatMap { result in
-            result.segments.compactMap { segment -> String? in
+        let candidatesByAudioWindow = batch.results.map { result in
+            let candidates = result.segments.compactMap { segment -> String? in
                 guard self.isReliable(segment: segment) else {
                     self.onSegmentVerdict?(false, segment.text)
                     SpeechQualityMonitor.shared.record(accepted: false)
@@ -224,27 +247,34 @@ actor LocalWhisperTranscription: TranscriptionService {
                 SpeechQualityMonitor.shared.record(accepted: true)
                 return clean
             }
+            return (seekTime: result.seekTime, candidates: candidates)
         }
 
-        // Collapse repeats WITHIN this one chunk before joining.
-        //
-        // `batch.results` is an array, and WhisperKit can return more than one
-        // result for the same audio — decode retries and temperature fallbacks
-        // each produce their own segments. flatMap then concatenated all of them,
-        // so a single 6-second chunk emitted the same utterance twice, worded
-        // slightly differently by each decode pass. That is the reported
-        // "duplicates that are not the same but differently transcribed", and it
-        // is a technical artefact rather than anything the speaker did.
-        //
-        // Safe because the scope is ONE chunk: two decodes of the same few seconds
-        // agreeing in substance is not a person repeating themselves. Genuine
-        // repetition across chunks is untouched — that is the deduplicator's job,
-        // with its own time window and thresholds.
-        if batch.results.count > 1 {
-            Log.transcribe.notice("local chunk returned \(batch.results.count, privacy: .public) results — collapsing intra-chunk repeats")
-        }
-        let text = Self.collapseIntraChunkRepeats(candidates).joined(separator: " ")
+        // WhisperKit returns one result per VAD audio window, and may also
+        // return multiple retry results for the SAME window. Flattening first
+        // made a later speaker legitimately repeat a phrase and then deleted
+        // it as a retry. Collapse only candidates sharing one seek offset.
+        let text = Self.collapseCandidatesBySeekTime(candidatesByAudioWindow)
+            .joined(separator: " ")
         return TranscriptArtifacts.clean(text)
+    }
+
+    /// Preserve VAD-window identity while removing retries of the same audio.
+    /// A nil offset is the single unchunked input and therefore one group.
+    static func collapseCandidatesBySeekTime(
+        _ results: [(seekTime: Float?, candidates: [String])]
+    ) -> [String] {
+        typealias Key = UInt32?
+        var order: [Key] = []
+        var grouped: [Key: [String]] = [:]
+        for result in results {
+            let key = result.seekTime?.bitPattern
+            if grouped[key] == nil { order.append(key) }
+            grouped[key, default: []].append(contentsOf: result.candidates)
+        }
+        return order.flatMap { key in
+            collapseIntraChunkRepeats(grouped[key] ?? [])
+        }
     }
 
     /// Drop candidates that repeat one already collected from the SAME chunk.
@@ -294,6 +324,82 @@ actor LocalWhisperTranscription: TranscriptionService {
         let normalized = language.lowercased().split(separator: "-", maxSplits: 1).first.map(String.init) ?? ""
         guard supportedLanguages.contains(normalized) else { return nil }
         return normalized
+    }
+
+    /// Retry only when detection left the supported set, or when a supported
+    /// conflict produced no reliable speech. A supported successful detection
+    /// remains a possible real code switch.
+    static func autoRecoveryLanguage(
+        detected: [String],
+        previous: String?,
+        acceptedHasReliableSpeech: Bool = true,
+        supportedLanguages: Set<String> = Config.automaticTranscriptionLanguageCodes
+    ) -> String? {
+        guard !detected.isEmpty,
+              let previous = previous.flatMap({
+                  acceptedAutoLanguage($0, supportedLanguages: supportedLanguages)
+              }) else { return nil }
+        let normalized = detected.map {
+            acceptedAutoLanguage($0, supportedLanguages: supportedLanguages)
+        }
+        if normalized.allSatisfy({ $0 == nil }) { return previous }
+        guard !acceptedHasReliableSpeech,
+              normalized.allSatisfy({ $0 != previous }) else { return nil }
+        return previous
+    }
+
+    /// A clearly Cyrillic transcript immediately before a provider failure can
+    /// seed local Auto as Russian. The configured mode remains `multi`, so a
+    /// later sustained code switch still works.
+    static func fallbackAutoLanguageHint(
+        configured: String,
+        recentText: String
+    ) -> String? {
+        guard configured == "multi" else { return nil }
+        let letters = recentText.unicodeScalars.filter {
+            CharacterSet.letters.contains($0)
+        }
+        guard letters.count >= 40 else { return nil }
+        let cyrillic = letters.filter {
+            (0x0400...0x052F).contains(Int($0.value))
+                || (0x2DE0...0x2DFF).contains(Int($0.value))
+                || (0xA640...0xA69F).contains(Int($0.value))
+        }.count
+        return Double(cyrillic) / Double(letters.count) >= 0.45 ? "ru" : nil
+    }
+
+    static func updatedAutoLanguageState(
+        _ state: AutoLanguageState,
+        observed rawLanguage: String,
+        switchAfter: Int = 2,
+        supportedLanguages: Set<String> = Config.automaticTranscriptionLanguageCodes
+    ) -> AutoLanguageState {
+        guard let language = acceptedAutoLanguage(
+            rawLanguage, supportedLanguages: supportedLanguages) else { return state }
+        guard let stable = state.stable else {
+            return AutoLanguageState(
+                stable: language,
+                conflictingCandidate: nil,
+                conflictingCount: 0)
+        }
+        guard language != stable else {
+            return AutoLanguageState(
+                stable: stable,
+                conflictingCandidate: nil,
+                conflictingCount: 0)
+        }
+        let count = state.conflictingCandidate == language
+            ? state.conflictingCount + 1 : 1
+        if count >= max(2, switchAfter) {
+            return AutoLanguageState(
+                stable: language,
+                conflictingCandidate: nil,
+                conflictingCount: 0)
+        }
+        return AutoLanguageState(
+            stable: stable,
+            conflictingCandidate: language,
+            conflictingCount: count)
     }
 
     static var compatibilityComputeOptions: ModelComputeOptions {
@@ -396,6 +502,7 @@ actor LocalWhisperTranscription: TranscriptionService {
                               streamID: String?,
                               whisper: WhisperKit) async throws -> InferenceBatch? {
         let automatic = configuredLanguage == "multi"
+        let promptTokens = glossaryPromptTokens(for: whisper)
 
         let options = DecodingOptions(
             task: .transcribe,
@@ -407,7 +514,7 @@ actor LocalWhisperTranscription: TranscriptionService {
             // per chunk and re-detects for each window in imported long media.
             detectLanguage: automatic,
             skipSpecialTokens: true,
-            promptTokens: glossaryPromptTokens(for: whisper),
+            promptTokens: promptTokens,
             concurrentWorkerCount: 1,
             chunkingStrategy: chunkingStrategy
         )
@@ -427,7 +534,65 @@ actor LocalWhisperTranscription: TranscriptionService {
             Log.transcribe.debug("local Auto selected \(language, privacy: .public) for the current chunk")
             return true
         }
+        let route = Self.source(from: streamID)
+        let stableLanguage = route.flatMap { route in
+            autoLanguageStates[route]?.stable ?? generationAutoLanguageHint
+        }
+        let acceptedHasReliableSpeech = accepted.contains(where: hasReliableSpeech)
+        if !acceptedHasReliableSpeech,
+           let recoveryLanguage = Self.autoRecoveryLanguage(
+               detected: results.map(\.language),
+               previous: stableLanguage,
+               acceptedHasReliableSpeech: acceptedHasReliableSpeech) {
+            Log.transcribe.notice(
+                "local Auto retrying unstable detection as prior \(recoveryLanguage, privacy: .public)")
+            let recoveryOptions = DecodingOptions(
+                task: .transcribe,
+                language: recoveryLanguage,
+                temperatureFallbackCount: temperatureFallbackCount,
+                usePrefillPrompt: true,
+                detectLanguage: false,
+                skipSpecialTokens: true,
+                promptTokens: promptTokens,
+                concurrentWorkerCount: 1,
+                chunkingStrategy: chunkingStrategy)
+            let recovered = try await whisper.transcribe(
+                audioArray: samples, decodeOptions: recoveryOptions)
+            if recovered.contains(where: hasReliableSpeech) {
+                if let route {
+                    let current = autoLanguageStates[route] ?? AutoLanguageState(
+                        stable: generationAutoLanguageHint,
+                        conflictingCandidate: nil,
+                        conflictingCount: 0)
+                    autoLanguageStates[route] = Self.updatedAutoLanguageState(
+                        current, observed: recoveryLanguage)
+                }
+                return InferenceBatch(results: recovered)
+            }
+        }
+        if let route,
+           let reliable = accepted.first(where: hasReliableSpeech),
+           let language = Self.acceptedAutoLanguage(reliable.language) {
+            let current = autoLanguageStates[route] ?? AutoLanguageState(
+                stable: generationAutoLanguageHint,
+                conflictingCandidate: nil,
+                conflictingCount: 0)
+            autoLanguageStates[route] = Self.updatedAutoLanguageState(
+                current, observed: language)
+        }
         return InferenceBatch(results: accepted)
+    }
+
+    private func hasReliableSpeech(_ result: TranscriptionResult) -> Bool {
+        let accepted = result.segments.compactMap { segment -> String? in
+            guard isReliable(segment: segment) else { return nil }
+            let clean = TranscriptArtifacts.cleanInline(segment.text)
+            guard !clean.isEmpty else { return nil }
+            if Self.isShortFragment(clean),
+               !Self.isReliableShortFragment(segment: segment) { return nil }
+            return clean
+        }
+        return !TranscriptArtifacts.clean(accepted.joined(separator: " ")).isEmpty
     }
 
     private func recordInferencePerformance(elapsed: TimeInterval, sampleCount: Int) {
@@ -490,7 +655,15 @@ actor LocalWhisperTranscription: TranscriptionService {
     }
 
     func cancelPendingTranscriptions(beforeGeneration: Int) async {
+        let hadObservedGeneration = latestGeneration >= 0
         latestGeneration = max(latestGeneration, beforeGeneration)
+        // Stop may establish the final-buffer generation before this newly
+        // created fallback has seen a full chunk. Keep its one-call hint for
+        // that trailing decode instead of leaving it permanently pending.
+        if !hadObservedGeneration, generationAutoLanguageHint == nil {
+            generationAutoLanguageHint = pendingAutoLanguageHint
+            pendingAutoLanguageHint = nil
+        }
         suspendedGeneration = nil
         inferenceEWMA = nil
         slowInferenceStreak = 0
@@ -635,11 +808,19 @@ actor LocalWhisperTranscription: TranscriptionService {
 
     private func registerGeneration(from streamID: String?) {
         guard let generation = Self.generation(from: streamID), generation > latestGeneration else { return }
+        let isFirstGeneration = latestGeneration < 0
         latestGeneration = generation
         suspendedGeneration = nil
         inferenceEWMA = nil
         slowInferenceStreak = 0
         sourceActivity.removeAll(keepingCapacity: true)
+        autoLanguageStates.removeAll(keepingCapacity: true)
+        if isFirstGeneration {
+            generationAutoLanguageHint = pendingAutoLanguageHint
+            pendingAutoLanguageHint = nil
+        } else {
+            generationAutoLanguageHint = nil
+        }
         performanceRecommendation = nil
         performanceRecommendationIssued = false
         var retained: [InferenceWaiter] = []
@@ -711,6 +892,13 @@ actor LocalWhisperTranscription: TranscriptionService {
     private static func generation(from streamID: String?) -> Int? {
         guard let prefix = streamID?.split(separator: ":", maxSplits: 1).first else { return nil }
         return Int(prefix)
+    }
+
+    private static func source(from streamID: String?) -> String? {
+        guard let source = streamID?.split(separator: ":", maxSplits: 1).last else {
+            return nil
+        }
+        return String(source)
     }
 
     /// Encode the team glossary into decoder prompt tokens (biases spelling).
@@ -845,7 +1033,8 @@ enum TranscriptionFactory {
     static func make(engine: TranscriptionEngine = Config.transcriptionEngineValue,
                      language: String = Config.transcriptionLanguage,
                      glossary: String = Config.transcriptionGlossary,
-                     localModel: String = Config.localWhisperModel) -> TranscriptionService {
+                     localModel: String = Config.localWhisperModel,
+                     autoLanguageHint: String? = nil) -> TranscriptionService {
         switch engine {
         case .local:
             // Live captions only: the post-call whole-file pass constructs
@@ -854,7 +1043,10 @@ enum TranscriptionFactory {
                 return ParakeetLiveTranscription(language: language)
             }
             return LocalWhisperTranscription(
-                model: localModel, language: language, glossary: glossary)
+                model: localModel,
+                language: language,
+                glossary: glossary,
+                autoLanguageHint: autoLanguageHint)
         case .server:
             // Managed large-v3 with an on-device safety net: cap / outage /
             // sign-out degrades the session instead of erroring every chunk.
@@ -862,7 +1054,8 @@ enum TranscriptionFactory {
                 primary: ServerWhisperTranscription(language: language, glossary: glossary),
                 fallback: LocalWhisperTranscription(model: localModel,
                                                     language: language,
-                                                    glossary: glossary))
+                                                    glossary: glossary,
+                                                    autoLanguageHint: autoLanguageHint))
         case .whisper:
             return WhisperAPITranscription(language: language, glossary: glossary)
         case .deepgram:

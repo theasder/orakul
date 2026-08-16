@@ -30,7 +30,10 @@ enum ChunkStitcher {
 
     /// Fuzzy matching needs more evidence than exact matching: an exact 2-word
     /// match is already weak, and a 2-word match with one word wrong is noise.
-    static let minimumFuzzyOverlapWords = 4
+    /// Three-word windows are admitted only at full agreement; this recovers
+    /// short real seams without letting a 2-of-3 coincidence eat speech.
+    static let minimumFuzzyOverlapWords = 3
+    static let threeWordFullAgreement = 0.999
 
     /// How much of the seam must agree for a near-match to count.
     ///
@@ -56,9 +59,27 @@ enum ChunkStitcher {
     /// assistant should not. A duplicated word is something the reader skims
     /// past, while a deleted one is speech that silently never reaches them.
     ///
-    /// 0.55 is statistically tied on mean WER and holds that growth, so it is
-    /// the safer side of a flat optimum.
-    static let fuzzyAgreementThreshold = 0.55
+    /// Per-word character matching inflates agreement scores, so the threshold
+    /// moves with it. On the measured Russian corpus, 0.65 recovered garbled
+    /// seams while avoiding the over-cut seen below this value.
+    static let fuzzyAgreementThreshold = 0.65
+
+    /// Two words agree when their transliterated characters mostly do. Short
+    /// words stay exact-only because one edit would make unrelated particles
+    /// look identical.
+    static let fuzzyWordThreshold = 0.72
+    static let fuzzyWordMinimumCharacters = 3
+
+    static func wordsAgree(_ a: String, _ b: String) -> Bool {
+        if a == b { return true }
+        let normalizedA = TranscriptDeduplicator.normalizedCharacters(a)
+        let normalizedB = TranscriptDeduplicator.normalizedCharacters(b)
+        guard min(normalizedA.count, normalizedB.count) >= fuzzyWordMinimumCharacters else {
+            return normalizedA == normalizedB
+        }
+        return TranscriptDeduplicator.characterSimilarity(normalizedA, normalizedB)
+            >= fuzzyWordThreshold
+    }
 
     /// `next` with its repeated opening removed.
     ///
@@ -99,9 +120,11 @@ enum ChunkStitcher {
             let tail = previousWords.suffix(length).map(\.normalized)
             let head = nextWords.prefix(length).map(\.normalized)
             let score = agreement(tail, head)
+            let threshold = length == 3
+                ? threeWordFullAgreement : fuzzyAgreementThreshold
             // Ties go to the longer window: inside a true seam every sub-window
             // also scores 1.0, and the longest is the whole repeat.
-            if score >= fuzzyAgreementThreshold, score > (best?.agreement ?? 0) {
+            if score >= threshold, score > (best?.agreement ?? 0) {
                 best = (length, score)
             }
             length -= 1
@@ -127,8 +150,8 @@ enum ChunkStitcher {
             var previousDiagonal = 0
             for j in 1...b.count {
                 let current = row[j]
-                row[j] = a[i - 1] == b[j - 1] ? previousDiagonal + 1
-                                              : max(row[j], row[j - 1])
+                row[j] = wordsAgree(a[i - 1], b[j - 1]) ? previousDiagonal + 1
+                                                        : max(row[j], row[j - 1])
                 previousDiagonal = current
             }
         }

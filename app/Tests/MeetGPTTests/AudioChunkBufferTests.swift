@@ -4,6 +4,29 @@ import Testing
 
 @Suite("Audio chunk buffer")
 struct AudioChunkBufferTests {
+    @Test("reported span reaches capture start when boundary search leaves a tail")
+    func reportsCaptureSpan() {
+        var emitted: [(Data, AudioChunkBuffer.ChunkTiming)] = []
+        let buffer = AudioChunkBuffer(
+            chunkSeconds: 1,
+            overlapSeconds: 0,
+            boundarySlackSeconds: 0.25
+        ) { wav, timing in
+            emitted.append((wav, timing))
+        }
+        buffer.append(AudioFixtures.voicedBuffer(
+            sampleRate: 16_000, seconds: 1.2))
+        let first = emitted.first
+        #expect(first != nil)
+        guard let first else { return }
+        let encodedDuration = Double(
+            LocalWhisperTranscription.floatSamples(fromWAV: first.0).count)
+            / 16_000
+        #expect(abs(first.1.captureSpan - 1.2) < 0.0001)
+        #expect(abs(first.1.audioDuration - encodedDuration) < 0.0001)
+        #expect(first.1.captureSpan >= first.1.audioDuration)
+    }
+
     @Test("emits one WAV chunk per chunkSeconds of voiced audio")
     func chunksAtBoundaries() {
         var wavs: [Data] = []
@@ -83,6 +106,25 @@ struct AudioChunkBufferTests {
         buffer.onSamples = { total += $0.count }
         buffer.append(AudioFixtures.voicedBuffer(sampleRate: 16_000, seconds: 2))
         #expect(total == 32_000)
+    }
+
+    @Test("route-boundary discard keeps cloud PCM out of the first Local chunk")
+    func discardBufferedRoutePrefix() {
+        var wavs: [Data] = []
+        let buffer = AudioChunkBuffer(
+            chunkSeconds: 1,
+            overlapSeconds: 0) { wav, _ in wavs.append(wav) }
+        buffer.append(AudioFixtures.voicedBuffer(
+            sampleRate: 16_000, seconds: 0.6))
+        buffer.discardBufferedSamples()
+        buffer.append(AudioFixtures.voicedBuffer(
+            sampleRate: 16_000, seconds: 0.6))
+        #expect(wavs.isEmpty)
+        // Flushing proves the post-boundary Local tail remains available. The
+        // empty assertion above is the key regression: without the discard,
+        // cloud 0.6s + Local 0.6s would already emit a mixed 1s window.
+        buffer.flush()
+        #expect(wavs.count == 1)
     }
 
     @Test("VAD drops silent chunks before the engine (when VAD is enabled)",

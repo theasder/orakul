@@ -1,5 +1,14 @@
 import Foundation
 
+enum LocalWhisperModelProvenance: String {
+    case automatic
+    case user
+    case adaptive
+    /// Persisted before provenance existed. It may be the obsolete blanket
+    /// default or a safety downgrade, so it is recommended—not rewritten.
+    case legacyUnknown
+}
+
 /// On-device (WhisperKit) model options + a hardware-aware default. Bigger
 /// models are more accurate but heavier; Apple Silicon's Neural Engine runs the
 /// balanced model in real time, Intel Macs stay on the fast one. The variant
@@ -91,6 +100,22 @@ enum LocalWhisperModel {
 
     static func isKnown(_ id: String) -> Bool { options.contains { $0.id == id } }
 
+    /// Upgrade only the obsolete automatic `base` default on capable Macs.
+    /// Explicit user choices and runtime thermal/performance downgrades are
+    /// never rewritten.
+    static func legacyAutomaticDefaultReplacement(
+        saved: String,
+        provenance: LocalWhisperModelProvenance,
+        migrationCompleted: Bool,
+        recommended: String
+    ) -> String? {
+        guard provenance == .automatic,
+              !migrationCompleted,
+              migrated(saved) == "base",
+              recommended != "base" else { return nil }
+        return recommended
+    }
+
     /// Accuracy-preserving downgrade ladder. `tiny` is intentionally not used
     /// until its mixed-language behavior has been validated in this app.
     static func nextLighter(than id: String) -> String? {
@@ -99,6 +124,40 @@ enum LocalWhisperModel {
         case "small": return "base"
         default: return nil
         }
+    }
+
+    /// Model for an optional post-call decode. This is separate from the live
+    /// two-track selector: a Max/Ultra or recent Pro can run Turbo accurately
+    /// after Stop, but a background quality pass must never begin a surprise
+    /// 1.5 GB download.
+    ///
+    /// `availableModels` is explicit so the policy stays pure and testable. In
+    /// production the just-used live model is always available. A previously
+    /// prepared Turbo may be added by a future cache inventory without changing
+    /// this safety rule.
+    static func postCallRefinementModel(
+        liveModel: String,
+        availableModels: Set<String>,
+        isAppleSilicon: Bool,
+        memoryGB: Double = Hardware.physicalMemoryGB,
+        chipTier: Hardware.AppleChipTier? = Hardware.appleChipTier(),
+        chipGeneration: Int? = Hardware.appleChipGeneration()
+    ) -> String {
+        let live = migrated(liveModel)
+        let available = Set(availableModels.map(migrated))
+        let capableForTurbo = recommendedDefault(
+            isAppleSilicon: isAppleSilicon,
+            memoryGB: memoryGB,
+            chipTier: chipTier,
+            chipGeneration: chipGeneration) == largeVariant
+
+        if capableForTurbo, available.contains(largeVariant) {
+            return largeVariant
+        }
+        if available.contains("small") { return "small" }
+        // A legacy Base session has Base in memory/cache. Keep it rather than
+        // silently downloading Small merely because the meeting ended.
+        return available.contains(live) ? live : "small"
     }
 
     static func title(for id: String) -> String {

@@ -443,6 +443,29 @@ struct CumulativeCrossTrackEchoTests {
 /// differently transcribed", and it is a different mechanism from cross-track echo.
 @Suite("Intra-chunk repeat collapse")
 struct IntraChunkCollapseTests {
+    @Test("similar speech at different VAD offsets survives")
+    func preservesRepeatedPhraseAcrossAudioWindows() {
+        let phrase = "we still need legal approval before the launch"
+        let out = LocalWhisperTranscription.collapseCandidatesBySeekTime([
+            (seekTime: 0, candidates: [phrase]),
+            (seekTime: 28, candidates: [phrase]),
+        ])
+        #expect(out == [phrase, phrase])
+    }
+
+    @Test("retry results at the same VAD offset collapse")
+    func collapsesRetriesAtSameAudioWindow() {
+        let out = LocalWhisperTranscription.collapseCandidatesBySeekTime([
+            (seekTime: 28, candidates: [
+                "we need legal to review the liability cap before signing",
+            ]),
+            (seekTime: 28, candidates: [
+                "we need legal to review that liability cap before we sign",
+            ]),
+        ])
+        #expect(out.count == 1)
+    }
+
     @Test("two decode passes over one chunk collapse to one line")
     func collapsesRewordedRepeat() {
         let out = LocalWhisperTranscription.collapseIntraChunkRepeats([

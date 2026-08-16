@@ -73,6 +73,61 @@ struct TranscriptEnhancementTests {
         }
     }
 
+    @Test("long-call merge keeps both source tails and cannot replace the full transcript")
+    func longInputsKeepRecentWindowsAndArePartial() async throws {
+        let start = Date(timeIntervalSince1970: 1_700_000_000)
+        var whisper: [TranscriptEntry] = []
+        for index in 0..<180 {
+            let text = index == 0
+                ? "WHISPER_EARLY_SENTINEL " + String(repeating: "a", count: 100)
+                : index == 179
+                    ? "WHISPER_LATE_SENTINEL final words"
+                    : "whisper line \(index) " + String(repeating: "a", count: 100)
+            whisper.append(TranscriptEntry(
+                source: .system,
+                text: text,
+                timestamp: start.addingTimeInterval(Double(index))))
+        }
+        var firefliesLines: [String] = []
+        for index in 0..<220 {
+            let text = index == 0
+                ? "Speaker: FIREFLIES_EARLY_SENTINEL "
+                    + String(repeating: "b", count: 100)
+                : index == 219
+                    ? "Speaker: FIREFLIES_LATE_SENTINEL final words"
+                    : "Speaker: fireflies line \(index) "
+                        + String(repeating: "b", count: 100)
+            firefliesLines.append(text)
+        }
+        let llm = MockLLMGateway(response: """
+        {"summary":"Merged retained windows","entries":[{"offsetSec":179,"speaker":"Speaker","source":"system","text":"final words"}]}
+        """)
+
+        let result = try await TranscriptEnhancementService.enhance(
+            whisper: whisper,
+            fireflies: FirefliesTranscript(
+                title: "Long call",
+                text: firefliesLines.joined(separator: "\n")),
+            sessionStart: start,
+            llm: llm,
+            model: LLMCatalog.model(id: "gpt-5.4-mini")
+                ?? LLMCatalog.defaultModel(for: .free))
+
+        let prompt = try #require(llm.calls.last?.user)
+        #expect(prompt.contains("WHISPER_LATE_SENTINEL"))
+        #expect(prompt.contains("FIREFLIES_LATE_SENTINEL"))
+        #expect(!prompt.contains("WHISPER_EARLY_SENTINEL"))
+        #expect(!prompt.contains("FIREFLIES_EARLY_SENTINEL"))
+        #expect(result.isPartial)
+    }
+
+    @Test("whole-line suffix drops a partial first exported row")
+    func wholeLineSuffixStartsAtAFullRow() {
+        let clipped = TranscriptEnhancementService.wholeLineSuffix(
+            "first row\nsecond row\nthird row", maxCharacters: 18)
+        #expect(clipped == "third row")
+    }
+
     @Test("pickFirefliesMeeting prefers the listing closest to session start")
     func picksNearestMeeting() {
         let target = Date(timeIntervalSince1970: 1_700_000_000)

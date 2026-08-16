@@ -17,10 +17,10 @@ enum TranscriptEnhancementService {
         let entries: [TranscriptEntry]
         let summary: String
         let firefliesTitle: String
-        /// The model ran out of output budget before closing the transcript, so
-        /// `entries` covers only the start of the meeting. A partial merge must
-        /// never REPLACE the on-device transcript — that would delete
-        /// everything after the cut.
+        /// `entries` covers only a bounded part of the meeting: either output
+        /// was truncated or one of the inputs was clipped. It must never
+        /// replace the full live transcript because content outside that
+        /// window would be deleted.
         let isPartial: Bool
 
         init(entries: [TranscriptEntry], summary: String,
@@ -43,8 +43,16 @@ enum TranscriptEnhancementService {
                         model: LLMModel = LLMCatalog.background(for: Config.selectedModel)
     ) async throws -> Result {
         let whisperText = SystemInstructions.formatEntries(whisper)
-        let clippedWhisper = String(whisperText.suffix(maxWhisperChars))
-        let clippedFireflies = String(fireflies.text.prefix(maxFirefliesChars))
+        let inputWasClipped = whisperText.count > maxWhisperChars
+            || fireflies.text.count > maxFirefliesChars
+        // Keep the recent end of both sources. The old code paired the Whisper
+        // tail with the Fireflies head, asking the model to reconcile opposite
+        // ends of a long meeting. Any clipping also makes replacement unsafe,
+        // even when the model returns syntactically complete JSON.
+        let clippedWhisper = wholeLineSuffix(
+            whisperText, maxCharacters: maxWhisperChars)
+        let clippedFireflies = wholeLineSuffix(
+            fireflies.text, maxCharacters: maxFirefliesChars)
 
         guard !clippedFireflies.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw TranscriptEnhancementError.emptyFireflies
@@ -137,8 +145,15 @@ enum TranscriptEnhancementService {
             entries: entries.sorted { $0.timestamp < $1.timestamp },
             summary: summaryText.isEmpty ? "Enhanced with Fireflies" : summaryText,
             firefliesTitle: fireflies.title,
-            isPartial: parsed.isTruncated
+            isPartial: parsed.isTruncated || inputWasClipped
         )
+    }
+
+    static func wholeLineSuffix(_ text: String, maxCharacters: Int) -> String {
+        guard maxCharacters > 0, text.count > maxCharacters else { return text }
+        let suffix = String(text.suffix(maxCharacters))
+        guard let newline = suffix.firstIndex(of: "\n") else { return suffix }
+        return String(suffix[suffix.index(after: newline)...])
     }
 
     /// Compact connector background for the enhance prompt (budgeted).

@@ -245,6 +245,7 @@ private struct TranscriptionSettingsTab: View {
     @State private var localModel: String = Config.localWhisperModel
     @State private var micNoiseSuppression: Bool = Config.micNoiseSuppressionEnabled
     @State private var adaptiveLocal: Bool = Config.adaptiveLocalWhisperEnabled
+    @State private var postStopFinalPass: Bool = Config.transcriptionPostStopFinalPassEnabled
     @State private var assemblyDiarization: Bool = Config.assemblyAIDiarizationEnabled
     @State private var firefliesEnhance: Bool = Config.firefliesTranscriptEnhanceEnabled
 
@@ -347,6 +348,23 @@ private struct TranscriptionSettingsTab: View {
                     Text("Если расшифровка раз за разом отстаёт, orakul возьмёт для следующей записи модель полегче. На Base предложит Deepgram, но в облако сам не уйдёт.")
                         .font(Typo.caption).foregroundStyle(Theme.inkTertiary)
                         .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    SettingsSection(
+                        title: "Уточнение после звонка",
+                        caption: "Выключено по умолчанию. Если включить, orakul повторно прочитает сохранённый звук на этом Mac после остановки. Живая расшифровка останется, если новый результат неполный или потерял содержание.") {
+                        SettingsRow {
+                            Label("Уточнять после остановки", systemImage: "waveform.badge.checkmark")
+                                .labelStyle(SettingLabelStyle())
+                            Spacer()
+                            Toggle("", isOn: $postStopFinalPass)
+                                .labelsHidden().toggleStyle(.switch)
+                                .onChange(of: postStopFinalPass) {
+                                    Config.transcriptionPostStopFinalPassEnabled = $0
+                                }
+                                .accessibilityLabel("Уточнять локальную расшифровку после остановки")
+                                .accessibilityIdentifier("settings.transcription.post-stop-final-pass")
+                        }
                     }
                 }
 
@@ -504,6 +522,7 @@ private struct TranscriptionSettingsTab: View {
             localModel = Config.localWhisperModel
             micNoiseSuppression = Config.micNoiseSuppressionEnabled
             adaptiveLocal = Config.adaptiveLocalWhisperEnabled
+            postStopFinalPass = Config.transcriptionPostStopFinalPassEnabled
             assemblyDiarization = Config.assemblyAIDiarizationEnabled
             firefliesEnhance = Config.firefliesTranscriptEnhanceEnabled
         }

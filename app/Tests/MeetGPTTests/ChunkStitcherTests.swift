@@ -197,4 +197,48 @@ struct ChunkStitcherTests {
         #expect(joined.components(separatedBy: "delivery date").count - 1 == 1)
         #expect(joined.contains("Kubernetes"))
     }
+
+    // MARK: - Garbled seams from a measured Russian call
+
+    @Test("cuts a seam whose words came back garbled")
+    func garbledSeam() {
+        let stitched = ChunkStitcher.stitch(
+            previous: "у же функцию, они должны параллельно работать.",
+            next: "функция не должно параллельно работать. Большой нагрузки может так случиться, что они разъедутся.")
+        #expect(!stitched.contains("параллельно работать."))
+        #expect(stitched.contains("Большой нагрузки"))
+        #expect(stitched.contains("разъедутся"))
+    }
+
+    @Test("cuts a short tail re-emission with one word mutated")
+    func mutatedTail() {
+        let stitched = ChunkStitcher.stitch(
+            previous: "Иногда еще бывает, что один логический мод",
+            next: "Один логический модуль разделяется на несколько пакетов или на несколько модури.")
+        #expect(stitched.contains("разделяется"))
+        #expect(!stitched.lowercased().hasPrefix("один логический"))
+    }
+
+    @Test("does not eat novel speech that merely shares its middle")
+    func novelHeadSurvives() {
+        let next = "Я сейчас говорю, что мне пока что немножко страшно латать"
+        #expect(ChunkStitcher.stitch(
+            previous: "потому что честно говоря мне пока что не было.",
+            next: next) == next)
+    }
+
+    @Test("a repeated interjection is speech, not a fuzzy seam")
+    func interjectionSurvives() {
+        let next = "Да, да, да, еще раз про шерк пакеты или что-то. Да."
+        #expect(ChunkStitcher.stitch(
+            previous: "Да, да, давай.", next: next) == next)
+    }
+
+    @Test("tiny words remain exact-only")
+    func tinyWordsExact() {
+        let next = "в системе добавляется какой-то кусок"
+        #expect(ChunkStitcher.stitch(
+            previous: "и разработка и вероятно какой-то фикс багов",
+            next: next) == next)
+    }
 }

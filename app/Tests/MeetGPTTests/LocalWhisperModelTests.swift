@@ -39,6 +39,67 @@ struct LocalWhisperModelTests {
             isAppleSilicon: false, memoryGB: 64, chipTier: nil) == "base")
     }
 
+    @Test("post-call uses Turbo only when capable and already available")
+    func postCallModelSelection() {
+        let turbo = LocalWhisperModel.largeVariant
+        #expect(LocalWhisperModel.postCallRefinementModel(
+            liveModel: turbo,
+            availableModels: [turbo],
+            isAppleSilicon: true,
+            memoryGB: 32,
+            chipTier: .pro,
+            chipGeneration: 4) == turbo)
+
+        #expect(LocalWhisperModel.postCallRefinementModel(
+            liveModel: "small",
+            availableModels: ["small"],
+            isAppleSilicon: true,
+            memoryGB: 32,
+            chipTier: .pro,
+            chipGeneration: 4) == "small")
+
+        #expect(LocalWhisperModel.postCallRefinementModel(
+            liveModel: turbo,
+            availableModels: [turbo, "small"],
+            isAppleSilicon: true,
+            memoryGB: 16,
+            chipTier: .plain,
+            chipGeneration: 4) == "small")
+    }
+
+    @Test("post-call never downloads Small over an available legacy Base")
+    func postCallAvoidsSurpriseDownload() {
+        #expect(LocalWhisperModel.postCallRefinementModel(
+            liveModel: "base",
+            availableModels: ["base"],
+            isAppleSilicon: true,
+            memoryGB: 32,
+            chipTier: .pro,
+            chipGeneration: 4) == "base")
+    }
+
+    @Test("legacy automatic base upgrades once without overriding deliberate choices")
+    func legacyAutomaticBaseMigration() {
+        #expect(LocalWhisperModel.legacyAutomaticDefaultReplacement(
+            saved: "base", provenance: .automatic,
+            migrationCompleted: false, recommended: "small") == "small")
+        #expect(LocalWhisperModel.legacyAutomaticDefaultReplacement(
+            saved: "base", provenance: .user,
+            migrationCompleted: false, recommended: "small") == nil)
+        #expect(LocalWhisperModel.legacyAutomaticDefaultReplacement(
+            saved: "base", provenance: .adaptive,
+            migrationCompleted: false, recommended: "small") == nil)
+        #expect(LocalWhisperModel.legacyAutomaticDefaultReplacement(
+            saved: "base", provenance: .legacyUnknown,
+            migrationCompleted: false, recommended: "small") == nil)
+        #expect(LocalWhisperModel.legacyAutomaticDefaultReplacement(
+            saved: "base", provenance: .automatic,
+            migrationCompleted: false, recommended: "base") == nil)
+        #expect(LocalWhisperModel.legacyAutomaticDefaultReplacement(
+            saved: "base", provenance: .automatic,
+            migrationCompleted: true, recommended: "small") == nil)
+    }
+
     @Test("chip generation parses from the CPU brand string")
     func chipGenerationParse() {
         #expect(Hardware.appleChipGeneration(brand: "Apple M1 Pro") == 1)
@@ -180,17 +241,24 @@ struct LocalWhisperModelTests {
 
     private func configPersistenceBody() {
         let key = "transcription.localModel"
-        let saved = UserDefaults.standard.string(forKey: key)
+        let defaults = UserDefaults.standard
+        let keys = [
+            key,
+            "transcription.localModelUserChosen",
+            "transcription.localModelProvenance",
+            Config.localModelHardwareDefaultMigrationKey,
+        ]
+        let saved = Dictionary(
+            uniqueKeysWithValues: keys.map { ($0, defaults.object(forKey: $0)) })
         defer {
-            if let saved { UserDefaults.standard.set(saved, forKey: key) }
-            else { UserDefaults.standard.removeObject(forKey: key) }
+            for key in keys {
+                if let value = saved[key] { defaults.set(value, forKey: key) }
+                else { defaults.removeObject(forKey: key) }
+            }
         }
 
         // An EXPLICIT pick is never rewritten by the default correction that
         // downgrades machines the old ladder over-provisioned.
-        let chosenKey = "transcription.localModelUserChosen"
-        let previouslyChosen = UserDefaults.standard.bool(forKey: chosenKey)
-        defer { UserDefaults.standard.set(previouslyChosen, forKey: chosenKey) }
         Config.localModelChosenByUser = true
         Config.localWhisperModel = LocalWhisperModel.largeVariant
         #expect(Config.localWhisperModel == LocalWhisperModel.largeVariant)
@@ -201,7 +269,7 @@ struct LocalWhisperModelTests {
         // other suites read in parallel, and it raced them.
 
         // A stale/garbage stored value falls back to the hardware default.
-        UserDefaults.standard.set("not-a-model", forKey: key)
+        defaults.set("not-a-model", forKey: key)
         #expect(LocalWhisperModel.isKnown(Config.localWhisperModel))
     }
 
@@ -240,6 +308,68 @@ struct LocalWhisperModelTests {
         #expect(LocalWhisperTranscription.acceptedAutoLanguage(
             "pl", supportedLanguages: ["pl"]
         ) == "pl")
+    }
+
+    @Test("Auto retries an unstable blip but preserves supported code switches")
+    func automaticLanguageRecovery() {
+        #expect(LocalWhisperTranscription.autoRecoveryLanguage(
+            detected: ["zh", "uk"], previous: "ru") == "ru")
+        #expect(LocalWhisperTranscription.autoRecoveryLanguage(
+            detected: ["pt"], previous: "ru") == nil)
+        #expect(LocalWhisperTranscription.autoRecoveryLanguage(
+            detected: ["pt"], previous: "ru",
+            acceptedHasReliableSpeech: false) == "ru")
+        #expect(LocalWhisperTranscription.autoRecoveryLanguage(
+            detected: ["zh"], previous: nil) == nil)
+    }
+
+    @Test("a clearly Cyrillic private call seeds Auto without replacing Auto")
+    func cyrillicLanguageHint() {
+        let russian = String(
+            repeating: "мы обсуждаем продукт и следующие шаги ", count: 4)
+        let english = String(
+            repeating: "we are discussing the product and next steps ", count: 4)
+        #expect(LocalWhisperTranscription.fallbackAutoLanguageHint(
+            configured: "multi", recentText: russian) == "ru")
+        #expect(LocalWhisperTranscription.fallbackAutoLanguageHint(
+            configured: "multi", recentText: english) == nil)
+        #expect(LocalWhisperTranscription.fallbackAutoLanguageHint(
+            configured: "en", recentText: russian) == nil)
+    }
+
+    @Test("one supported conflict does not replace stable Auto; a sustained switch does")
+    func autoLanguageConsensus() {
+        let russian = LocalWhisperTranscription.AutoLanguageState(
+            stable: "ru", conflictingCandidate: nil, conflictingCount: 0)
+        let firstPortuguese = LocalWhisperTranscription.updatedAutoLanguageState(
+            russian, observed: "pt")
+        #expect(firstPortuguese.stable == "ru")
+        #expect(firstPortuguese.conflictingCandidate == "pt")
+        let secondPortuguese = LocalWhisperTranscription.updatedAutoLanguageState(
+            firstPortuguese, observed: "pt")
+        #expect(secondPortuguese.stable == "pt")
+        #expect(secondPortuguese.conflictingCandidate == nil)
+    }
+
+    @Test("the Auto seed lasts one recording generation")
+    func autoLanguageHintLifecycle() async {
+        let local = LocalWhisperTranscription(
+            model: "base", language: "multi", autoLanguageHint: "ru")
+        await local.registerGenerationForTesting(20)
+        #expect(await local.stableAutoLanguageForTesting() == "ru")
+        await local.cancelPendingTranscriptions(beforeGeneration: 20)
+        #expect(await local.stableAutoLanguageForTesting() == "ru")
+        await local.registerGenerationForTesting(21)
+        #expect(await local.stableAutoLanguageForTesting() == nil)
+        await local.shutdown()
+
+        let stoppedBeforeFirstChunk = LocalWhisperTranscription(
+            model: "base", language: "multi", autoLanguageHint: "ru")
+        await stoppedBeforeFirstChunk.cancelPendingTranscriptions(beforeGeneration: 30)
+        #expect(await stoppedBeforeFirstChunk.stableAutoLanguageForTesting() == "ru")
+        await stoppedBeforeFirstChunk.registerGenerationForTesting(31)
+        #expect(await stoppedBeforeFirstChunk.stableAutoLanguageForTesting() == nil)
+        await stoppedBeforeFirstChunk.shutdown()
     }
 
     @Test("Core ML prediction errors are recoverable, unrelated errors are not")

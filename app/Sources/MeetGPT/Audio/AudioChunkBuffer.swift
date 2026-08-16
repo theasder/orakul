@@ -4,7 +4,14 @@ import Foundation
 /// Accumulates incoming PCM buffers, converts to mono 16 kHz Int16 PCM,
 /// and emits fixed-duration chunks for transcription.
 final class AudioChunkBuffer {
-    typealias ChunkHandler = (_ wavData: Data, _ durationSeconds: Double) -> Void
+    struct ChunkTiming: Equatable {
+        /// Samples encoded and sent to the recognizer.
+        let audioDuration: TimeInterval
+        /// Span from the first encoded sample to callback delivery. This can be
+        /// longer than encoded audio when pause-boundary search leaves a tail.
+        let captureSpan: TimeInterval
+    }
+    typealias ChunkHandler = (_ wavData: Data, _ timing: ChunkTiming) -> Void
 
     private let targetSampleRate: Double = 16_000
     private let chunkSeconds: Double
@@ -70,6 +77,24 @@ final class AudioChunkBuffer {
         }
     }
 
+    /// Attach retention without replacing a live-stream sample consumer.
+    func addSampleObserver(_ observer: @escaping ([Int16]) -> Void) {
+        lock.lock(); defer { lock.unlock() }
+        let previous = sampleHandler
+        sampleHandler = { samples in
+            previous?(samples)
+            observer(samples)
+        }
+    }
+
+    /// Start a new route at a clean audio boundary without changing its
+    /// callbacks. Used when a streaming provider degrades to Local: buffered
+    /// cloud-era PCM must not leak into the retained private suffix.
+    func discardBufferedSamples() {
+        lock.lock(); defer { lock.unlock() }
+        sampleAccumulator.removeAll(keepingCapacity: true)
+    }
+
     init(chunkSeconds: Double,
          label: String = "audio",
          overlapSeconds: Double = Config.transcriptionChunkOverlapSeconds,
@@ -97,7 +122,7 @@ final class AudioChunkBuffer {
                      onSamples: (([Int16]) -> Void)?,
                      discardBufferedSamples: Bool = true,
                      flushBufferedSamplesToPreviousHandler: Bool = false) {
-        var trailingChunk: (handler: ChunkHandler, wav: Data, duration: Double)?
+        var trailingChunk: (handler: ChunkHandler, wav: Data, timing: ChunkTiming)?
         lock.lock()
         if flushBufferedSamplesToPreviousHandler, !sampleAccumulator.isEmpty {
             let samples = sampleAccumulator
@@ -109,7 +134,7 @@ final class AudioChunkBuffer {
                 trailingChunk = (
                     self.onChunk,
                     WAVEncoder.encode(samples: samples, sampleRate: Int(targetSampleRate)),
-                    duration)
+                    ChunkTiming(audioDuration: duration, captureSpan: duration))
             } else {
                 chunksGated += 1
             }
@@ -125,7 +150,7 @@ final class AudioChunkBuffer {
         // lease synchronously, while future capture is already guaranteed to
         // observe only the new handler.
         if let trailingChunk {
-            trailingChunk.handler(trailingChunk.wav, trailingChunk.duration)
+            trailingChunk.handler(trailingChunk.wav, trailingChunk.timing)
         }
     }
 
@@ -146,6 +171,7 @@ final class AudioChunkBuffer {
         let samplesPerChunk = Int(targetSampleRate * chunkSeconds)
         let overlapSamples = min(Int(targetSampleRate * overlapSeconds), samplesPerChunk - 1)
         while sampleAccumulator.count >= samplesPerChunk {
+            let captureSpan = Double(sampleAccumulator.count) / targetSampleRate
             // Prefer to end the window at a PAUSE rather than on the clock.
             //
             // A fixed boundary cuts wherever it lands, which for a fast talker
@@ -172,7 +198,9 @@ final class AudioChunkBuffer {
             }
             chunksEmitted += 1
             let wav = WAVEncoder.encode(samples: slice, sampleRate: Int(targetSampleRate))
-            onChunk(wav, chunkSeconds)
+            onChunk(wav, ChunkTiming(
+                audioDuration: Double(slice.count) / targetSampleRate,
+                captureSpan: captureSpan))
         }
     }
 
@@ -233,7 +261,7 @@ final class AudioChunkBuffer {
         sampleAccumulator.removeAll(keepingCapacity: false)
         guard !vadEnabled || VoiceActivity.isVoiced(samples, threshold: vadThreshold) else { return }
         let wav = WAVEncoder.encode(samples: samples, sampleRate: Int(targetSampleRate))
-        onChunk(wav, duration)
+        onChunk(wav, ChunkTiming(audioDuration: duration, captureSpan: duration))
     }
 
     private func heartbeatIfDue() {

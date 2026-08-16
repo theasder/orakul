@@ -6,6 +6,8 @@ final class SessionAudioRecorder {
     private let sampleRate = 16_000
     private let cap: Int
     private var samples: [Int16] = []
+    private var truncated = false
+    private var sealed = false
     private let lock = NSLock()
 
     /// Default cap ≈ 60 minutes at 16 kHz mono (~115 MB).
@@ -13,21 +15,68 @@ final class SessionAudioRecorder {
         self.cap = 16_000 * 60 * maxMinutes
     }
 
+    /// Small-cap seam for lifecycle/truncation tests without allocating an
+    /// hour of PCM.
+    init(maxSamplesForTesting: Int) {
+        self.cap = max(0, maxSamplesForTesting)
+    }
+
     func append(_ batch: [Int16]) {
         lock.lock(); defer { lock.unlock() }
+        guard !sealed else { return }
         let room = cap - samples.count
-        guard room > 0 else { return }
-        samples.append(contentsOf: batch.prefix(room))
+        let accepted = max(0, min(room, batch.count))
+        if accepted < batch.count { truncated = true }
+        guard accepted > 0 else { return }
+        samples.append(contentsOf: batch.prefix(accepted))
     }
 
     func reset() {
         lock.lock(); defer { lock.unlock() }
         samples.removeAll(keepingCapacity: false)
+        truncated = false
+        sealed = false
+    }
+
+    /// Freeze retained PCM at Stop. Audio callbacks queued after consent ended
+    /// cannot extend a destructive post-call decode.
+    func seal() {
+        lock.lock(); defer { lock.unlock() }
+        sealed = true
+    }
+
+    /// Drop old retained audio without reopening a stopped recorder. The next
+    /// real recording calls `reset()` after capture starts.
+    func discard() {
+        lock.lock(); defer { lock.unlock() }
+        samples.removeAll(keepingCapacity: false)
+        truncated = false
     }
 
     var isEmpty: Bool {
         lock.lock(); defer { lock.unlock() }
         return samples.isEmpty
+    }
+
+    var retainedSampleCount: Int {
+        lock.lock(); defer { lock.unlock() }
+        return samples.count
+    }
+
+    var retainedDuration: TimeInterval {
+        TimeInterval(retainedSampleCount) / TimeInterval(sampleRate)
+    }
+
+    var isTruncated: Bool {
+        lock.lock(); defer { lock.unlock() }
+        return truncated
+    }
+
+    /// Immutable PCM snapshot for bounded post-call windows. Keeping the split
+    /// outside the lock prevents a long meeting from blocking the audio tap.
+    func sampleSnapshot() -> [Int16] {
+        lock.lock(); defer { lock.unlock() }
+        return samples
     }
 
     /// Snapshot the accumulated audio as a PCM-16 WAV.

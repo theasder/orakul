@@ -296,7 +296,7 @@ struct DeepgramHandoffIntegrationTests {
         var localFactoryCalls = 0
         return AppState(
             credentialStore: InMemoryKeychain(),
-            transcriptionServiceFactory: { engine, _, _, _ in
+            transcriptionServiceFactory: { engine, _, _, _, _ in
                 switch engine {
                 case .local:
                     defer { localFactoryCalls += 1 }
@@ -425,7 +425,7 @@ struct DeepgramHandoffIntegrationTests {
         let initial = HandoffTranscriber(text: "initial")
         let state = AppState(
             credentialStore: InMemoryKeychain(),
-            transcriptionServiceFactory: { _, _, _, _ in initial },
+            transcriptionServiceFactory: { _, _, _, _, _ in initial },
             transcriptionEngineAvailability: { $0 == .local })
 
         #expect(!state.selectTranscriptionEngine(.deepgram))
@@ -446,7 +446,7 @@ struct DeepgramHandoffIntegrationTests {
             let streamers = StreamerCapture()
             let state = AppState(
                 credentialStore: InMemoryKeychain(),
-                transcriptionServiceFactory: { engine, _, _, _ -> TranscriptionService in
+                transcriptionServiceFactory: { engine, _, _, _, _ -> TranscriptionService in
                     if engine == .local { return previous }
                     return placeholder
                 },
@@ -664,7 +664,7 @@ struct DeepgramHandoffIntegrationTests {
         var localFactoryCalls = 0
         let state = AppState(
             credentialStore: InMemoryKeychain(),
-            transcriptionServiceFactory: { engine, _, _, _ -> TranscriptionService in
+            transcriptionServiceFactory: { engine, _, _, _, _ -> TranscriptionService in
                 switch engine {
                 case .local:
                     defer { localFactoryCalls += 1 }

@@ -16,6 +16,30 @@ struct TranscriptionEngineLiveSwitchTests {
             assemblyDiarization: false)
     }
 
+    @Test("account hydration republishes the engine the next recording will use")
+    func hydrationKeepsSettingsAndRuntimeAligned() {
+        let idle = AppState.transcriptionEngineAfterCredentialHydration(
+            displayed: .local,
+            resolvedAfterHydration: .deepgram,
+            callInFlight: false)
+        #expect(idle == .deepgram)
+
+        // If the user already began the private call while Keychain was
+        // loading, hydration must not arm cloud for the following call.
+        let recording = AppState.transcriptionEngineAfterCredentialHydration(
+            displayed: .local,
+            resolvedAfterHydration: .deepgram,
+            callInFlight: true)
+        #expect(recording == .local)
+
+        #expect(AppState.recordingBoundaryEngine(
+            displayed: recording,
+            displayedIsAvailable: true) == .local)
+        #expect(AppState.recordingBoundaryEngine(
+            displayed: .deepgram,
+            displayedIsAvailable: false) == .local)
+    }
+
     @Test("choosing Instant replaces the active Local engine during the call")
     func localToInstantUpdatesActiveRuntimeState() {
         let savedEngine = Config.transcriptionEngineValue
