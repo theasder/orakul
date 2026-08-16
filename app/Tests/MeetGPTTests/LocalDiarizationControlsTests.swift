@@ -6,20 +6,20 @@ import ViewInspector
 
 private actor LocalDiarizationUIProbe {
     private var expectedCount: Int?
+    private var countWaiter: CheckedContinuation<Int, Never>?
 
     func run(expected: Int) async throws -> [SpeakerSegment] {
         expectedCount = expected
+        countWaiter?.resume(returning: expected)
+        countWaiter = nil
         try await Task.sleep(nanoseconds: 10_000_000_000)
         return [SpeakerSegment(
             speakerID: "remote", startSeconds: 0, endSeconds: 20)]
     }
 
-    func waitForCount() async -> Int? {
-        for _ in 0..<400 {
-            if let expectedCount { return expectedCount }
-            try? await Task.sleep(nanoseconds: 5_000_000)
-        }
-        return expectedCount
+    func nextCount() async -> Int {
+        if let expectedCount { return expectedCount }
+        return await withCheckedContinuation { countWaiter = $0 }
     }
 }
 
@@ -90,9 +90,8 @@ struct LocalDiarizationControlsTests {
             }
 
             try idle.find(button: "Подписать говорящих").tap()
-            let receivedCount = await probe.waitForCount()
-            #expect(receivedCount == 3, "модель получила \(String(describing: receivedCount))")
             #expect(state.localDiarizationRunning)
+            #expect(await probe.nextCount() == 3)
 
             let running = try rendered(state: state, manager: manager)
             #expect(throws: Never.self) {
