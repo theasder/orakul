@@ -103,28 +103,41 @@ struct TranscriptNoiseRecoveryTests {
         }
     }
 
-    @Test("glossary-only hallucinations are rejected")
-    func glossaryOnly() {
-        let glossary = ["Orakul", "Proglib"]
-        #expect(TranscriptDeduplicator.isNoiseArtifact(
-            entry("Orakul."), glossary: glossary))
-        #expect(TranscriptDeduplicator.isNoiseArtifact(
+    @Test("project terms remain valid short answers even when in the glossary")
+    func glossaryTermsAreSpeech() {
+        let glossary = ["Asana", "Jira", "Orakul", "Proglib"]
+        for term in glossary {
+            #expect(!TranscriptDeduplicator.isNoiseArtifact(
+                entry(term), glossary: glossary), "\(term)")
+        }
+        #expect(!TranscriptDeduplicator.isNoiseArtifact(
             entry("Orakul, Proglib"), glossary: glossary))
-        #expect(!TranscriptDeduplicator.isNoiseArtifact(
-            entry("Мы показали Orakul инвесторам"), glossary: glossary))
-        #expect(!TranscriptDeduplicator.isNoiseArtifact(
-            entry("Orakul."), glossary: []))
     }
 
-    @Test("same-track garbled tail is rejected only near its host")
+    @Test("same-track short speech is preserved without speaker proof")
     func sameTrackTail() {
         let host = entry(
             "Давай посмотрим на общие цифры продаж", .system, at: 0)
-        #expect(TranscriptDeduplicator.isDuplicate(
+        #expect(!TranscriptDeduplicator.isDuplicate(
             entry("шие цифры продаш.", .system, at: 5), of: [host]))
         #expect(!TranscriptDeduplicator.isDuplicate(
             entry("Хорошие цифры!", .system, at: 5), of: [host]))
         #expect(!TranscriptDeduplicator.isDuplicate(
             entry("шие цифры продаш.", .system, at: 30), of: [host]))
+    }
+
+    @Test("different speakers may repeat the same short answer on one track")
+    func differentSpeakerRepeat() {
+        let first = TranscriptEntry(
+            source: .system,
+            text: "Да, я полностью с этим согласен",
+            timestamp: Date(timeIntervalSinceReferenceDate: 0),
+            speaker: "Speaker A")
+        let second = TranscriptEntry(
+            source: .system,
+            text: "Да, я полностью с этим согласен",
+            timestamp: Date(timeIntervalSinceReferenceDate: 2),
+            speaker: "Speaker B")
+        #expect(!TranscriptDeduplicator.isDuplicate(second, of: [first]))
     }
 }

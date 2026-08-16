@@ -16,6 +16,37 @@ struct TranscriptionEngineLiveSwitchTests {
             assemblyDiarization: false)
     }
 
+    @Test("one handoff boundary orders an equal-time old final before the new route")
+    func equalWallClockHandoffOrder() {
+        let boundary = Date(timeIntervalSinceReferenceDate: 1_000)
+        let old = RecordingGenerationToken(
+            1, routeStartedAt: boundary.addingTimeInterval(-10))
+        old.retireRoute(at: boundary)
+        let nextStart = RecordingGenerationToken.nextRouteStart(after: boundary)
+        let next = RecordingGenerationToken(1, routeStartedAt: nextStart)
+
+        let oldFinal = old.timestampForStreamingResult(arrivedAt: boundary)
+        let nextChunk = next.captureStart(duration: 0, completedAt: boundary)
+        #expect(oldFinal == boundary)
+        #expect(nextChunk == nextStart)
+        #expect(oldFinal < nextChunk)
+    }
+
+    @Test("credit fallback advances the shared route epoch past its old final")
+    func equalWallClockFallbackOrder() {
+        let boundary = Date(timeIntervalSinceReferenceDate: 2_000)
+        let token = RecordingGenerationToken(
+            1, routeStartedAt: boundary.addingTimeInterval(-10))
+        let nextStart = token.transitionFromStreamingToChunked(at: boundary)
+
+        let oldFinal = token.timestampForStreamingResult(arrivedAt: boundary)
+        let nextChunk = token.captureStart(duration: 0, completedAt: boundary)
+        #expect(oldFinal == boundary)
+        #expect(nextStart > boundary)
+        #expect(nextChunk == nextStart)
+        #expect(oldFinal < nextChunk)
+    }
+
     @Test("account hydration republishes the engine the next recording will use")
     func hydrationKeepsSettingsAndRuntimeAligned() {
         let idle = AppState.transcriptionEngineAfterCredentialHydration(
@@ -60,6 +91,59 @@ struct TranscriptionEngineLiveSwitchTests {
         #expect(state.liveTranscriptionConfiguration().active?.engine == .deepgram)
         #expect(state.selectedTranscriptionEngine == .deepgram)
         #expect(state.pendingEngineChange == nil)
+    }
+
+    @Test("engine selection is rejected while paused so Settings cannot outrun routing")
+    func pausedEngineSelectionIsRejected() {
+        let savedEngine = Config.transcriptionEngineValue
+        defer { Config.transcriptionEngineValue = savedEngine }
+        Config.transcriptionEngineValue = .local
+        var handoffs: [TranscriptionEngine] = []
+        let state = AppState(
+            credentialStore: InMemoryKeychain(),
+            transcriptionEngineSwitchOverride: { engine in
+                handoffs.append(engine)
+                return true
+            })
+        state.applyTestActiveRecordingSettings(snapshot(engine: .local))
+        state.applyTestWorkspace(recording: true)
+        state.pauseRecording()
+
+        #expect(!state.selectTranscriptionEngine(.deepgram))
+        #expect(handoffs.isEmpty)
+        #expect(state.selectedTranscriptionEngine == .local)
+        #expect(Config.transcriptionEngineValue == .local)
+        #expect(state.liveTranscriptionConfiguration().active?.engine == .local)
+        #expect(state.lastError?.contains("Возобновите") == true)
+    }
+
+    @Test("Local to cloud invalidates the old final-pass interval across a round trip")
+    func cloudRoundTripInvalidatesLocalContinuity() {
+        let savedEngine = Config.transcriptionEngineValue
+        defer { Config.transcriptionEngineValue = savedEngine }
+        Config.transcriptionEngineValue = .local
+        let state = AppState(
+            credentialStore: InMemoryKeychain(),
+            transcriptionEngineSwitchOverride: { _ in true })
+        let start = Date(timeIntervalSinceReferenceDate: 40_000)
+        state.transcript = [TranscriptEntry(
+            source: .system,
+            text: (0..<20).map { "word\($0)" }.joined(separator: " "),
+            timestamp: start,
+            transcriptionEngine: .local)]
+        state.applyTestLocalFinalPassRetention(
+            samples: AudioFixtures.voicedInt16(
+                count: 2 * LocalFinalPass.sampleRate),
+            startedAt: start,
+            preparedModel: "base")
+        state.applyTestActiveRecordingSettings(snapshot(engine: .local))
+        state.applyTestWorkspace(recording: true)
+
+        #expect(state.selectTranscriptionEngine(.server))
+        #expect(state.selectTranscriptionEngine(.local))
+        state.applyTestWorkspace(recording: false)
+        #expect(!state.canRetranscribeLocally,
+                "the pre-cloud PCM interval became eligible again")
     }
 
     @Test("a failed Instant handoff keeps Local active and reports the failure")

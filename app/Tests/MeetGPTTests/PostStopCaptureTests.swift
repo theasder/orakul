@@ -107,4 +107,29 @@ struct PostStopCaptureTests {
         app.ingestStreamedLine(text: "an imported line", source: .system)
         #expect(app.transcript.count == 1)
     }
+
+    @Test("streamed-final drain is bounded and test-overridable")
+    func streamedFinalDrainDelay() {
+        let retiredAt = Date(timeIntervalSinceReferenceDate: 100)
+        let stop = retiredAt.addingTimeInterval(60)
+        #expect(AppState.streamedFinalDrainBoundaryAtStop(
+            hadActiveStream: false,
+            previouslyRetiredAt: retiredAt,
+            stopBoundary: stop) == stop)
+        #expect(AppState.streamedFinalDrainBoundaryAtStop(
+            hadActiveStream: false,
+            previouslyRetiredAt: nil,
+            stopBoundary: stop) == nil)
+        #expect(AppState.remainingStreamedFinalDrainDelay(
+            retiredAt: retiredAt,
+            now: retiredAt.addingTimeInterval(1)) == 2)
+        #expect(AppState.remainingStreamedFinalDrainDelay(
+            retiredAt: retiredAt,
+            now: retiredAt.addingTimeInterval(4)) == 0)
+        AppState.$streamedFinalDrainGraceWindow.withValue(0) {
+            #expect(AppState.remainingStreamedFinalDrainDelay(
+                retiredAt: retiredAt,
+                now: retiredAt) == 0)
+        }
+    }
 }

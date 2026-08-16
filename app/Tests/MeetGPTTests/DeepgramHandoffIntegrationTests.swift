@@ -318,6 +318,37 @@ struct DeepgramHandoffIntegrationTests {
             deepgramAuthOverride: auth)
     }
 
+    @Test("every explicit Instant to Private switch starts retained Local PCM")
+    func explicitInstantToPrivateRetainsAudio() {
+        let savedToggle = Config.transcriptionPostStopFinalPassEnabled
+        defer { Config.transcriptionPostStopFinalPassEnabled = savedToggle }
+        Config.transcriptionPostStopFinalPassEnabled = true
+
+        let previous = HandoffTranscriber(text: "private words")
+        let placeholder = HandoffTranscriber(text: "instant placeholder")
+        let nextLocal = HandoffTranscriber(text: "next private words")
+        let state = makeState(
+            auth: .key("unit-key"),
+            previous: previous,
+            placeholder: placeholder,
+            nextLocal: nextLocal,
+            transport: InertDeepgramTransport(),
+            streamers: StreamerCapture())
+        let systemChunker = AudioChunkBuffer(
+            chunkSeconds: 1, overlapSeconds: 0) { _, _ in }
+        let micChunker = AudioChunkBuffer(
+            chunkSeconds: 1, overlapSeconds: 0) { _, _ in }
+        state.installTestLiveTranscriptionRuntime(
+            settings: handoffSnapshot(.deepgram),
+            systemChunker: systemChunker,
+            micChunker: micChunker,
+            generation: 39)
+
+        #expect(state.selectTranscriptionEngine(.local))
+        systemChunker.onSamples?([1, 2, 3])
+        #expect(state.retainedAudioSampleCountForTesting == 3)
+    }
+
     @Test("real Local to Instant switch starts both routes, then returns to Local")
     func successfulSwitchExecutesProductionRoutes() async throws {
         try await withUnhurriedReadiness {

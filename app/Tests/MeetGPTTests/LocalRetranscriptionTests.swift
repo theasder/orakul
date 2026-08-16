@@ -2,25 +2,229 @@ import Foundation
 import Testing
 @testable import MeetGPT
 
-/// Re-transcribing the finished recording locally, in one pass.
+private actor BlockingLocalFinalPassTranscriber: TranscriptionService {
+    private var continuation: CheckedContinuation<String, Never>?
+    private var started = false
+
+    func transcribe(wav: Data) async throws -> String {
+        started = true
+        return await withCheckedContinuation { continuation = $0 }
+    }
+
+    func waitUntilStarted() async -> Bool {
+        for _ in 0..<200 {
+            if started { return true }
+            try? await Task.sleep(nanoseconds: 5_000_000)
+        }
+        return started
+    }
+
+    func release(_ text: String) {
+        continuation?.resume(returning: text)
+        continuation = nil
+    }
+}
+
+private actor ImmediateLocalFinalPassTranscriber: TranscriptionService {
+    let text: String
+    init(_ text: String) { self.text = text }
+    func transcribe(wav: Data) async throws -> String { text }
+}
+
+/// Re-transcribing the finished recording locally in bounded windows.
 ///
-/// Measured across twelve real recordings, a single whole-file decode beat the
-/// live 6-second pipeline on EVERY one — mean WER 0.2541 to 0.1731 — at
-/// 0.12–0.16x realtime. The live path cuts at 6 seconds because a caption has
-/// to appear while people are still talking; once the call is over that
-/// constraint is gone.
+/// A five-minute whole-file decode returned only 92 words against a 611-word
+/// reference. Twelve-second windows with overlap were the measured safe
+/// default, and the replacement remains transactional.
 ///
 /// The tests that matter are the refusals. This rewrites a transcript that took
 /// a whole meeting to produce, so every path that could replace something good
 /// with something worse — or with nothing — is pinned here.
 @MainActor
-@Suite("Local re-transcription")
+@Suite("Local re-transcription", .serialized)
 struct LocalRetranscriptionTests {
 
     private func finishedCall() -> AppState {
         let state = AppState(credentialStore: InMemoryKeychain())
         state.applyTestWorkspace(recording: false)
         return state
+    }
+
+    private func installEligibleLocalCall(_ state: AppState) {
+        let start = Date(timeIntervalSinceReferenceDate: 20_000)
+        state.transcript = [TranscriptEntry(
+            source: .system,
+            text: (0..<20).map { "word\($0)" }.joined(separator: " "),
+            timestamp: start,
+            transcriptionEngine: .local)]
+        state.applyTestLocalFinalPassRetention(
+            samples: AudioFixtures.voicedInt16(count: 2 * LocalFinalPass.sampleRate),
+            startedAt: start,
+            preparedModel: "base")
+    }
+
+    @Test("an ordinary finished Local Whisper call remains eligible after reset")
+    func ordinaryLocalCallIsEligible() {
+        let state = finishedCall()
+        installEligibleLocalCall(state)
+        #expect(state.canRetranscribeLocally)
+    }
+
+    @Test("retention follows the opt-in toggle")
+    func retentionRequiresOptIn() {
+        #expect(!AppState.shouldRetainSessionAudio(
+            engine: .local,
+            hasAssemblyAI: false,
+            assemblyDiarization: false,
+            localFinalPassEnabled: false))
+        #expect(AppState.shouldRetainSessionAudio(
+            engine: .local,
+            hasAssemblyAI: false,
+            assemblyDiarization: false,
+            localFinalPassEnabled: true))
+    }
+
+    @Test("pause invalidates linear final-pass time and releases unshared PCM")
+    func pauseInvalidatesFinalPass() {
+        let state = AppState(credentialStore: InMemoryKeychain())
+        state.applyTestWorkspace(recording: true)
+        installEligibleLocalCall(state)
+        state.pauseRecording()
+        state.resumeRecording()
+        state.applyTestWorkspace(recording: false)
+        #expect(!state.canRetranscribeLocally)
+        #expect(state.retainedAudioSampleCountForTesting == 0)
+    }
+
+    @Test("accepted refinement keeps PCM needed by opted-in diarization")
+    func assemblyConsumerKeepsAudio() {
+        #expect(!AppState.shouldReleaseRetainedAudioAfterLocalFinalPass(
+            hasAssemblyAI: true,
+            assemblyDiarization: true))
+        #expect(AppState.shouldReleaseRetainedAudioAfterLocalFinalPass(
+            hasAssemblyAI: false,
+            assemblyDiarization: true))
+        #expect(AppState.shouldReleaseRetainedAudioAfterLocalFinalPass(
+            hasAssemblyAI: true,
+            assemblyDiarization: false))
+    }
+
+    @Test("PCM retained only for diarization does not authorize Local replacement")
+    func sharedPCMDoesNotOptInFinalPass() {
+        let state = finishedCall()
+        let start = Date(timeIntervalSinceReferenceDate: 30_000)
+        state.transcript = [TranscriptEntry(
+            source: .system,
+            text: (0..<20).map { "word\($0)" }.joined(separator: " "),
+            timestamp: start,
+            transcriptionEngine: .local)]
+        state.applyTestLocalFinalPassRetention(
+            samples: AudioFixtures.voicedInt16(
+                count: 2 * LocalFinalPass.sampleRate),
+            startedAt: start,
+            preparedModel: "base",
+            optedIn: false)
+
+        #expect(state.retainedAudioSampleCountForTesting > 0)
+        #expect(!state.canRetranscribeLocally)
+    }
+
+    @Test("Clear cancels and revision-blocks a non-cooperative manual pass")
+    func clearCancelsManualPass() async {
+        let service = BlockingLocalFinalPassTranscriber()
+        let state = AppState(
+            credentialStore: InMemoryKeychain(),
+            localFinalPassServiceFactory: { _, _ in service })
+        state.applyTestWorkspace(recording: false)
+        installEligibleLocalCall(state)
+        state.retranscribeLocallyNow()
+        #expect(await service.waitUntilStarted())
+
+        state.clearAll()
+        await service.release((0..<20).map { "word\($0)" }.joined(separator: " "))
+        await Task.yield()
+        #expect(state.transcript.isEmpty)
+        #expect(state.retainedAudioSampleCountForTesting == 0)
+        #expect(!state.localRetranscribing)
+    }
+
+    @Test("accepted final pass releases PCM with no other opted-in consumer")
+    func acceptedPassReleasesAudio() async {
+        let words = (0..<20).map { "word\($0)" }.joined(separator: " ")
+        let service = ImmediateLocalFinalPassTranscriber(words)
+        let state = AppState(
+            credentialStore: InMemoryKeychain(),
+            localFinalPassServiceFactory: { _, _ in service })
+        state.applyTestWorkspace(recording: false)
+        installEligibleLocalCall(state)
+
+        state.retranscribeLocallyNow()
+        for _ in 0..<10_000 {
+            if !state.localRetranscribing { break }
+            await Task.yield()
+        }
+        #expect(!state.localRetranscribing)
+        #expect(state.retainedAudioSampleCountForTesting == 0)
+        #expect(state.transcript.contains { $0.text == words })
+    }
+
+    @Test("decoder failure preserves live text and releases unshared PCM")
+    func failedPassReleasesAudio() async {
+        let service = ImmediateLocalFinalPassTranscriber("")
+        let state = AppState(
+            credentialStore: InMemoryKeychain(),
+            localFinalPassServiceFactory: { _, _ in service })
+        state.applyTestWorkspace(recording: false)
+        installEligibleLocalCall(state)
+        let live = state.transcript
+
+        state.retranscribeLocallyNow()
+        for _ in 0..<10_000 {
+            if !state.localRetranscribing { break }
+            await Task.yield()
+        }
+        #expect(state.transcript == live)
+        #expect(state.retainedAudioSampleCountForTesting == 0)
+        #expect(!state.canRetranscribeLocally)
+    }
+
+    @Test("quality refusal preserves live text and releases unshared PCM")
+    func refusedPassReleasesAudio() async {
+        let service = ImmediateLocalFinalPassTranscriber("word0 word1")
+        let state = AppState(
+            credentialStore: InMemoryKeychain(),
+            localFinalPassServiceFactory: { _, _ in service })
+        state.applyTestWorkspace(recording: false)
+        installEligibleLocalCall(state)
+        let live = state.transcript
+
+        state.retranscribeLocallyNow()
+        for _ in 0..<10_000 {
+            if !state.localRetranscribing { break }
+            await Task.yield()
+        }
+        #expect(state.transcript == live)
+        #expect(state.retainedAudioSampleCountForTesting == 0)
+        #expect(!state.canRetranscribeLocally)
+    }
+
+    @Test("restore-style invalidation cancels an automatic pass")
+    func clearCancelsAutomaticPass() async {
+        let service = BlockingLocalFinalPassTranscriber()
+        let state = AppState(
+            credentialStore: InMemoryKeychain(),
+            localFinalPassServiceFactory: { _, _ in service })
+        state.applyTestWorkspace(recording: false)
+        installEligibleLocalCall(state)
+        let task = state.scheduleAutomaticLocalFinalPass(after: nil, enabled: true)
+        #expect(await service.waitUntilStarted())
+
+        state.clearAll()
+        await service.release((0..<20).map { "word\($0)" }.joined(separator: " "))
+        await task?.value
+        #expect(state.transcript.isEmpty)
+        #expect(state.retainedAudioSampleCountForTesting == 0)
+        #expect(!state.localRetranscribing)
     }
 
     @Test("refuses while a call is still live")
@@ -86,31 +290,6 @@ struct LocalRetranscriptionTests {
         let state = finishedCall()
         Config.transcriptionEngineValue = .deepgram
         #expect(!state.canRetranscribeLocally)
-    }
-
-    @Test("the measured claim is recorded where the code can be checked against it")
-    func measuredClaimIsDocumented() {
-        // Not a behaviour test. The 32% figure is the entire justification for
-        // this feature existing, and a number that lives only in a commit
-        // message gets re-litigated. It is in the doc comment beside the code.
-        let chunkedMean = 0.2541
-        let wholeFileMean = 0.1731
-        #expect((1 - wholeFileMean / chunkedMean) > 0.30)
-    }
-    @Test("the whole-file pass runs without a glossary, on measurement")
-    func wholeFilePassSkipsTheGlossary() {
-        // Recorded as a test because the instinct is to pass it — a glossary is
-        // the biggest lever in the LIVE path (term recall 0.53 to 0.93), and it
-        // was passed here in the first version of this feature.
-        //
-        // Measured on the two IETF fixtures, in THIS pass it bought 5 terms and
-        // cost 14 points of recall: 467 words down to 372 against a 588-word
-        // reference. A fuller transcript is what this pass exists to produce,
-        // so the trade goes the other way here than it does live.
-        let glossaryHelpsLive = 0.93 - 0.53
-        let recallCostWholeFile = 0.626 - 0.488
-        #expect(glossaryHelpsLive > 0, "glossary helps the live chunked path")
-        #expect(recallCostWholeFile > 0.10, "and costs recall in the whole-file pass")
     }
 
 }

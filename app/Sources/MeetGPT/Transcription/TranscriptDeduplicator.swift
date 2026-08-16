@@ -25,9 +25,10 @@ enum TranscriptDeduplicator {
     /// twice minutes apart is kept.
     static let window: TimeInterval = 14
 
-    /// Below this token count, only an EXACT repeat is dropped. Short replies
-    /// ("yes", "right", "makes sense") legitimately recur from both people
-    /// seconds apart, and fuzzy-matching them would delete real dialogue.
+    /// Below this token count, fuzzy matching is disabled. Short same-track
+    /// replies ("yes", "right", "makes sense") survive even when exact because
+    /// an unlabeled system track may contain multiple people; exact cross-track
+    /// echoes may still be suppressed.
     static let fuzzyMinimumTokens = 4
 
     /// Token overlap at which two lines are treated as the same utterance.
@@ -94,31 +95,12 @@ enum TranscriptDeduplicator {
         "the", "so", "and", "o", "uh", "um",
     ]
 
-    /// A custom glossary biases the decoder toward those words. On noise this
-    /// can produce a line made entirely from the glossary itself; with no
-    /// glossary configured this gate remains inactive.
-    static func isNoiseArtifact(_ entry: TranscriptEntry, glossary: [String]) -> Bool {
+    /// Reject only a closed list of bare connective/filler emissions. A line
+    /// containing nothing but a project term ("Asana", "Jira", "Orakul") is
+    /// also a normal short answer; glossary membership is never proof of noise.
+    static func isNoiseArtifact(_ entry: TranscriptEntry, glossary _: [String]) -> Bool {
         let entryTokens = tokens(entry.text)
-        if entryTokens.count == 1, fillerSingletons.contains(entryTokens[0]) {
-            return true
-        }
-        guard !entryTokens.isEmpty, !glossary.isEmpty else { return false }
-        let glossaryTokens = Set(glossary.flatMap { tokens($0) })
-        guard !glossaryTokens.isEmpty else { return false }
-        return entryTokens.allSatisfy { glossaryTokens.contains($0) }
-    }
-
-    /// A short same-track result may be a garbled re-emission of the previous
-    /// line's tail. Suffix anchoring and the short time window distinguish it
-    /// from a genuine repeat later in the call.
-    static let sameTrackStutterWindow: TimeInterval = 6
-    static let sameTrackStutterThreshold = 0.66
-
-    static func isGarbledTailStutter(_ fragment: String, previous: String) -> Bool {
-        guard fragment.count >= fragmentMinimumCharacters else { return false }
-        guard fragment.count <= previous.count else { return false }
-        let tail = String(previous.suffix(fragment.count + 4))
-        return characterSimilarity(fragment, tail) >= sameTrackStutterThreshold
+        return entryTokens.count == 1 && fillerSingletons.contains(entryTokens[0])
     }
 
     static func isDuplicate(_ candidate: TranscriptEntry,
@@ -134,9 +116,27 @@ enum TranscriptDeduplicator {
             // A line cannot duplicate one recorded after it.
             if age < -window { continue }
 
+            // Diarization is direct evidence that two people spoke. Their
+            // wording may genuinely match, so no same-track text heuristic may
+            // erase the later speaker's response, short or long.
+            if existing.source == candidate.source,
+               let existingSpeaker = existing.speaker,
+               let candidateSpeaker = candidate.speaker,
+               existingSpeaker != candidateSpeaker {
+                continue
+            }
+
             let existingTokens = tokens(existing.text)
             if existingTokens.isEmpty { continue }
-            if existingTokens == candidateTokens { return true }
+            if existingTokens == candidateTokens {
+                // Two people on one system track can give the same short
+                // answer seconds apart. There is no speaker proof here, so
+                // preserve short same-track repeats; overlap stitching removes
+                // decoder re-emissions before they reach this history gate.
+                if existing.source == candidate.source,
+                   candidateTokens.count < fuzzyMinimumTokens { continue }
+                return true
+            }
 
             // Echo through two acoustic paths changes word boundaries and even
             // scripts, so exact-token rules miss it. Character comparison is
@@ -157,14 +157,6 @@ enum TranscriptDeduplicator {
                    fragmentIsEcho(candidateCharacters, host: existingCharacters) {
                     return true
                 }
-            }
-
-            if existing.source == candidate.source,
-               abs(age) <= sameTrackStutterWindow,
-               candidateTokens.count <= fragmentMaximumTokens,
-               isGarbledTailStutter(normalizedCharacters(candidate.text),
-                                    previous: normalizedCharacters(existing.text)) {
-                return true
             }
 
             guard candidateTokens.count >= fuzzyMinimumTokens,

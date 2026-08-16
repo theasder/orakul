@@ -8,6 +8,7 @@ final class SessionAudioRecorder {
     private var samples: [Int16] = []
     private var truncated = false
     private var sealed = false
+    private var paused = false
     private let lock = NSLock()
 
     /// Default cap ≈ 60 minutes at 16 kHz mono (~115 MB).
@@ -23,7 +24,7 @@ final class SessionAudioRecorder {
 
     func append(_ batch: [Int16]) {
         lock.lock(); defer { lock.unlock() }
-        guard !sealed else { return }
+        guard !sealed, !paused else { return }
         let room = cap - samples.count
         let accepted = max(0, min(room, batch.count))
         if accepted < batch.count { truncated = true }
@@ -36,6 +37,20 @@ final class SessionAudioRecorder {
         samples.removeAll(keepingCapacity: false)
         truncated = false
         sealed = false
+        paused = false
+    }
+
+    /// Capture continues while the UI session is paused, but retained audio
+    /// must follow the consent-visible active intervals only.
+    func pause() {
+        lock.lock(); defer { lock.unlock() }
+        paused = true
+    }
+
+    func resume() {
+        lock.lock(); defer { lock.unlock() }
+        guard !sealed else { return }
+        paused = false
     }
 
     /// Freeze retained PCM at Stop. Audio callbacks queued after consent ended
@@ -67,6 +82,12 @@ final class SessionAudioRecorder {
         TimeInterval(retainedSampleCount) / TimeInterval(sampleRate)
     }
 
+    func retainedDuration(from sampleOffset: Int) -> TimeInterval {
+        lock.lock(); defer { lock.unlock() }
+        let start = max(0, min(sampleOffset, samples.count))
+        return TimeInterval(samples.count - start) / TimeInterval(sampleRate)
+    }
+
     var isTruncated: Bool {
         lock.lock(); defer { lock.unlock() }
         return truncated
@@ -77,6 +98,12 @@ final class SessionAudioRecorder {
     func sampleSnapshot() -> [Int16] {
         lock.lock(); defer { lock.unlock() }
         return samples
+    }
+
+    func sampleSnapshot(from sampleOffset: Int) -> [Int16] {
+        lock.lock(); defer { lock.unlock() }
+        let start = max(0, min(sampleOffset, samples.count))
+        return Array(samples[start...])
     }
 
     /// Snapshot the accumulated audio as a PCM-16 WAV.
