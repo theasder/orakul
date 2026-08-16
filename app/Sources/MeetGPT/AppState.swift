@@ -1607,17 +1607,20 @@ final class AppState: ObservableObject {
         startedAt: Date,
         preparedModel: String? = "base",
         optedIn: Bool = true,
-        serverDiarizationEligible: Bool = false
+        serverDiarizationEligible: Bool = false,
+        localDiarization: Bool = false
     ) {
         guard Self.isUnderTest else { return }
         sessionRecorder.reset()
         sessionRecorder.append(samples)
         sessionRecorder.seal()
         sessionRetainedAudioStart = startedAt
-        sessionAudioStart = optedIn ? startedAt : nil
+        sessionAudioStart = (optedIn || localDiarization) ? startedAt : nil
         sessionAudioStartSample = 0
         sessionRetainedAudioTimelineValid = true
         localFinalPassOptedInForSession = optedIn
+        localDiarizationOptedInForSession = localDiarization
+        localDiarizationContinuityValid = localDiarization
         serverDiarizationEligibleForSession = serverDiarizationEligible
         localFinalPassContinuityValid = optedIn
         activeSessionPreparedLocalWhisperModel = preparedModel
@@ -1627,7 +1630,8 @@ final class AppState: ObservableObject {
             localModel: preparedModel ?? "base",
             microphoneNoiseSuppression: false,
             glossary: "",
-            assemblyDiarization: false)
+            assemblyDiarization: false,
+            localDiarization: localDiarization)
     }
 
     var retainedAudioSampleCountForTesting: Int {
@@ -1641,6 +1645,11 @@ final class AppState: ObservableObject {
 
     var retainedAudioTimelineValidForTesting: Bool {
         Self.isUnderTest && sessionRetainedAudioTimelineValid
+    }
+
+    func truncateRetainedAudioForTesting(maxSamples: Int) {
+        guard Self.isUnderTest else { return }
+        sessionRecorder.setMaximumSamplesForTesting(maxSamples)
     }
 
     func handleSessionExpiredForTesting() {
@@ -2038,6 +2047,9 @@ final class AppState: ObservableObject {
 
     /// Keys for transcription providers now come from build-time `Secrets`.
     @Published var diarizing = false
+    @Published private(set) var localDiarizationRunning = false
+    @Published private(set) var localDiarizationProgress: Double = 0
+    @Published private(set) var localDiarizationNote: String?
     /// Fireflies + Whisper LLM merge in progress (post-call or manual).
     @Published var enhancingTranscript = false
     /// The pending post-call Fireflies merge, waiting out Fireflies' own
@@ -2118,6 +2130,7 @@ final class AppState: ObservableObject {
             && !transcript.isEmpty
             && status == .idle
             && !enhancingTranscript
+            && !diarizing
             && !localRetranscribing
             && !firefliesImporting
     }
@@ -3219,6 +3232,13 @@ final class AppState: ObservableObject {
     /// may retain the same PCM for diarization, but that does not opt the call
     /// into Local transcript replacement.
     private var localFinalPassOptedInForSession = false
+    /// Separate start-of-route consent for private speaker labels. It may share
+    /// PCM with local refinement, but neither feature authorizes the other.
+    private var localDiarizationOptedInForSession = false
+    /// True only while `sessionAudioStart` and its sample offset describe one
+    /// continuous Local route. Cloud prefixes retained for another consumer
+    /// must never be relabeled from this later suffix.
+    private var localDiarizationContinuityValid = false
     /// Captured at the recording boundary. Signed-in users already have a
     /// manual server Improve/diarization consumer; a Local refinement must not
     /// discard its PCM merely because no AssemblyAI key is configured.
@@ -3300,6 +3320,15 @@ final class AppState: ObservableObject {
     private var automaticLocalFinalPassTask: Task<Void, Never>?
     private var manualLocalFinalPassTask: Task<Void, Never>?
     private var localFinalPassRevision = 0
+    /// Local speaker work has its own revision lease. CoreML inference may not
+    /// stop immediately, so stale results are blocked from mutating a new call.
+    private var localDiarizationTask: Task<Void, Never>?
+    private var localDiarizationRunID: UUID?
+    private var localDiarizationRevision = 0
+    /// Deterministic model seam for lifecycle tests. Production leaves nil.
+    var localDiarizationRunnerOverride: (
+        ([Float], Int, LocalDiarization.Progress?) async throws -> [SpeakerSegment]
+    )?
     private var tickTask: Task<Void, Never>?
     private var brainstormTask: Task<Void, Never>?
     private var blindSpotRefreshDebounce: Task<Void, Never>?
@@ -4661,6 +4690,8 @@ final class AppState: ObservableObject {
             // interval must never remain eligible across cloud audio.
             localFinalPassContinuityValid = false
             localFinalPassOptedInForSession = false
+            localDiarizationContinuityValid = false
+            localDiarizationOptedInForSession = false
             sessionAudioStart = nil
             sessionAudioStartSample = 0
             activeSessionPreparedLocalWhisperModel = nil
@@ -6059,6 +6090,8 @@ final class AppState: ObservableObject {
         sessionAudioStart = nil
         sessionAudioStartSample = 0
         localFinalPassOptedInForSession = false
+        localDiarizationOptedInForSession = false
+        localDiarizationContinuityValid = false
         // The meter does NOT stop by itself. It accumulates against wall time
         // from `activeSince`, so without this the pause would look right in the
         // UI while still billing co-pilot hours for an empty room — the exact
@@ -9045,7 +9078,8 @@ final class AppState: ObservableObject {
             hasAssemblyAI: hasAssemblyAI,
             assemblyDiarization: sessionSettings.assemblyDiarization,
             serverDiarization: serverDiarizationEligible,
-            localFinalPassEnabled: localFinalPassEnabled)
+            localFinalPassEnabled: localFinalPassEnabled,
+            localDiarizationEnabled: sessionSettings.localDiarization)
         // Publish the immutable in-flight snapshot before the potentially slow
         // model preparation await. Settings rejects changes during `.starting`
         // so its visible row can never outrun this route.
@@ -9080,6 +9114,8 @@ final class AppState: ObservableObject {
         sessionAudioStartSample = 0
         sessionRetainedAudioTimelineValid = true
         localFinalPassContinuityValid = false
+        localDiarizationContinuityValid = false
+        localDiarizationOptedInForSession = false
         systemCaptureDiagnostics.reset()
         micCaptureDiagnostics.reset()
 
@@ -9171,14 +9207,13 @@ final class AppState: ObservableObject {
             activeSessionPreparedLocalWhisperModel = preparedLocalWhisperModel
             localFinalPassOptedInForSession = localFinalPassEnabled
                 && sessionEngine == .local
+            localDiarizationOptedInForSession = sessionSettings.localDiarization
+                && sessionEngine == .local
             serverDiarizationEligibleForSession = serverDiarizationEligible
             // The reset above clears the old recorder and provenance. Attach
             // the new observer afterwards so Local always retains its private
             // remote track for a safe manual/opt-in final pass.
-            if retainSessionAudio,
-               preparedLocalWhisperModel != nil
-                || (hasAssemblyAI && sessionSettings.assemblyDiarization)
-                || serverDiarizationEligible {
+            if retainSessionAudio {
                 beginSessionAudioRetention(on: systemChunker, at: startedAt)
             }
             sessionUsedAI = false
@@ -9268,6 +9303,8 @@ final class AppState: ObservableObject {
             sessionRetainedAudioTimelineValid = true
             localFinalPassContinuityValid = false
             localFinalPassOptedInForSession = false
+            localDiarizationContinuityValid = false
+            localDiarizationOptedInForSession = false
             serverDiarizationEligibleForSession = false
             pendingStartupLocalFallback = nil
             recordingStartedAt = nil
@@ -9553,7 +9590,7 @@ final class AppState: ObservableObject {
         guard firefliesTranscriptProvider != nil || mcp != nil,
               status == .idle,
               !firefliesImporting, !enhancingTranscript,
-              !localRetranscribing else { return }
+              !localRetranscribing, !diarizing else { return }
         // One explicit import replaces a pending automatic/manual merge. This
         // advances the revision before we capture the new operation identity.
         cancelFirefliesEnhance()
@@ -9609,7 +9646,7 @@ final class AppState: ObservableObject {
     private func enhanceTranscriptWithFireflies(automatic: Bool) async -> Bool {
         guard firefliesTranscriptProvider != nil || mcp != nil else { return false }
         guard status == .idle else { return false }
-        guard !enhancingTranscript, !localRetranscribing else { return false }
+        guard !enhancingTranscript, !localRetranscribing, !diarizing else { return false }
         guard !transcript.isEmpty else {
             if !automatic { lastError = TranscriptEnhancementError.emptyWhisper.localizedDescription }
             return false
@@ -9691,6 +9728,7 @@ final class AppState: ObservableObject {
                     "\(result.summary) · partial merge — transcript left unchanged"
             } else {
                 transcript = result.entries
+                localDiarizationNote = nil
                 transcriptEnhanceNote = result.summary
             }
             contextFiles.removeAll { $0.name.hasPrefix("Enhanced · Fireflies") }
@@ -9737,9 +9775,10 @@ final class AppState: ObservableObject {
         hasAssemblyAI: Bool,
         assemblyDiarization: Bool,
         serverDiarization: Bool = false,
-        localFinalPassEnabled: Bool = Config.transcriptionPostStopFinalPassEnabled
+        localFinalPassEnabled: Bool = Config.transcriptionPostStopFinalPassEnabled,
+        localDiarizationEnabled: Bool = false
     ) -> Bool {
-        (engine == .local && localFinalPassEnabled)
+        (engine == .local && (localFinalPassEnabled || localDiarizationEnabled))
             || (hasAssemblyAI && assemblyDiarization)
             || serverDiarization
     }
@@ -9757,18 +9796,24 @@ final class AppState: ObservableObject {
     private func shouldCollectRetainedAudio(on engine: TranscriptionEngine) -> Bool {
         guard sessionRetainedAudioTimelineValid else { return false }
         return hasSessionDiarizationAudioConsumer
-            || (engine == .local && localFinalPassOptedInForSession)
+            || (engine == .local
+                && (localFinalPassOptedInForSession
+                    || localDiarizationOptedInForSession))
     }
 
-    private func beginLocalFinalPassSuffix(at startedAt: Date) {
-        guard sessionRetainedAudioTimelineValid,
-              Config.transcriptionPostStopFinalPassEnabled else { return }
+    private func beginLocalPostprocessSuffix(at startedAt: Date) {
+        guard sessionRetainedAudioTimelineValid else { return }
+        let finalPassEnabled = Config.transcriptionPostStopFinalPassEnabled
+        let localDiarizationEnabled = activeRecordingSettings?.localDiarization ?? false
+        guard finalPassEnabled || localDiarizationEnabled else { return }
         if sessionRetainedAudioStart == nil {
             sessionRetainedAudioStart = startedAt
         }
         sessionAudioStart = startedAt
         sessionAudioStartSample = sessionRecorder.retainedSampleCount
-        localFinalPassOptedInForSession = true
+        localFinalPassOptedInForSession = finalPassEnabled
+        localDiarizationOptedInForSession = localDiarizationEnabled
+        localDiarizationContinuityValid = localDiarizationEnabled
     }
 
     /// Attach only after `resetForNewRecording`; otherwise the reset erases the
@@ -9778,7 +9823,7 @@ final class AppState: ObservableObject {
         if sessionRetainedAudioStart == nil {
             sessionRetainedAudioStart = startedAt
         }
-        if localFinalPassOptedInForSession {
+        if localFinalPassOptedInForSession || localDiarizationOptedInForSession {
             sessionAudioStart = startedAt
             sessionAudioStartSample = sessionRecorder.retainedSampleCount
         } else {
@@ -9787,6 +9832,7 @@ final class AppState: ObservableObject {
         }
         localFinalPassContinuityValid = localFinalPassOptedInForSession
             && activeSessionPreparedLocalWhisperModel != nil
+        localDiarizationContinuityValid = localDiarizationOptedInForSession
         let recorder = sessionRecorder
         chunker?.addSampleObserver { samples in recorder.append(samples) }
     }
@@ -9856,12 +9902,30 @@ final class AppState: ObservableObject {
     static func shouldReleaseRetainedAudioAfterLocalFinalPass(
         hasAssemblyAI: Bool,
         assemblyDiarization: Bool,
-        serverDiarization: Bool = false
+        serverDiarization: Bool = false,
+        localDiarization: Bool = false
     ) -> Bool {
-        !(serverDiarization || (hasAssemblyAI && assemblyDiarization))
+        !(serverDiarization || localDiarization
+            || (hasAssemblyAI && assemblyDiarization))
+    }
+
+    func cancelLocalSpeakerLabels(showNotice: Bool = true) {
+        let wasRunning = localDiarizationRunning
+        localDiarizationRevision &+= 1
+        localDiarizationTask?.cancel()
+        localDiarizationTask = nil
+        localDiarizationRunID = nil
+        localDiarizationRunning = false
+        localDiarizationProgress = 0
+        if wasRunning { diarizing = false }
+        if showNotice, wasRunning {
+            localDiarizationNote = "Определение говорящих отменено."
+        }
+        if !showNotice { localDiarizationNote = nil }
     }
 
     private func invalidateLocalFinalPassTasks(discardRetainedAudio: Bool) {
+        cancelLocalSpeakerLabels(showNotice: false)
         localFinalPassRevision &+= 1
         automaticLocalFinalPassTask?.cancel()
         manualLocalFinalPassTask?.cancel()
@@ -9875,6 +9939,8 @@ final class AppState: ObservableObject {
             sessionAudioStartSample = 0
             localFinalPassContinuityValid = false
             localFinalPassOptedInForSession = false
+            localDiarizationContinuityValid = false
+            localDiarizationOptedInForSession = false
             serverDiarizationEligibleForSession = false
         }
     }
@@ -9956,7 +10022,8 @@ final class AppState: ObservableObject {
         let releaseRetainedAudio = Self.shouldReleaseRetainedAudioAfterLocalFinalPass(
             hasAssemblyAI: hasAssemblyAI,
             assemblyDiarization: settings?.assemblyDiarization ?? false,
-            serverDiarization: serverDiarizationEligibleForSession)
+            serverDiarization: serverDiarizationEligibleForSession,
+            localDiarization: localDiarizationOptedInForSession)
         // There is deliberately no implicit retry contract. Once a pass has
         // consumed the PCM, decoder failure and conservative quality refusal
         // both preserve the live text and release the audio unless opted-in
@@ -10098,6 +10165,7 @@ final class AppState: ObservableObject {
                 retainedAudioStart: bounds.start,
                 retainedAudioEnd: bounds.end,
                 replaceLocalRowsBefore: bounds.replaceLocalRowsBefore)
+            localDiarizationNote = nil
             lastError = nil
             persistCurrentSession()
             recordLocalFinalPass(
@@ -10137,43 +10205,183 @@ final class AppState: ObservableObject {
         ])
     }
 
-    /// On-device speaker labels for the lines already captured (roadmap F5).
-    ///
-    /// Runs against the recording this session already holds, so nothing is
-    /// re-transcribed and nothing leaves the Mac. It labels the REMOTE track
-    /// only — the mic track is this user, whose identity was never in doubt —
-    /// and a line the diarizer says nothing about keeps the label it had, so a
-    /// pass that fails halfway cannot degrade a transcript.
-    ///
-    /// Off by default (`LocalDiarization.isEnabled`): a confidently wrong
-    /// speaker label is the exact complaint this answers, so it ships dark
-    /// until it is measured against the cloud pass on real multi-party calls.
-    func labelSpeakersLocally() async {
-        guard LocalDiarization.isEnabled,
-              sessionRetainedAudioTimelineValid,
-              !diarizing else { return }
-        let wav = sessionRecorder.makeWAV()
-        guard !wav.isEmpty, let start = sessionRetainedAudioStart else { return }
-        let requestedSessionID = currentSessionID
-        let samples = LocalWhisperTranscription.floatSamples(fromWAV: wav)
-        guard LocalDiarization.canRun(sampleCount: samples.count) else { return }
+    private struct LocalDiarizationAudioSnapshot {
+        let pcm: ArraySlice<Int16>
+        let start: Date
+        let end: Date
+        let wasTruncated: Bool
+    }
 
+    private func localDiarizationAudioSnapshot() -> LocalDiarizationAudioSnapshot? {
+        guard sessionRetainedAudioTimelineValid,
+              localDiarizationOptedInForSession,
+              localDiarizationContinuityValid,
+              let start = sessionAudioStart else { return nil }
+        let pcm = sessionRecorder.snapshotSamples(
+            fromSampleOffset: sessionAudioStartSample)
+        guard LocalDiarization.canRun(sampleCount: pcm.count) else { return nil }
+        return LocalDiarizationAudioSnapshot(
+            pcm: pcm,
+            start: start,
+            end: start.addingTimeInterval(Double(pcm.count) / 16_000),
+            wasTruncated: sessionRecorder.isTruncated)
+    }
+
+    /// Manual Beta action. `Вы` owns slot 1 because the microphone track is
+    /// already known; remote clusters are stable Спикер 2...5 by first
+    /// appearance. Paused or mixed-route PCM is refused rather than shifted
+    /// onto the wrong transcript rows.
+    var canLabelSpeakersLocally: Bool {
+        guard let settings = activeRecordingSettings else { return false }
+        let retainedLocalSamples = max(
+            0, sessionRecorder.retainedSampleCount - sessionAudioStartSample)
+        return settings.engine == .local
+            && settings.localDiarization
+            && localDiarizationOptedInForSession
+            && localDiarizationContinuityValid
+            && sessionRetainedAudioTimelineValid
+            && status == .idle
+            && !transcript.isEmpty
+            && sessionAudioStart != nil
+            && !diarizing
+            && !localRetranscribing
+            && automaticLocalFinalPassTask == nil
+            && manualLocalFinalPassTask == nil
+            && !enhancingTranscript
+            && !firefliesImporting
+            && LocalDiarization.canRun(sampleCount: retainedLocalSamples)
+    }
+
+    var hasScheduledLocalDiarization: Bool { localDiarizationTask != nil }
+
+    func labelSpeakersLocallyNow(
+        expectedRemoteSpeakerCount: Int = Config.localDiarizationRemoteSpeakerCount
+    ) {
+        guard canLabelSpeakersLocally,
+              let audio = localDiarizationAudioSnapshot() else { return }
+
+        let runID = UUID()
+        let revision = localDiarizationRevision
+        let requestedSessionID = currentSessionID
+        let requestedGeneration = chunkGeneration
+        let requestedTranscriptRevision = transcriptRevision
+        let requestedTranscript = transcript
+        // Retention consent is snapshotted with the recording; the count is a
+        // run-time hint so it can be corrected and rerun on the same PCM.
+        let expected = LocalDiarization.normalizedRemoteSpeakerCount(
+            expectedRemoteSpeakerCount)
+
+        localDiarizationRunID = runID
+        localDiarizationRunning = true
+        localDiarizationProgress = 0
+        localDiarizationNote = nil
         diarizing = true
-        defer { diarizing = false }
+        localDiarizationTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            await self.performLocalSpeakerLabels(
+                audio: audio,
+                expectedRemoteSpeakerCount: expected,
+                requestedSessionID: requestedSessionID,
+                requestedGeneration: requestedGeneration,
+                requestedTranscriptRevision: requestedTranscriptRevision,
+                requestedTranscript: requestedTranscript,
+                requestedRevision: revision,
+                runID: runID)
+            guard self.localDiarizationRunID == runID else { return }
+            self.localDiarizationTask = nil
+            self.localDiarizationRunID = nil
+            self.localDiarizationRunning = false
+            self.localDiarizationProgress = 0
+            self.diarizing = false
+        }
+    }
+
+    private func performLocalSpeakerLabels(
+        audio: LocalDiarizationAudioSnapshot,
+        expectedRemoteSpeakerCount: Int,
+        requestedSessionID: UUID,
+        requestedGeneration: Int,
+        requestedTranscriptRevision: Int,
+        requestedTranscript: [TranscriptEntry],
+        requestedRevision: Int,
+        runID: UUID
+    ) async {
+        let progress: LocalDiarization.Progress = { [weak self] value in
+            Task { @MainActor [weak self] in
+                guard let self, self.localDiarizationRunID == runID,
+                      self.localDiarizationRevision == requestedRevision else { return }
+                self.localDiarizationProgress = min(1, max(0, value))
+            }
+        }
+
         do {
-            let segments = try await LocalDiarization.segments(samples: samples)
-            guard currentSessionID == requestedSessionID, !segments.isEmpty else { return }
-            transcript = SpeakerAssignment.apply(segments: segments, to: transcript,
-                                                 sessionStart: start)
+            let samples = try await LocalDiarization.floatSamples(from: audio.pcm)
+            try Task.checkCancellation()
+            let segments: [SpeakerSegment]
+            if let override = localDiarizationRunnerOverride {
+                segments = try await override(
+                    samples, expectedRemoteSpeakerCount, progress)
+            } else {
+                segments = try await LocalDiarization.segments(
+                    samples: samples,
+                    expectedRemoteSpeakerCount: expectedRemoteSpeakerCount,
+                    progress: progress)
+            }
+
+            guard localDiarizationRunID == runID,
+                  currentSessionID == requestedSessionID,
+                  chunkGeneration == requestedGeneration,
+                  transcriptRevision == requestedTranscriptRevision,
+                  localDiarizationRevision == requestedRevision,
+                  transcript == requestedTranscript,
+                  status == .idle,
+                  localDiarizationContinuityValid,
+                  !Task.isCancelled else { return }
+
+            let found = SpeakerAssignment.distinctSpeakers(in: segments)
+            guard found > 0 else {
+                localDiarizationNote =
+                    "Речь собеседников недостаточно ясна. Транскрипт не изменён."
+                return
+            }
+            let labeled = SpeakerAssignment.apply(
+                segments: segments,
+                to: requestedTranscript,
+                sessionStart: audio.start,
+                firstRemoteSpeakerNumber: 2,
+                localSpeakerLabel: SpeakerAssignment.localSpeakerLabel)
+            // The Local route may be only a suffix after an Instant fallback,
+            // and the one-hour cap may leave later rows without PCM. Never
+            // relabel outside the exact retained interval.
+            transcript = zip(requestedTranscript, labeled).map { original, candidate in
+                guard original.timestamp >= audio.start,
+                      original.timestamp < audio.end else { return original }
+                return candidate
+            }
             persistCurrentSession()
+            let resultNote = found == expectedRemoteSpeakerCount
+                ? "Говорящие определены на этом Mac. Бета — проверьте имена перед отправкой."
+                : "Найдено голосов: \(found) из \(expectedRemoteSpeakerCount). Бета — проверьте метки или запустите снова с другим числом."
+            localDiarizationNote = resultNote + (audio.wasTruncated
+                ? " Подписана только полностью сохранённая часть; поздние строки не изменены."
+                : "")
             devCallDiagnostics.record(
                 event: "local_diarization",
-                fields: ["speakers": "\(SpeakerAssignment.distinctSpeakers(in: segments))",
-                         "segments": "\(segments.count)"])
+                fields: [
+                    "expectedRemoteSpeakers": "\(expectedRemoteSpeakerCount)",
+                    "foundRemoteSpeakers": "\(found)",
+                    "segments": "\(segments.count)",
+                    "pipeline": "offline-community-1",
+                ])
+        } catch is CancellationError {
+            // Cancel/New Call/History are ordinary lifecycle boundaries.
         } catch {
-            // Silent: labels are a bonus on a transcript that already works,
-            // and an error banner about them would be pure noise.
-            Log.general.error("local diarization skipped — \(error.localizedDescription)")
+            guard localDiarizationRunID == runID,
+                  localDiarizationRevision == requestedRevision else { return }
+            localDiarizationNote =
+                "Не удалось определить говорящих на этом Mac. Транскрипт не изменён."
+            Log.general.error(
+                "local diarization skipped — \(error.localizedDescription)")
         }
     }
 
@@ -10244,6 +10452,7 @@ final class AppState: ObservableObject {
             }
             let mine = transcript.filter { $0.source == .mic }
             transcript = (diarized + mine).sorted { $0.timestamp < $1.timestamp }
+            localDiarizationNote = nil
             lastError = nil
             persistCurrentSession()
         } catch {
@@ -10552,7 +10761,7 @@ final class AppState: ObservableObject {
                 // refinement interval. The recorder may keep an earlier prefix
                 // for opted-in diarization, so remember the sample offset
                 // rather than counting that prefix as Local coverage.
-                beginLocalFinalPassSuffix(at: nextRouteStart)
+                beginLocalPostprocessSuffix(at: nextRouteStart)
             }
             let keepRecording = shouldCollectRetainedAudio(on: engine)
             systemChunker.reconfigure(
@@ -10574,6 +10783,9 @@ final class AppState: ObservableObject {
                 localFinalPassContinuityValid =
                     localFinalPassOptedInForSession
                         && activeSessionPreparedLocalWhisperModel != nil
+                localDiarizationContinuityValid =
+                    localDiarizationOptedInForSession
+                        && sessionAudioStart != nil
             }
             transcriberLanguage = previousSettings.language
             transcriberGlossary = previousSettings.glossary
@@ -10649,7 +10861,7 @@ final class AppState: ObservableObject {
             // The attempted cloud route ended the old Local interval even when
             // it failed before readiness. Start a provable future-only suffix;
             // replayed pre-ready chunks remain live prefix rows outside it.
-            beginLocalFinalPassSuffix(at: restoredRouteStart)
+            beginLocalPostprocessSuffix(at: restoredRouteStart)
         }
         let keepRecording = shouldCollectRetainedAudio(on: settings.engine)
         systemChunker.reconfigure(
@@ -10693,6 +10905,8 @@ final class AppState: ObservableObject {
                 ? settings.localModel : nil
             localFinalPassContinuityValid = localFinalPassOptedInForSession
                 && activeSessionPreparedLocalWhisperModel != nil
+                && sessionAudioStart != nil
+            localDiarizationContinuityValid = localDiarizationOptedInForSession
                 && sessionAudioStart != nil
         }
         let bufferedChunks = preReadyBuffer?.drainForRollback() ?? []
@@ -11108,7 +11322,10 @@ final class AppState: ObservableObject {
         systemStreamer?.finish()
         micStreamer?.finish()
 
-        if Config.transcriptionPostStopFinalPassEnabled,
+        let localSpeakerRetentionEnabled =
+            activeRecordingSettings?.localDiarization ?? false
+        if (Config.transcriptionPostStopFinalPassEnabled
+                || localSpeakerRetentionEnabled),
            sessionRetainedAudioTimelineValid {
             // Drop the unfinished cloud window, then retain only PCM captured
             // after the private fallback boundary. Cloud transcript rows stay
@@ -11116,7 +11333,7 @@ final class AppState: ObservableObject {
             systemChunker?.discardBufferedSamples()
             micChunker?.discardBufferedSamples()
             let wasAlreadyRetaining = hasSessionDiarizationAudioConsumer
-            beginLocalFinalPassSuffix(at: nextRouteStart)
+            beginLocalPostprocessSuffix(at: nextRouteStart)
             let recorder = sessionRecorder
             if !wasAlreadyRetaining {
                 systemChunker?.addSampleObserver { samples in recorder.append(samples) }
@@ -11160,6 +11377,8 @@ final class AppState: ObservableObject {
         localFinalPassContinuityValid = localFinalPassOptedInForSession
             && sessionAudioStart != nil
             && activeSessionPreparedLocalWhisperModel != nil
+        localDiarizationContinuityValid = localDiarizationOptedInForSession
+            && sessionAudioStart != nil
         activeRecordingSettings = activeRecordingSettings?.replacingEngine(with: .local)
         activeChunkRouteLease = routeLease
         pendingEngineChange = nil

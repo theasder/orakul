@@ -86,6 +86,19 @@ struct LocalRetranscriptionTests {
             engine: .local,
             hasAssemblyAI: false,
             assemblyDiarization: false,
+            localFinalPassEnabled: false,
+            localDiarizationEnabled: true))
+        #expect(!AppState.shouldRetainSessionAudio(
+            engine: .deepgram,
+            hasAssemblyAI: false,
+            assemblyDiarization: false,
+            localFinalPassEnabled: false,
+            localDiarizationEnabled: true),
+                "a hidden Local toggle cannot retain an initially-cloud call")
+        #expect(AppState.shouldRetainSessionAudio(
+            engine: .local,
+            hasAssemblyAI: false,
+            assemblyDiarization: false,
             serverDiarization: true,
             localFinalPassEnabled: false))
     }
@@ -136,6 +149,32 @@ struct LocalRetranscriptionTests {
             hasAssemblyAI: false,
             assemblyDiarization: false,
             serverDiarization: true))
+        #expect(!AppState.shouldReleaseRetainedAudioAfterLocalFinalPass(
+            hasAssemblyAI: false,
+            assemblyDiarization: false,
+            localDiarization: true))
+    }
+
+    @Test("PCM retained only for private labels does not authorize Local replacement")
+    func localSpeakerPCMDoesNotOptInFinalPass() {
+        let state = finishedCall()
+        let start = Date(timeIntervalSinceReferenceDate: 30_500)
+        state.transcript = [TranscriptEntry(
+            source: .system,
+            text: (0..<20).map { "word\($0)" }.joined(separator: " "),
+            timestamp: start,
+            transcriptionEngine: .local)]
+        state.applyTestLocalFinalPassRetention(
+            samples: AudioFixtures.voicedInt16(
+                count: 21 * LocalFinalPass.sampleRate),
+            startedAt: start,
+            preparedModel: "base",
+            optedIn: false,
+            localDiarization: true)
+
+        #expect(state.retainedAudioSampleCountForTesting > 0)
+        #expect(!state.canRetranscribeLocally)
+        #expect(state.canLabelSpeakersLocally)
     }
 
     @Test("PCM retained only for diarization does not authorize Local replacement")
@@ -188,6 +227,51 @@ struct LocalRetranscriptionTests {
         #expect(!state.localRetranscribing)
         #expect(state.retainedAudioSampleCountForTesting > 0)
         #expect(state.transcript.contains { $0.text == words })
+    }
+
+    @Test("accepted final pass clears stale private labels and keeps PCM for rerun")
+    func acceptedPassLetsPrivateLabelsRunAgain() async {
+        let words = (0..<20).map { "word\($0)" }.joined(separator: " ")
+        let service = ImmediateLocalFinalPassTranscriber(words)
+        let state = AppState(
+            credentialStore: InMemoryKeychain(),
+            localFinalPassServiceFactory: { _, _ in service })
+        state.applyTestWorkspace(recording: false)
+        let start = Date(timeIntervalSinceReferenceDate: 31_500)
+        state.transcript = [TranscriptEntry(
+            source: .system, text: words, timestamp: start,
+            transcriptionEngine: .local)]
+        state.applyTestLocalFinalPassRetention(
+            samples: AudioFixtures.voicedInt16(
+                count: 21 * LocalFinalPass.sampleRate),
+            startedAt: start,
+            preparedModel: "base",
+            optedIn: true,
+            localDiarization: true)
+        state.localDiarizationRunnerOverride = { _, _, _ in
+            [SpeakerSegment(
+                speakerID: "remote", startSeconds: 0, endSeconds: 21)]
+        }
+
+        state.labelSpeakersLocallyNow(expectedRemoteSpeakerCount: 1)
+        for _ in 0..<10_000 {
+            if !state.hasScheduledLocalDiarization { break }
+            await Task.yield()
+        }
+        #expect(state.transcript.first?.speaker == "Спикер 2")
+        #expect(state.localDiarizationNote?.contains("Говорящие определены") == true)
+
+        state.retranscribeLocallyNow()
+        for _ in 0..<10_000 {
+            if !state.localRetranscribing { break }
+            await Task.yield()
+        }
+
+        #expect(!state.localRetranscribing)
+        #expect(state.transcript.first?.speaker == nil)
+        #expect(state.localDiarizationNote == nil)
+        #expect(state.retainedAudioSampleCountForTesting > 0)
+        #expect(state.canLabelSpeakersLocally)
     }
 
     @Test("Clear cancels and revision-blocks a non-cooperative manual pass")

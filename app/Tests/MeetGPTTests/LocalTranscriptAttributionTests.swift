@@ -97,6 +97,43 @@ struct LocalTranscriptAttributionTests {
         #expect(!output.contains("Them: Only one person"))
         #expect(output.contains("Speaker A: A labeled cloud turn."))
     }
+
+    @Test("explicit private labels survive rendering, prompts, export, and history")
+    func privateLabelsFlowThroughProductOutputs() throws {
+        let entries = [
+            TranscriptEntry(
+                source: .mic, text: "Я проверю договор.", timestamp: base,
+                speaker: "Вы", transcriptionEngine: .local),
+            TranscriptEntry(
+                source: .system, text: "Я пришлю правки.",
+                timestamp: base.addingTimeInterval(2), speaker: "Спикер 2",
+                transcriptionEngine: .local),
+        ]
+
+        let rendered = TranscriptTextRenderer.render(
+            entries: entries, provisional: [], appearance: nil)
+        #expect(rendered.segments.map(\.speaker) == ["Вы", "Спикер 2"])
+        #expect(rendered.attributed.string.contains("Вы"))
+        #expect(rendered.attributed.string.contains("Спикер 2"))
+
+        let prompt = SystemInstructions.formatEntries(entries)
+        #expect(prompt.contains("][audio] Вы: Я проверю договор."))
+        #expect(prompt.contains("][audio] Спикер 2: Я пришлю правки."))
+
+        let exported = TranscriptExporter.plainText(
+            title: "Локальный звонок", date: base, entries: entries,
+            timeZone: TimeZone(secondsFromGMT: 0)!)
+        #expect(exported.contains("Вы: Я проверю договор."))
+        #expect(exported.contains("Спикер 2: Я пришлю правки."))
+
+        let saved = SavedSession(
+            id: UUID(), title: "Локальный звонок", startedAt: base, savedAt: base,
+            goal: "", entries: entries, transcriptionEngine: .local,
+            aiResponse: "", digest: "")
+        let decoded = try JSONDecoder().decode(
+            SavedSession.self, from: JSONEncoder().encode(saved))
+        #expect(decoded.entries.map(\.speaker) == ["Вы", "Спикер 2"])
+    }
 }
 
 @MainActor

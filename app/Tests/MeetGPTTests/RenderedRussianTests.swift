@@ -130,8 +130,13 @@ struct RenderedRussianTests {
         // тестовом хосте от прошлых прогонов осталось «Head of RevOps». Проверка
         // ругалась бы на чужую строку вместо интерфейса.
         let savedRole = Config.userCustomRole
-        defer { Config.userCustomRole = savedRole }
+        let savedContextSets = Config.contextSets
+        defer {
+            Config.userCustomRole = savedRole
+            Config.contextSets = savedContextSets
+        }
         Config.userCustomRole = ""
+        Config.contextSets = []
 
         let state = AppState(llm: MockLLMGateway(response: ""),
                              sessionStore: SessionStore(root: root))

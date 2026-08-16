@@ -60,7 +60,10 @@ struct SettingsAccessibilityInventoryTests {
         var ids = [
             "settings.transcription.language", "settings.transcription.aec",
             "settings.transcription.fireflies-enhance", "settings.transcription.local-model",
-            "settings.transcription.adaptive", "settings.transcription.glossary",
+            "settings.transcription.adaptive", "settings.transcription.post-stop-final-pass",
+            "settings.transcription.local-diarization",
+            "settings.transcription.local-diarization-speakers",
+            "settings.transcription.glossary",
             "settings.transcription.glossary-suggestions.enabled",
             "settings.transcription.glossary-suggestions.generate",
         ]
@@ -68,6 +71,27 @@ struct SettingsAccessibilityInventoryTests {
             "settings.transcription.engine.\($0.rawValue)"
         }
         require(ids, in: try inspected(tab: .transcription))
+    }
+
+    @Test("Russian private-speaker copy states count, privacy, and retention limits")
+    func localSpeakerBetaCopy() async throws {
+        try await SharedDefaults.withExclusiveAccess {
+            let savedEngine = Config.transcriptionEngineValue
+            defer { Config.transcriptionEngineValue = savedEngine }
+            Config.transcriptionEngineValue = .local
+            let text = try inspected(tab: .transcription)
+                .findAll(ViewType.Text.self).map { try $0.string() }
+                .joined(separator: " ")
+            let required = [
+                "1–4 голоса", "Автоподсчёта нет", "34 МБ",
+                "Аудио и эмбеддинги остаются на этом Mac",
+                "голосовые отпечатки не сохраняются",
+                "только в локальной истории этого звонка на этом Mac",
+                "дольше часа", "проверьте метки перед отправкой",
+            ]
+            let missing = required.filter { !text.contains($0) }
+            #expect(missing.isEmpty, "нет текста: \(missing)")
+        }
     }
 
     @Test("AI model and every live co-pilot switch have stable identities")

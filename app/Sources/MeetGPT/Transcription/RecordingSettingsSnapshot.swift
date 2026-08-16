@@ -11,6 +11,30 @@ struct RecordingSettingsSnapshot: Equatable {
     let microphoneNoiseSuppression: Bool
     let glossary: String
     let assemblyDiarization: Bool
+    let localDiarization: Bool
+    let localDiarizationRemoteSpeakerCount: Int
+
+    init(
+        engine: TranscriptionEngine,
+        language: String,
+        localModel: String,
+        microphoneNoiseSuppression: Bool,
+        glossary: String,
+        assemblyDiarization: Bool,
+        localDiarization: Bool = false,
+        localDiarizationRemoteSpeakerCount: Int = 1
+    ) {
+        self.engine = engine
+        self.language = language
+        self.localModel = localModel
+        self.microphoneNoiseSuppression = microphoneNoiseSuppression
+        self.glossary = glossary
+        self.assemblyDiarization = assemblyDiarization
+        self.localDiarization = localDiarization
+        self.localDiarizationRemoteSpeakerCount =
+            LocalDiarization.normalizedRemoteSpeakerCount(
+                localDiarizationRemoteSpeakerCount)
+    }
 
     static func configured() -> RecordingSettingsSnapshot {
         RecordingSettingsSnapshot(
@@ -19,7 +43,10 @@ struct RecordingSettingsSnapshot: Equatable {
             localModel: Config.localWhisperModel,
             microphoneNoiseSuppression: Config.micNoiseSuppressionEnabled,
             glossary: Config.transcriptionGlossary,
-            assemblyDiarization: Config.assemblyAIDiarizationEnabled
+            assemblyDiarization: Config.assemblyAIDiarizationEnabled,
+            localDiarization: Config.localDiarizationEnabled,
+            localDiarizationRemoteSpeakerCount:
+                Config.localDiarizationRemoteSpeakerCount
         )
     }
 
@@ -33,6 +60,9 @@ struct RecordingSettingsSnapshot: Equatable {
             localModel: localModel,
             microphoneNoiseSuppression: microphoneNoiseSuppression,
             glossary: glossary,
-            assemblyDiarization: assemblyDiarization)
+            assemblyDiarization: assemblyDiarization,
+            localDiarization: localDiarization,
+            localDiarizationRemoteSpeakerCount:
+                localDiarizationRemoteSpeakerCount)
     }
 }

@@ -4,7 +4,7 @@ import Foundation
 /// diarized at stop. Thread-safe; capped to bound memory on long meetings.
 final class SessionAudioRecorder {
     private let sampleRate = 16_000
-    private let cap: Int
+    private var cap: Int
     private var samples: [Int16] = []
     private var truncated = false
     private var sealed = false
@@ -20,6 +20,17 @@ final class SessionAudioRecorder {
     /// hour of PCM.
     init(maxSamplesForTesting: Int) {
         self.cap = max(0, maxSamplesForTesting)
+    }
+
+    /// Shrink an existing fixture to exercise the one-hour-cap behavior
+    /// without allocating an hour of PCM. Production never calls this.
+    func setMaximumSamplesForTesting(_ maximum: Int) {
+        lock.lock(); defer { lock.unlock() }
+        cap = max(0, maximum)
+        if samples.count > cap {
+            samples.removeSubrange(cap...)
+            truncated = true
+        }
     }
 
     func append(_ batch: [Int16]) {
@@ -104,6 +115,15 @@ final class SessionAudioRecorder {
         lock.lock(); defer { lock.unlock() }
         let start = max(0, min(sampleOffset, samples.count))
         return Array(samples[start...])
+    }
+
+    /// Immutable zero-copy view for consumers that immediately convert PCM
+    /// off the main actor. Copy-on-write keeps the view stable if a later
+    /// workspace reset discards the recorder while conversion is still ending.
+    func snapshotSamples(fromSampleOffset sampleOffset: Int = 0) -> ArraySlice<Int16> {
+        lock.lock(); defer { lock.unlock() }
+        let start = max(0, min(sampleOffset, samples.count))
+        return samples[start...]
     }
 
     /// Snapshot the accumulated audio as a PCM-16 WAV.

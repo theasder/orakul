@@ -160,14 +160,19 @@ private actor ScriptedHandoffTranscriber: TranscriptionService {
     }
 }
 
-private func handoffSnapshot(_ engine: TranscriptionEngine) -> RecordingSettingsSnapshot {
+private func handoffSnapshot(
+    _ engine: TranscriptionEngine,
+    localDiarization: Bool = false
+) -> RecordingSettingsSnapshot {
     RecordingSettingsSnapshot(
         engine: engine,
         language: "en",
         localModel: "base",
         microphoneNoiseSuppression: false,
         glossary: "Falcon-SLA, Kubernetes",
-        assemblyDiarization: false)
+        assemblyDiarization: false,
+        localDiarization: localDiarization,
+        localDiarizationRemoteSpeakerCount: 2)
 }
 
 @MainActor
@@ -430,6 +435,51 @@ struct DeepgramHandoffIntegrationTests {
         #expect(state.selectTranscriptionEngine(.local))
         systemChunker.onSamples?([1, 2, 3])
         #expect(state.retainedAudioSampleCountForTesting == 3)
+    }
+
+    @Test("Instant terminal fallback retains a private-label suffix without final refinement")
+    func terminalFallbackRetainsLocalSpeakerAudio() async throws {
+        try await withUnhurriedReadiness {
+            let savedToggle = Config.transcriptionPostStopFinalPassEnabled
+            defer { Config.transcriptionPostStopFinalPassEnabled = savedToggle }
+            Config.transcriptionPostStopFinalPassEnabled = false
+
+            let previous = HandoffTranscriber(text: "private prefix")
+            let placeholder = HandoffTranscriber(text: "instant placeholder")
+            let nextLocal = HandoffTranscriber(text: "fallback private")
+            let transport = InertDeepgramTransport()
+            let streamers = StreamerCapture()
+            let state = makeState(
+                auth: .key("unit-key"), previous: previous,
+                placeholder: placeholder, nextLocal: nextLocal,
+                transport: transport, streamers: streamers)
+            let systemChunker = AudioChunkBuffer(
+                chunkSeconds: 0.02, overlapSeconds: 0) { _, _ in }
+            let micChunker = AudioChunkBuffer(
+                chunkSeconds: 0.02, overlapSeconds: 0) { _, _ in }
+            state.installTestLiveTranscriptionRuntime(
+                settings: handoffSnapshot(.local, localDiarization: true),
+                systemChunker: systemChunker,
+                micChunker: micChunker,
+                generation: 390)
+
+            #expect(state.selectTranscriptionEngine(.deepgram))
+            let pair = streamers.snapshot()
+            try #require(pair.count == 2)
+            #expect(pair[0].markCurrentSocketHealthyForTesting())
+            #expect(pair[1].markCurrentSocketHealthyForTesting())
+            await drainMainActor()
+
+            pair[0].onTerminalFailure?("test terminal fallback")
+            #expect(await waitFor {
+                state.liveTranscriptionConfiguration().active?.engine == .local
+            })
+            systemChunker.onSamples?([1, 2, 3, 4])
+
+            #expect(state.retainedAudioSampleCountForTesting == 4)
+            #expect(state.retainedAudioOriginsForTesting.local != nil)
+            #expect(!state.canRetranscribeLocally)
+        }
     }
 
     @Test("every non-Local to Private route starts a fresh retained suffix")

@@ -346,6 +346,8 @@ struct RecordingSettingsIsolationTests {
         let savedAEC = Config.micNoiseSuppressionEnabled
         let savedGlossary = Config.transcriptionGlossary
         let savedDiarization = Config.assemblyAIDiarizationEnabled
+        let savedLocalDiarization = Config.localDiarizationEnabled
+        let savedRemoteSpeakerCount = Config.localDiarizationRemoteSpeakerCount
         defer {
             Config.transcriptionEngineValue = savedEngine
             Config.transcriptionLanguage = savedLanguage
@@ -353,6 +355,8 @@ struct RecordingSettingsIsolationTests {
             Config.micNoiseSuppressionEnabled = savedAEC
             Config.transcriptionGlossary = savedGlossary
             Config.assemblyAIDiarizationEnabled = savedDiarization
+            Config.localDiarizationEnabled = savedLocalDiarization
+            Config.localDiarizationRemoteSpeakerCount = savedRemoteSpeakerCount
         }
 
         Config.transcriptionEngineValue = .local
@@ -361,6 +365,8 @@ struct RecordingSettingsIsolationTests {
         Config.micNoiseSuppressionEnabled = false
         Config.transcriptionGlossary = "Falcon, Kubernetes"
         Config.assemblyAIDiarizationEnabled = false
+        Config.localDiarizationEnabled = true
+        Config.localDiarizationRemoteSpeakerCount = 3
         let active = RecordingSettingsSnapshot.configured()
 
         Config.transcriptionEngineValue = .whisper
@@ -369,6 +375,8 @@ struct RecordingSettingsIsolationTests {
         Config.micNoiseSuppressionEnabled = true
         Config.transcriptionGlossary = "Orion"
         Config.assemblyAIDiarizationEnabled = true
+        Config.localDiarizationEnabled = false
+        Config.localDiarizationRemoteSpeakerCount = 1
 
         #expect(active.engine == .local)
         #expect(active.language == "en")
@@ -376,9 +384,16 @@ struct RecordingSettingsIsolationTests {
         #expect(!active.microphoneNoiseSuppression)
         #expect(active.glossaryTerms == ["Falcon", "Kubernetes"])
         #expect(!active.assemblyDiarization)
+        #expect(active.localDiarization)
+        #expect(active.localDiarizationRemoteSpeakerCount == 3)
+        let switched = active.replacingEngine(with: .deepgram)
+        #expect(switched.localDiarization)
+        #expect(switched.localDiarizationRemoteSpeakerCount == 3)
         #expect(RecordingSettingsSnapshot.configured().language == "ru")
         #expect(RecordingSettingsSnapshot.configured().microphoneNoiseSuppression)
         #expect(RecordingSettingsSnapshot.configured().glossaryTerms == ["Orion"])
+        #expect(!RecordingSettingsSnapshot.configured().localDiarization)
+        #expect(RecordingSettingsSnapshot.configured().localDiarizationRemoteSpeakerCount == 1)
     }
 
     @Test("all streamers retain glossary A after Config changes to B")

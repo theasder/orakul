@@ -246,6 +246,8 @@ private struct TranscriptionSettingsTab: View {
     @State private var micNoiseSuppression: Bool = Config.micNoiseSuppressionEnabled
     @State private var adaptiveLocal: Bool = Config.adaptiveLocalWhisperEnabled
     @State private var postStopFinalPass: Bool = Config.transcriptionPostStopFinalPassEnabled
+    @State private var localSpeakerLabels: Bool = Config.localDiarizationEnabled
+    @State private var remoteSpeakerCount: Int = Config.localDiarizationRemoteSpeakerCount
     @State private var assemblyDiarization: Bool = Config.assemblyAIDiarizationEnabled
     @State private var firefliesEnhance: Bool = Config.firefliesTranscriptEnhanceEnabled
 
@@ -364,6 +366,44 @@ private struct TranscriptionSettingsTab: View {
                                 }
                                 .accessibilityLabel("Уточнять локальную расшифровку после остановки")
                                 .accessibilityIdentifier("settings.transcription.post-stop-final-pass")
+                        }
+                    }
+
+                    SettingsSection(
+                        title: "Приватные метки говорящих · Бета",
+                        caption: "Включите до следующей локальной записи: orakul сохранит дорожку собеседников в памяти. После остановки выберите 1–4 голоса и запустите определение; число можно изменить и повторить на том же звонке. Автоподсчёта нет — в измерении он завышал число голосов. При первом запуске скачается около 34 МБ моделей. Аудио и эмбеддинги остаются на этом Mac, голосовые отпечатки не сохраняются. Метки сохраняются только в локальной истории этого звонка на этом Mac. У звонков дольше часа подписывается только полностью сохранённая часть. Бета — проверьте метки перед отправкой."
+                    ) {
+                        SettingsRow {
+                            Label("Определять говорящих на этом Mac", systemImage: "person.2.wave.2")
+                                .labelStyle(SettingLabelStyle())
+                            Spacer()
+                            Toggle("", isOn: $localSpeakerLabels)
+                                .labelsHidden().toggleStyle(.switch)
+                                .onChange(of: localSpeakerLabels) {
+                                    Config.localDiarizationEnabled = $0
+                                }
+                                .accessibilityLabel("Определять говорящих на этом Mac")
+                                .accessibilityIdentifier(
+                                    "settings.transcription.local-diarization")
+                        }
+                        SettingsRow {
+                            Label("Голосов собеседников", systemImage: "person.3")
+                                .labelStyle(SettingLabelStyle())
+                            Spacer()
+                            Picker("", selection: $remoteSpeakerCount) {
+                                ForEach(LocalDiarization.remoteSpeakerCountRange, id: \.self) {
+                                    Text("\($0)").tag($0)
+                                }
+                            }
+                            .labelsHidden().pickerStyle(.menu)
+                            .frame(maxWidth: 90)
+                            .disabled(!localSpeakerLabels)
+                            .onChange(of: remoteSpeakerCount) {
+                                Config.localDiarizationRemoteSpeakerCount = $0
+                            }
+                            .accessibilityLabel("Число голосов собеседников")
+                            .accessibilityIdentifier(
+                                "settings.transcription.local-diarization-speakers")
                         }
                     }
                 }
@@ -523,6 +563,8 @@ private struct TranscriptionSettingsTab: View {
             micNoiseSuppression = Config.micNoiseSuppressionEnabled
             adaptiveLocal = Config.adaptiveLocalWhisperEnabled
             postStopFinalPass = Config.transcriptionPostStopFinalPassEnabled
+            localSpeakerLabels = Config.localDiarizationEnabled
+            remoteSpeakerCount = Config.localDiarizationRemoteSpeakerCount
             assemblyDiarization = Config.assemblyAIDiarizationEnabled
             firefliesEnhance = Config.firefliesTranscriptEnhanceEnabled
         }

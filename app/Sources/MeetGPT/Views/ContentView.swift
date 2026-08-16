@@ -238,6 +238,8 @@ private struct MandatoryInformationOverlay: View {
 
 private struct MeetingColumn: View {
     @EnvironmentObject var state: AppState
+    @AppStorage("transcription.localDiarizationRemoteSpeakers")
+    private var postCallRemoteSpeakerCount = 1
 
     private static let dateFormatter: DateFormatter =
         // Было "EEEE, MMM d · h:mm a" без локали: на английской macOS шапка
@@ -252,11 +254,18 @@ private struct MeetingColumn: View {
                 SectionLabel("Транскрипт")
                 Spacer()
                 downloadTranscriptButton
-                diarizeControl
                 livePill
             }
             .padding(.horizontal, Space.xl)
             .padding(.bottom, Space.s)
+
+            diarizeControl
+                .padding(.horizontal, Space.xl)
+                .padding(.bottom, Space.s)
+                .onAppear {
+                    postCallRemoteSpeakerCount =
+                        Config.localDiarizationRemoteSpeakerCount
+                }
 
             if let notice = state.transcriptionPerformanceNotice {
                 TranscriptionPerformanceBanner(notice: notice)
@@ -362,6 +371,25 @@ private struct MeetingColumn: View {
                     .font(Typo.caption)
                     .foregroundStyle(Theme.inkSecondary)
             }
+        } else if state.localDiarizationRunning {
+            VStack(alignment: .leading, spacing: Space.xs) {
+                HStack(spacing: Space.s) {
+                    ProgressView(value: state.localDiarizationProgress)
+                        .frame(width: 48)
+                        .accessibilityLabel("Ход определения говорящих")
+                        .accessibilityIdentifier(
+                            "postcall.localDiarization.progress")
+                    Text(state.localDiarizationProgress < 0.2
+                         ? "Готовлю локальную модель…"
+                         : "Разделяю голоса на этом Mac…")
+                        .font(Typo.caption)
+                        .foregroundStyle(Theme.inkSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Button("Отмена") { state.cancelLocalSpeakerLabels() }
+                    .buttonStyle(QuietButtonStyle(prominent: false))
+                    .accessibilityIdentifier("postcall.localDiarization.cancel")
+            }
         } else if state.diarizing {
             HStack(spacing: Space.xs) {
                 BreathingDots(tint: Theme.accent)
@@ -370,7 +398,7 @@ private struct MeetingColumn: View {
                     .foregroundStyle(Theme.inkSecondary)
             }
         } else {
-            HStack(spacing: Space.s) {
+            VStack(alignment: .leading, spacing: Space.xs) {
                 if state.canEnhanceWithFireflies {
                     Button { state.enhanceTranscriptWithFirefliesNow() } label: {
                         Label("Дополнить из Fireflies", systemImage: "flame")
@@ -394,6 +422,38 @@ private struct MeetingColumn: View {
                     и сохраняет его содержание.
                     """)
                     .accessibilityIdentifier("postcall.retranscribeLocal")
+                }
+                if state.canLabelSpeakersLocally {
+                    HStack(spacing: Space.s) {
+                        Text("Голосов собеседников")
+                            .font(Typo.caption)
+                            .foregroundStyle(Theme.inkSecondary)
+                        Picker("", selection: $postCallRemoteSpeakerCount) {
+                            ForEach(LocalDiarization.remoteSpeakerCountRange, id: \.self) {
+                                Text("\($0)").tag($0)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                        .frame(width: 64)
+                        .onChange(of: postCallRemoteSpeakerCount) {
+                            Config.localDiarizationRemoteSpeakerCount = $0
+                        }
+                        .accessibilityLabel("Число голосов собеседников")
+                        .accessibilityIdentifier(
+                            "postcall.localDiarization.speakers")
+                    }
+                    Button {
+                        state.labelSpeakersLocallyNow(
+                            expectedRemoteSpeakerCount:
+                                postCallRemoteSpeakerCount)
+                    } label: {
+                        Label("Подписать говорящих", systemImage: "person.2.wave.2")
+                    }
+                    .buttonStyle(QuietButtonStyle(prominent: false))
+                    .help("Определяет выбранное число голосов по сохранённой дорожке на этом Mac. Аудио никуда не отправляется, голосовые отпечатки не сохраняются, кредиты не тратятся. Метки сохраняются только в локальной истории этого звонка на этом Mac. Бета — проверьте их перед отправкой.")
+                    .accessibilityLabel("Определить говорящих на этом Mac")
+                    .accessibilityIdentifier("postcall.localDiarization.run")
                 }
                 if state.canDiarize {
                     Button { state.diarizeNow() } label: {
@@ -428,9 +488,16 @@ private struct MeetingColumn: View {
                     Text(note)
                         .font(Typo.caption)
                         .foregroundStyle(Theme.inkTertiary)
-                        .lineLimit(1)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if let note = state.localDiarizationNote, !note.isEmpty {
+                    Text(note)
+                        .font(Typo.caption)
+                        .foregroundStyle(Theme.inkTertiary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 

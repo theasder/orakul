@@ -1115,6 +1115,30 @@ enum Config {
         set { UserDefaults.standard.set(newValue, forKey: "transcription.postStopFinalPass") }
     }
 
+    /// Beta, post-call, and entirely on-device. Enabling this is also explicit
+    /// consent to retain the remote mono track in memory until the next call or
+    /// app quit. It never enables a cloud route.
+    static var localDiarizationEnabled: Bool {
+        get { LocalDiarization.isEnabled }
+        set { LocalDiarization.isEnabled = newValue }
+    }
+
+    /// Automatic-count mode over-segments badly. Require a small, explicit
+    /// count of remote voices (the local user is already known as `Вы`).
+    static var localDiarizationRemoteSpeakerCount: Int {
+        get {
+            let key = "transcription.localDiarizationRemoteSpeakers"
+            guard UserDefaults.standard.object(forKey: key) != nil else { return 1 }
+            return LocalDiarization.normalizedRemoteSpeakerCount(
+                UserDefaults.standard.integer(forKey: key))
+        }
+        set {
+            UserDefaults.standard.set(
+                LocalDiarization.normalizedRemoteSpeakerCount(newValue),
+                forKey: "transcription.localDiarizationRemoteSpeakers")
+        }
+    }
+
     /// AssemblyAI is post-call diarization, not a live fallback. Default off:
     /// retaining the system track for a possible upload requires opt-in.
     static var assemblyAIDiarizationEnabled: Bool {
