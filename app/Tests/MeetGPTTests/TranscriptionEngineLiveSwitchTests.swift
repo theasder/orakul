@@ -117,6 +117,34 @@ struct TranscriptionEngineLiveSwitchTests {
         #expect(state.lastError?.contains("Возобновите") == true)
     }
 
+    @Test("delayed startup cannot publish Private before the Instant route retires")
+    func startingEngineSelectionIsRejected() {
+        let savedEngine = Config.transcriptionEngineValue
+        defer { Config.transcriptionEngineValue = savedEngine }
+        Config.transcriptionEngineValue = .deepgram
+        var handoffs: [TranscriptionEngine] = []
+        let state = AppState(
+            credentialStore: InMemoryKeychain(),
+            transcriptionEngineSwitchOverride: { engine in
+                handoffs.append(engine)
+                return true
+            })
+        state.installTestLiveTranscriptionRuntime(
+            settings: snapshot(engine: .deepgram),
+            systemChunker: AudioChunkBuffer(chunkSeconds: 1) { _, _ in },
+            micChunker: AudioChunkBuffer(chunkSeconds: 1) { _, _ in })
+        state.status = .starting
+        let configuredBeforeSelection = Config.transcriptionEngineValue
+
+        #expect(!state.selectTranscriptionEngine(.local))
+        #expect(handoffs.isEmpty)
+        #expect(state.selectedTranscriptionEngine == .deepgram)
+        #expect(Config.transcriptionEngineValue == configuredBeforeSelection)
+        #expect(state.liveTranscriptionConfiguration().active?.engine == .deepgram)
+        #expect(state.pendingEngineChange == nil)
+        #expect(state.lastError?.contains("Дождитесь начала") == true)
+    }
+
     @Test("Local to cloud invalidates the old final-pass interval across a round trip")
     func cloudRoundTripInvalidatesLocalContinuity() {
         let savedEngine = Config.transcriptionEngineValue

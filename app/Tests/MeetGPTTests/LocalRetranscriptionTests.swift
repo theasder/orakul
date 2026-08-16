@@ -82,6 +82,12 @@ struct LocalRetranscriptionTests {
             hasAssemblyAI: false,
             assemblyDiarization: false,
             localFinalPassEnabled: true))
+        #expect(AppState.shouldRetainSessionAudio(
+            engine: .local,
+            hasAssemblyAI: false,
+            assemblyDiarization: false,
+            serverDiarization: true,
+            localFinalPassEnabled: false))
     }
 
     @Test("pause invalidates linear final-pass time and releases unshared PCM")
@@ -107,6 +113,10 @@ struct LocalRetranscriptionTests {
         #expect(AppState.shouldReleaseRetainedAudioAfterLocalFinalPass(
             hasAssemblyAI: true,
             assemblyDiarization: false))
+        #expect(!AppState.shouldReleaseRetainedAudioAfterLocalFinalPass(
+            hasAssemblyAI: false,
+            assemblyDiarization: false,
+            serverDiarization: true))
     }
 
     @Test("PCM retained only for diarization does not authorize Local replacement")
@@ -123,10 +133,42 @@ struct LocalRetranscriptionTests {
                 count: 2 * LocalFinalPass.sampleRate),
             startedAt: start,
             preparedModel: "base",
-            optedIn: false)
+            optedIn: false,
+            serverDiarizationEligible: true)
 
         #expect(state.retainedAudioSampleCountForTesting > 0)
         #expect(!state.canRetranscribeLocally)
+    }
+
+    @Test("accepted final pass keeps PCM for signed-in server diarization")
+    func serverConsumerKeepsAudioAfterPass() async {
+        let words = (0..<20).map { "word\($0)" }.joined(separator: " ")
+        let service = ImmediateLocalFinalPassTranscriber(words)
+        let state = AppState(
+            credentialStore: InMemoryKeychain(),
+            localFinalPassServiceFactory: { _, _ in service })
+        state.applyTestWorkspace(recording: false)
+        let start = Date(timeIntervalSinceReferenceDate: 31_000)
+        state.transcript = [TranscriptEntry(
+            source: .system,
+            text: words,
+            timestamp: start,
+            transcriptionEngine: .local)]
+        state.applyTestLocalFinalPassRetention(
+            samples: AudioFixtures.voicedInt16(
+                count: 2 * LocalFinalPass.sampleRate),
+            startedAt: start,
+            preparedModel: "base",
+            serverDiarizationEligible: true)
+
+        state.retranscribeLocallyNow()
+        for _ in 0..<10_000 {
+            if !state.localRetranscribing { break }
+            await Task.yield()
+        }
+        #expect(!state.localRetranscribing)
+        #expect(state.retainedAudioSampleCountForTesting > 0)
+        #expect(state.transcript.contains { $0.text == words })
     }
 
     @Test("Clear cancels and revision-blocks a non-cooperative manual pass")

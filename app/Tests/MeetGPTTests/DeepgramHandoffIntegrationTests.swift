@@ -318,6 +318,89 @@ struct DeepgramHandoffIntegrationTests {
             deepgramAuthOverride: auth)
     }
 
+    @Test("paused production Local route drops audio and Resume starts a clean future chunk")
+    func pausedLocalRouteDropsAudio() async {
+        let local = HandoffTranscriber(text: "resumed private words")
+        let state = AppState(
+            transcriber: local,
+            credentialStore: InMemoryKeychain())
+        let systemChunker = AudioChunkBuffer(
+            chunkSeconds: 0.02, overlapSeconds: 0) { _, _ in }
+        let micChunker = AudioChunkBuffer(
+            chunkSeconds: 0.02, overlapSeconds: 0) { _, _ in }
+        state.installTestLiveTranscriptionRuntime(
+            settings: handoffSnapshot(.local),
+            systemChunker: systemChunker,
+            micChunker: micChunker,
+            generation: 31)
+
+        // Leave a pre-pause fragment. It must be discarded at the boundary,
+        // not combined with future audio after Resume.
+        systemChunker.append(
+            AudioFixtures.voicedBuffer(sampleRate: 16_000, seconds: 0.01))
+        state.pauseRecording()
+        systemChunker.append(
+            AudioFixtures.voicedBuffer(sampleRate: 16_000, seconds: 0.05))
+        micChunker.append(
+            AudioFixtures.voicedBuffer(sampleRate: 16_000, seconds: 0.05))
+        await drainMainActor()
+        #expect(await local.snapshot().transcriptions == 0)
+        #expect(state.transcript.isEmpty)
+
+        state.resumeRecording()
+        systemChunker.append(
+            AudioFixtures.voicedBuffer(sampleRate: 16_000, seconds: 0.015))
+        await drainMainActor()
+        #expect(await local.snapshot().transcriptions == 0)
+        systemChunker.append(
+            AudioFixtures.voicedBuffer(sampleRate: 16_000, seconds: 0.01))
+        #expect(await waitFor {
+            await local.snapshot().transcriptions > 0
+                && state.transcript.contains(where: { $0.text == "resumed private words" })
+        })
+    }
+
+    @Test("paused production Instant route sends no PCM and Resume sends only future audio")
+    func pausedInstantRouteDropsAudio() async throws {
+        try await withUnhurriedReadiness {
+            let previous = HandoffTranscriber(text: "old private")
+            let placeholder = HandoffTranscriber(text: "instant placeholder")
+            let nextLocal = HandoffTranscriber(text: "future private")
+            let transport = InertDeepgramTransport()
+            let streamers = StreamerCapture()
+            let state = makeState(
+                auth: .key("unit-key"), previous: previous,
+                placeholder: placeholder, nextLocal: nextLocal,
+                transport: transport, streamers: streamers)
+            let systemChunker = AudioChunkBuffer(
+                chunkSeconds: 0.02, overlapSeconds: 0) { _, _ in }
+            let micChunker = AudioChunkBuffer(
+                chunkSeconds: 0.02, overlapSeconds: 0) { _, _ in }
+            state.installTestLiveTranscriptionRuntime(
+                settings: handoffSnapshot(.local),
+                systemChunker: systemChunker,
+                micChunker: micChunker,
+                generation: 32)
+            #expect(state.selectTranscriptionEngine(.deepgram))
+            try #require(streamers.snapshot().count == 2)
+
+            state.pauseRecording()
+            systemChunker.append(
+                AudioFixtures.voicedBuffer(sampleRate: 16_000, seconds: 0.05))
+            micChunker.append(
+                AudioFixtures.voicedBuffer(sampleRate: 16_000, seconds: 0.05))
+            await drainMainActor()
+            #expect(transport.snapshot().sends == 0)
+
+            state.resumeRecording()
+            systemChunker.append(
+                AudioFixtures.voicedBuffer(sampleRate: 16_000, seconds: 0.05))
+            micChunker.append(
+                AudioFixtures.voicedBuffer(sampleRate: 16_000, seconds: 0.05))
+            #expect(await waitFor { transport.snapshot().sends > 0 })
+        }
+    }
+
     @Test("every explicit Instant to Private switch starts retained Local PCM")
     func explicitInstantToPrivateRetainsAudio() {
         let savedToggle = Config.transcriptionPostStopFinalPassEnabled
@@ -347,6 +430,42 @@ struct DeepgramHandoffIntegrationTests {
         #expect(state.selectTranscriptionEngine(.local))
         systemChunker.onSamples?([1, 2, 3])
         #expect(state.retainedAudioSampleCountForTesting == 3)
+    }
+
+    @Test("a Private suffix keeps the whole-call origin for server diarization")
+    func privateSuffixPreservesDiarizationOrigin() {
+        let savedToggle = Config.transcriptionPostStopFinalPassEnabled
+        defer { Config.transcriptionPostStopFinalPassEnabled = savedToggle }
+        Config.transcriptionPostStopFinalPassEnabled = true
+
+        let state = makeState(
+            auth: .key("unit-key"),
+            previous: HandoffTranscriber(text: "old private"),
+            placeholder: HandoffTranscriber(text: "instant"),
+            nextLocal: HandoffTranscriber(text: "new private"),
+            transport: InertDeepgramTransport(),
+            streamers: StreamerCapture())
+        let wholeCallStart = Date(timeIntervalSinceReferenceDate: 12_345)
+        state.applyTestLocalFinalPassRetention(
+            samples: [1, 2, 3],
+            startedAt: wholeCallStart,
+            optedIn: false,
+            serverDiarizationEligible: true)
+        let systemChunker = AudioChunkBuffer(
+            chunkSeconds: 1, overlapSeconds: 0) { _, _ in }
+        let micChunker = AudioChunkBuffer(
+            chunkSeconds: 1, overlapSeconds: 0) { _, _ in }
+        state.installTestLiveTranscriptionRuntime(
+            settings: handoffSnapshot(.deepgram),
+            systemChunker: systemChunker,
+            micChunker: micChunker,
+            generation: 40)
+
+        #expect(state.selectTranscriptionEngine(.local))
+        let origins = state.retainedAudioOriginsForTesting
+        #expect(origins.full == wholeCallStart)
+        #expect(origins.local != nil)
+        #expect(origins.local != origins.full)
     }
 
     @Test("real Local to Instant switch starts both routes, then returns to Local")

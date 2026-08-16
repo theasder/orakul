@@ -1606,15 +1606,18 @@ final class AppState: ObservableObject {
         samples: [Int16],
         startedAt: Date,
         preparedModel: String? = "base",
-        optedIn: Bool = true
+        optedIn: Bool = true,
+        serverDiarizationEligible: Bool = false
     ) {
         guard Self.isUnderTest else { return }
         sessionRecorder.reset()
         sessionRecorder.append(samples)
         sessionRecorder.seal()
-        sessionAudioStart = startedAt
+        sessionRetainedAudioStart = startedAt
+        sessionAudioStart = optedIn ? startedAt : nil
         sessionAudioStartSample = 0
         localFinalPassOptedInForSession = optedIn
+        serverDiarizationEligibleForSession = serverDiarizationEligible
         localFinalPassContinuityValid = optedIn
         activeSessionPreparedLocalWhisperModel = preparedModel
         activeRecordingSettings = RecordingSettingsSnapshot(
@@ -1628,6 +1631,11 @@ final class AppState: ObservableObject {
 
     var retainedAudioSampleCountForTesting: Int {
         Self.isUnderTest ? sessionRecorder.retainedSampleCount : 0
+    }
+
+    var retainedAudioOriginsForTesting: (full: Date?, local: Date?) {
+        guard Self.isUnderTest else { return (nil, nil) }
+        return (sessionRetainedAudioStart, sessionAudioStart)
     }
 
     func handleSessionExpiredForTesting() {
@@ -2030,6 +2038,14 @@ final class AppState: ObservableObject {
     /// The pending post-call Fireflies merge, waiting out Fireflies' own
     /// processing time. Held so a new recording can cancel it.
     private var firefliesEnhanceTask: Task<Void, Never>?
+    /// Explicit enhancement is tracked too: cancellation is cooperative, but
+    /// the session/revision guards below also stop a non-cooperative fetch from
+    /// committing into a later call.
+    private var manualFirefliesEnhanceTask: Task<Void, Never>?
+    /// Cancellation is not enough for an MCP/provider that is already inside
+    /// an await. Advancing this revision makes every captured mutation identity
+    /// stale synchronously on clear, restore, or new-call start.
+    private var firefliesMutationRevision = 0
 
     /// A free Fireflies merge is already scheduled for this call.
     ///
@@ -2088,9 +2104,9 @@ final class AppState: ObservableObject {
 
     /// Fireflies is connected and there is a local transcript worth merging.
     var canEnhanceWithFireflies: Bool {
-        (mcp?.prefersMCP("fireflies") ?? false)
+        (firefliesTranscriptProvider != nil || (mcp?.prefersMCP("fireflies") ?? false))
             && !transcript.isEmpty
-            && status != .recording
+            && status == .idle
             && !enhancingTranscript
             && !localRetranscribing
             && !firefliesImporting
@@ -3171,6 +3187,11 @@ final class AppState: ObservableObject {
     private var activeSessionPreparedLocalWhisperModel: String?
     private let googleAuth = GoogleAuth()
     private let sessionRecorder = SessionAudioRecorder()
+    /// Wall-clock origin of sample zero in `sessionRecorder`. Diarization uses
+    /// the whole retained track even when Local refinement starts at a later
+    /// cloud-to-private suffix boundary.
+    private var sessionRetainedAudioStart: Date?
+    /// Wall-clock origin of the Local-only interval eligible for refinement.
     private var sessionAudioStart: Date?
     /// Sample offset where the current Local refinement interval begins. The
     /// recorder may also hold an earlier cloud prefix for opted-in diarization;
@@ -3184,6 +3205,10 @@ final class AppState: ObservableObject {
     /// may retain the same PCM for diarization, but that does not opt the call
     /// into Local transcript replacement.
     private var localFinalPassOptedInForSession = false
+    /// Captured at the recording boundary. Signed-in users already have a
+    /// manual server Improve/diarization consumer; a Local refinement must not
+    /// discard its PCM merely because no AssemblyAI key is configured.
+    private var serverDiarizationEligibleForSession = false
     private var systemStreamer: DeepgramStreamer?
     private var micStreamer: DeepgramStreamer?
     /// A streamer retired during a mid-call handoff can still deliver its
@@ -3386,6 +3411,12 @@ final class AppState: ObservableObject {
     ) -> DeepgramStreamer
     private let transcriptionEngineAvailability: (TranscriptionEngine) -> Bool
     private let deepgramAuthOverride: DeepgramAuth?
+    typealias FirefliesTranscriptProvider = @MainActor (
+        _ near: Date?, _ within: TimeInterval?
+    ) async throws -> FirefliesTranscript
+    /// Nil in production. It keeps the fetch/session race deterministic in
+    /// tests while both shipped paths still use MCP.
+    private let firefliesTranscriptProvider: FirefliesTranscriptProvider?
 
     /// True when running inside `swift test` / XCTest / swift-testing — used to
     /// skip app-only OS integrations (notification authorization, workspace
@@ -3437,6 +3468,7 @@ final class AppState: ObservableObject {
              Config.engineAvailable($0)
          },
          deepgramAuthOverride: DeepgramAuth? = nil,
+         firefliesTranscriptProvider: FirefliesTranscriptProvider? = nil,
          backgroundLLMQueue: BackgroundLLMQueue = BackgroundLLMQueue(),
          blindSpotSuggestionProvider: @escaping (
              BlindSpotProviderRequest
@@ -3480,6 +3512,7 @@ final class AppState: ObservableObject {
         self.deepgramStreamerFactory = deepgramStreamerFactory
         self.transcriptionEngineAvailability = transcriptionEngineAvailability
         self.deepgramAuthOverride = deepgramAuthOverride
+        self.firefliesTranscriptProvider = firefliesTranscriptProvider
         self.bgQueue = backgroundLLMQueue
         self.blindSpotSuggestionProvider = blindSpotSuggestionProvider
         self.factCheckProvider = factCheckProvider
@@ -3614,6 +3647,8 @@ final class AppState: ObservableObject {
         brainstormTask?.cancel()
         agendaTask?.cancel()
         remindersTask?.cancel()
+        firefliesEnhanceTask?.cancel()
+        manualFirefliesEnhanceTask?.cancel()
         systemStreamer?.finish()
         micStreamer?.finish()
         // Block-based observers are NOT auto-removed on dealloc — without this,
@@ -4185,6 +4220,7 @@ final class AppState: ObservableObject {
     /// Load a saved session back into the workspace (blocked while recording).
     func restoreSession(_ session: SavedSession) {
         guard !isRecording, status == .idle else { return }
+        cancelFirefliesEnhance()
         invalidateLocalFinalPassTasks(discardRetainedAudio: true)
         // Save the call being navigated AWAY from before its workspace is
         // overwritten. Without this, anything changed since the last automatic
@@ -4207,10 +4243,12 @@ final class AppState: ObservableObject {
         // live meeting's recorder remain attached to a restored History item —
         // doing so could upload old audio from the new workspace's Diarize UI.
         sessionRecorder.reset()
+        sessionRetainedAudioStart = nil
         sessionAudioStart = nil
         sessionAudioStartSample = 0
         localFinalPassContinuityValid = false
         activeSessionPreparedLocalWhisperModel = nil
+        serverDiarizationEligibleForSession = false
         currentSessionID = session.id      // further saves update the same file
         // The workspace is now showing a PAST meeting rather than the one being
         // worked on. This is what puts the "New call" affordance on screen: it
@@ -4529,9 +4567,24 @@ final class AppState: ObservableObject {
             return true
         }
 
+        // Capture startup owns a fixed, already-published engine snapshot. A
+        // different selection here used to publish Private immediately while
+        // startup could still open the old Instant route and send audio before
+        // applying the pending switch. Keep both the saved and visible choice
+        // unchanged until capture reaches a routable state.
+        if status == .starting {
+            pendingEngineChange = nil
+            let startupEngine = selectedTranscriptionEngine
+            guard engine == startupEngine else {
+                lastError = "Дождитесь начала записи перед сменой движка. Запуск продолжается на «\(startupEngine.advantageTitle)»."
+                return false
+            }
+            return true
+        }
+
         Config.transcriptionEngineValue = engine
         selectedTranscriptionEngine = engine
-        guard status == .starting || status == .recording else {
+        guard status == .recording else {
             pendingEngineChange = nil
             return true
         }
@@ -4541,9 +4594,6 @@ final class AppState: ObservableObject {
         }
 
         pendingEngineChange = engine
-        // Capture setup owns the buffers until `.recording`; startRecording
-        // consumes this pending choice immediately after capture comes online.
-        guard status == .recording else { return true }
 
         guard switchActiveTranscriptionEngine(
             to: engine, replacing: previousSettings, previousEngine: previousEngine
@@ -5934,17 +5984,24 @@ final class AppState: ObservableObject {
         analytics(.featureUsed(.pauseResume))
         let now = Date()
         recordingElapsed.pause(at: now)
+        // Close the transcription boundary before publishing `.paused`.
+        // ScreenCaptureKit/AVAudioEngine taps remain installed, so status alone
+        // cannot prevent their callbacks from sending to Deepgram or Local.
+        systemChunker?.pause()
+        micChunker?.pause()
         status = .paused
         localFinalPassContinuityValid = false
         sessionRecorder.pause()
         if Self.shouldReleaseRetainedAudioAfterLocalFinalPass(
             hasAssemblyAI: hasAssemblyAI,
-            assemblyDiarization: activeRecordingSettings?.assemblyDiarization ?? false) {
+            assemblyDiarization: activeRecordingSettings?.assemblyDiarization ?? false,
+            serverDiarization: serverDiarizationEligibleForSession) {
             // Without a piecewise wall-clock map, pre/post-pause PCM cannot be
             // assigned safe transcript timestamps. Preserve the live text and
             // stop retaining for this final-pass-only call.
             sessionRecorder.seal()
             sessionRecorder.discard()
+            sessionRetainedAudioStart = nil
             sessionAudioStart = nil
             sessionAudioStartSample = 0
         }
@@ -5966,11 +6023,16 @@ final class AppState: ObservableObject {
         guard status == .paused else { return }
         let now = Date()
         recordingElapsed.resume(at: now)
-        sessionRecorder.resume()
         // Флаг с прошлого звонка не должен встречать следующий.
         systemAudioLostDuringRecording = false
         microphoneLostDuringRecording = false
+        // Publish the active state first, then open clean future audio
+        // boundaries. No callback can be admitted while the UI still says the
+        // meeting is paused.
         status = .recording
+        sessionRecorder.resume()
+        systemChunker?.resume()
+        micChunker?.resume()
         // Back to whatever the co-pilot setting actually is, not
         // unconditionally on: a call paused with automation off must resume
         // with it still off.
@@ -5991,6 +6053,7 @@ final class AppState: ObservableObject {
     var isSessionLive: Bool { status == .recording || status == .paused }
 
     func clearAll() {
+        cancelFirefliesEnhance()
         invalidateLocalFinalPassTasks(discardRetainedAudio: true)
         supersedeActiveAI()
         aiResponse = ""
@@ -6013,6 +6076,7 @@ final class AppState: ObservableObject {
         transcript.removeAll()
         provisional.removeAll()
         sessionRecorder.reset()
+        sessionRetainedAudioStart = nil
         sessionAudioStart = nil
         sessionAudioStartSample = 0
         localFinalPassContinuityValid = false
@@ -8864,6 +8928,7 @@ final class AppState: ObservableObject {
         // Invalidate a stopped call's manual/automatic rewrite before any
         // permission or model await. A non-cooperative decoder may finish, but
         // its revision can no longer commit into the new workspace.
+        cancelFirefliesEnhance()
         invalidateLocalFinalPassTasks(discardRetainedAudio: true)
         status = .starting
         lastError = nil
@@ -8921,14 +8986,16 @@ final class AppState: ObservableObject {
         let sessionSettings = configuredSettings.replacingEngine(with: sessionEngine)
         let sessionLanguage = sessionSettings.language
         let localFinalPassEnabled = Config.transcriptionPostStopFinalPassEnabled
+        let serverDiarizationEligible = canDiarizeOnServer
         let retainSessionAudio = Self.shouldRetainSessionAudio(
             engine: sessionEngine,
             hasAssemblyAI: hasAssemblyAI,
             assemblyDiarization: sessionSettings.assemblyDiarization,
+            serverDiarization: serverDiarizationEligible,
             localFinalPassEnabled: localFinalPassEnabled)
         // Publish the immutable in-flight snapshot before the potentially slow
-        // model preparation await. Settings changes during `.starting` can then
-        // be identified honestly as pending for the following recording.
+        // model preparation await. Settings rejects changes during `.starting`
+        // so its visible row can never outrun this route.
         activeRecordingSettings = sessionSettings
         await prepareTranscriberForRecording(
             engine: sessionEngine,
@@ -8955,6 +9022,7 @@ final class AppState: ObservableObject {
 
         // Always clear the previous session's recorded audio first.
         sessionRecorder.reset()
+        sessionRetainedAudioStart = nil
         sessionAudioStart = nil
         sessionAudioStartSample = 0
         localFinalPassContinuityValid = false
@@ -9049,12 +9117,14 @@ final class AppState: ObservableObject {
             activeSessionPreparedLocalWhisperModel = preparedLocalWhisperModel
             localFinalPassOptedInForSession = localFinalPassEnabled
                 && sessionEngine == .local
+            serverDiarizationEligibleForSession = serverDiarizationEligible
             // The reset above clears the old recorder and provenance. Attach
             // the new observer afterwards so Local always retains its private
             // remote track for a safe manual/opt-in final pass.
             if retainSessionAudio,
                preparedLocalWhisperModel != nil
-                || (hasAssemblyAI && sessionSettings.assemblyDiarization) {
+                || (hasAssemblyAI && sessionSettings.assemblyDiarization)
+                || serverDiarizationEligible {
                 beginSessionAudioRetention(on: systemChunker, at: startedAt)
             }
             sessionUsedAI = false
@@ -9137,10 +9207,12 @@ final class AppState: ObservableObject {
             systemChunker = nil
             micChunker = nil
             sessionRecorder.reset()
+            sessionRetainedAudioStart = nil
             sessionAudioStart = nil
             sessionAudioStartSample = 0
             localFinalPassContinuityValid = false
             localFinalPassOptedInForSession = false
+            serverDiarizationEligibleForSession = false
             recordingStartedAt = nil
             recordingElapsed.stop()
             activeSessionEngine = nil
@@ -9325,15 +9397,21 @@ final class AppState: ObservableObject {
     private static let firefliesEnhanceSchedule: [TimeInterval] = [5 * 60, 5 * 60, 10 * 60, 20 * 60]
 
     private func scheduleFirefliesEnhance() {
-        firefliesEnhanceTask?.cancel()
+        cancelFirefliesEnhance()
         let sessionID = currentSessionID
+        let revision = firefliesMutationRevision
         firefliesEnhanceTask = Task { [weak self] in
+            defer {
+                if self?.firefliesMutationRevision == revision {
+                    self?.firefliesEnhanceTask = nil
+                }
+            }
             for delay in Self.firefliesEnhanceSchedule {
                 try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
                 guard !Task.isCancelled, let self else { return }
                 // The workspace has moved on — a later call, or one recording
                 // now. Enhancing would rewrite the wrong meeting's transcript.
-                guard self.currentSessionID == sessionID, !self.isRecording else { return }
+                guard self.currentSessionID == sessionID, self.status == .idle else { return }
                 if await self.enhanceTranscriptWithFireflies(automatic: true) { return }
             }
         }
@@ -9341,8 +9419,11 @@ final class AppState: ObservableObject {
 
     /// Cancels a pending automatic merge — used when the workspace moves on.
     func cancelFirefliesEnhance() {
+        firefliesMutationRevision &+= 1
         firefliesEnhanceTask?.cancel()
         firefliesEnhanceTask = nil
+        manualFirefliesEnhanceTask?.cancel()
+        manualFirefliesEnhanceTask = nil
     }
 
     /// Manual "Enhance with Fireflies" from the transcript toolbar.
@@ -9351,18 +9432,64 @@ final class AppState: ObservableObject {
         // An explicit run replaces the pending automatic one; two merges of the
         // same transcript race each other.
         cancelFirefliesEnhance()
-        Task { await enhanceTranscriptWithFireflies(automatic: false) }
+        let revision = firefliesMutationRevision
+        manualFirefliesEnhanceTask = Task { [weak self] in
+            defer {
+                if self?.firefliesMutationRevision == revision {
+                    self?.manualFirefliesEnhanceTask = nil
+                }
+            }
+            await self?.enhanceTranscriptWithFireflies(automatic: false)
+        }
+    }
+
+    private struct TranscriptMutationIdentity: Equatable {
+        let sessionID: UUID
+        let revision: Int
+        let firefliesRevision: Int
+        let transcript: [TranscriptEntry]
+    }
+
+    private func captureTranscriptMutationIdentity() -> TranscriptMutationIdentity {
+        TranscriptMutationIdentity(
+            sessionID: currentSessionID,
+            revision: transcriptRevision,
+            firefliesRevision: firefliesMutationRevision,
+            transcript: transcript)
+    }
+
+    private func matchesTranscriptMutationIdentity(
+        _ identity: TranscriptMutationIdentity
+    ) -> Bool {
+        currentSessionID == identity.sessionID
+            && transcriptRevision == identity.revision
+            && firefliesMutationRevision == identity.firefliesRevision
+            && transcript == identity.transcript
+    }
+
+    private func fetchFirefliesTranscript(
+        near: Date?, within: TimeInterval? = nil
+    ) async throws -> FirefliesTranscript? {
+        if let firefliesTranscriptProvider {
+            return try await firefliesTranscriptProvider(near, within)
+        }
+        guard let mcp else { return nil }
+        return try await mcp.firefliesTranscript(near: near, within: within)
     }
 
     /// Import Fireflies via MCP, attach as context, then reconcile into the
     /// live transcript when Whisper captions exist for this session.
     func importAndEnhanceWithFireflies() async {
-        guard let mcp, !firefliesImporting, !enhancingTranscript,
+        guard firefliesTranscriptProvider != nil || mcp != nil,
+              !firefliesImporting, !enhancingTranscript,
               !localRetranscribing else { return }
         firefliesImporting = true
         defer { firefliesImporting = false }
+        let expected = captureTranscriptMutationIdentity()
+        let near = recordingStartedAt ?? sessionDate
         do {
-            let fireflies = try await mcp.firefliesTranscript(near: recordingStartedAt ?? sessionDate)
+            guard let fireflies = try await fetchFirefliesTranscript(near: near),
+                  matchesTranscriptMutationIdentity(expected) else { return }
             contextFiles.removeAll {
                 $0.name.hasPrefix("Fireflies ·") || $0.name.hasPrefix("Enhanced · Fireflies")
             }
@@ -9376,6 +9503,7 @@ final class AppState: ObservableObject {
                 await applyFirefliesEnhancement(fireflies, automatic: false)
             }
         } catch {
+            guard matchesTranscriptMutationIdentity(expected) else { return }
             lastError = error.localizedDescription
         }
     }
@@ -9387,7 +9515,8 @@ final class AppState: ObservableObject {
     ///   stop retrying.
     @discardableResult
     private func enhanceTranscriptWithFireflies(automatic: Bool) async -> Bool {
-        guard let mcp else { return false }
+        guard firefliesTranscriptProvider != nil || mcp != nil else { return false }
+        if automatic { guard status == .idle else { return false } }
         guard !enhancingTranscript, !localRetranscribing else { return false }
         guard !transcript.isEmpty else {
             if !automatic { lastError = TranscriptEnhancementError.emptyWhisper.localizedDescription }
@@ -9395,13 +9524,16 @@ final class AppState: ObservableObject {
         }
         enhancingTranscript = true
         defer { enhancingTranscript = false }
+        let expected = captureTranscriptMutationIdentity()
+        let near = recordingStartedAt ?? sessionDate
         do {
             // Both paths insist the Fireflies meeting IS this call. A manual run
             // is a request to enhance THIS transcript, not to import a different
             // meeting's words into it.
-            let fireflies = try await mcp.firefliesTranscript(
-                near: recordingStartedAt ?? sessionDate,
-                within: MCPConnectionManager.firefliesMatchWindow)
+            guard let fireflies = try await fetchFirefliesTranscript(
+                near: near,
+                within: MCPConnectionManager.firefliesMatchWindow),
+                  matchesTranscriptMutationIdentity(expected) else { return false }
             // Keep the raw Fireflies text available as context for prompt runs.
             if !contextFiles.contains(where: { $0.name == "Fireflies · \(fireflies.title)" }) {
                 contextFiles.append(ImportedContextFile(
@@ -9410,6 +9542,7 @@ final class AppState: ObservableObject {
             }
             return await applyFirefliesEnhancement(fireflies, automatic: automatic)
         } catch {
+            guard matchesTranscriptMutationIdentity(expected) else { return false }
             if !automatic {
                 lastError = error.localizedDescription
             } else {
@@ -9425,10 +9558,9 @@ final class AppState: ObservableObject {
     ///   for a transcript to EXIST, not to re-ask a model that already spoke.
     @discardableResult
     private func applyFirefliesEnhancement(_ fireflies: FirefliesTranscript, automatic: Bool) async -> Bool {
-        let requestedSessionID = currentSessionID
-        let requestedTranscriptRevision = transcriptRevision
+        let expected = captureTranscriptMutationIdentity()
         let sessionStart = recordingStartedAt ?? transcript.first?.timestamp ?? sessionDate
-        let whisperSnapshot = transcript
+        let whisperSnapshot = expected.transcript
         let goalSnapshot = effectiveCallGoal
         let digestSnapshot = callDigest
         // Pull connected-app context (Notion/CRM/trackers/…) so the merge can
@@ -9443,6 +9575,7 @@ final class AppState: ObservableObject {
                 includeTeam: true,
                 maxCharsPerSource: 1_500,
                 maxSources: 6)
+            guard matchesTranscriptMutationIdentity(expected) else { return false }
         }
         do {
             let result = try await TranscriptEnhancementService.enhance(
@@ -9452,9 +9585,7 @@ final class AppState: ObservableObject {
                 goal: goalSnapshot,
                 digest: digestSnapshot,
                 grounding: grounding)
-            guard currentSessionID == requestedSessionID,
-                  transcriptRevision == requestedTranscriptRevision,
-                  transcript == whisperSnapshot else { return false }
+            guard matchesTranscriptMutationIdentity(expected) else { return false }
             // A partial merge covers only the start of the meeting. Replacing
             // the transcript with it would DELETE every line after the cut, so
             // the merged part is offered as context and the on-device
@@ -9475,7 +9606,7 @@ final class AppState: ObservableObject {
             persistCurrentSession()
             return true
         } catch TranscriptEnhancementError.summaryOnly(let summary) {
-            guard currentSessionID == requestedSessionID else { return false }
+            guard matchesTranscriptMutationIdentity(expected) else { return false }
             // The model summarised what changed but its entry list was
             // unusable. That summary is still the useful half of the answer —
             // show it instead of an error full of broken JSON.
@@ -9483,7 +9614,7 @@ final class AppState: ObservableObject {
             lastError = nil
             return true
         } catch {
-            guard currentSessionID == requestedSessionID else { return false }
+            guard matchesTranscriptMutationIdentity(expected) else { return false }
             if !automatic {
                 lastError = error.localizedDescription
             } else {
@@ -9509,17 +9640,27 @@ final class AppState: ObservableObject {
         engine: TranscriptionEngine,
         hasAssemblyAI: Bool,
         assemblyDiarization: Bool,
+        serverDiarization: Bool = false,
         localFinalPassEnabled: Bool = Config.transcriptionPostStopFinalPassEnabled
     ) -> Bool {
         (engine == .local && localFinalPassEnabled)
             || (hasAssemblyAI && assemblyDiarization)
+            || serverDiarization
     }
 
     /// Attach only after `resetForNewRecording`; otherwise the reset erases the
     /// timestamp while the observer keeps appending provenance-free audio.
     func beginSessionAudioRetention(on chunker: AudioChunkBuffer?, at startedAt: Date) {
-        sessionAudioStart = startedAt
-        sessionAudioStartSample = sessionRecorder.retainedSampleCount
+        if sessionRetainedAudioStart == nil {
+            sessionRetainedAudioStart = startedAt
+        }
+        if localFinalPassOptedInForSession {
+            sessionAudioStart = startedAt
+            sessionAudioStartSample = sessionRecorder.retainedSampleCount
+        } else {
+            sessionAudioStart = nil
+            sessionAudioStartSample = 0
+        }
         localFinalPassContinuityValid = localFinalPassOptedInForSession
             && activeSessionPreparedLocalWhisperModel != nil
         let recorder = sessionRecorder
@@ -9575,6 +9716,7 @@ final class AppState: ObservableObject {
             replaceLocalRowsBefore: audio.replaceLocalRowsBefore)
         return !localRetranscribing
             && !enhancingTranscript
+            && !firefliesImporting
             && !diarizing
             && localFinalPassOptedInForSession
             && activeSessionPreparedLocalWhisperModel != nil
@@ -9588,9 +9730,10 @@ final class AppState: ObservableObject {
 
     static func shouldReleaseRetainedAudioAfterLocalFinalPass(
         hasAssemblyAI: Bool,
-        assemblyDiarization: Bool
+        assemblyDiarization: Bool,
+        serverDiarization: Bool = false
     ) -> Bool {
-        !(hasAssemblyAI && assemblyDiarization)
+        !(serverDiarization || (hasAssemblyAI && assemblyDiarization))
     }
 
     private func invalidateLocalFinalPassTasks(discardRetainedAudio: Bool) {
@@ -9602,10 +9745,12 @@ final class AppState: ObservableObject {
         localRetranscribing = false
         if discardRetainedAudio {
             sessionRecorder.discard()
+            sessionRetainedAudioStart = nil
             sessionAudioStart = nil
             sessionAudioStartSample = 0
             localFinalPassContinuityValid = false
             localFinalPassOptedInForSession = false
+            serverDiarizationEligibleForSession = false
         }
     }
 
@@ -9671,6 +9816,7 @@ final class AppState: ObservableObject {
         guard !Task.isCancelled,
               localFinalPassRevision == revision,
               !enhancingTranscript,
+              !firefliesImporting,
               let audio = localFinalPassAudioSnapshot() else {
             recordLocalFinalPass(trigger: trigger, reason: .notEligible)
             return
@@ -9684,7 +9830,8 @@ final class AppState: ObservableObject {
         let settings = activeRecordingSettings
         let releaseRetainedAudio = Self.shouldReleaseRetainedAudioAfterLocalFinalPass(
             hasAssemblyAI: hasAssemblyAI,
-            assemblyDiarization: settings?.assemblyDiarization ?? false)
+            assemblyDiarization: settings?.assemblyDiarization ?? false,
+            serverDiarization: serverDiarizationEligibleForSession)
         // There is deliberately no implicit retry contract. Once a pass has
         // consumed the PCM, decoder failure and conservative quality refusal
         // both preserve the live text and release the audio unless opted-in
@@ -9698,6 +9845,7 @@ final class AppState: ObservableObject {
                 activeSessionPreparedLocalWhisperModel = nil
                 if releaseRetainedAudio {
                     sessionRecorder.discard()
+                    sessionRetainedAudioStart = nil
                     sessionAudioStart = nil
                     sessionAudioStartSample = 0
                 }
@@ -9878,7 +10026,7 @@ final class AppState: ObservableObject {
     func labelSpeakersLocally() async {
         guard LocalDiarization.isEnabled, !diarizing else { return }
         let wav = sessionRecorder.makeWAV()
-        guard !wav.isEmpty, let start = sessionAudioStart else { return }
+        guard !wav.isEmpty, let start = sessionRetainedAudioStart else { return }
         let requestedSessionID = currentSessionID
         let samples = LocalWhisperTranscription.floatSamples(fromWAV: wav)
         guard LocalDiarization.canRun(sampleCount: samples.count) else { return }
@@ -9934,7 +10082,7 @@ final class AppState: ObservableObject {
     private func diarizeSession() async {
         guard !diarizing, canDiarizeOnServer || (hasAssemblyAI && Config.assemblyAIDiarizationEnabled) else { return }
         let wav = sessionRecorder.makeWAV()
-        guard !wav.isEmpty, let start = sessionAudioStart else { return }
+        guard !wav.isEmpty, let start = sessionRetainedAudioStart else { return }
         let requestedSessionID = currentSessionID
         let requestedGeneration = chunkGeneration
 
@@ -10276,11 +10424,14 @@ final class AppState: ObservableObject {
                 // refinement interval. The recorder may keep an earlier prefix
                 // for opted-in diarization, so remember the sample offset
                 // rather than counting that prefix as Local coverage.
+                if sessionRetainedAudioStart == nil {
+                    sessionRetainedAudioStart = nextRouteStart
+                }
                 sessionAudioStart = nextRouteStart
                 sessionAudioStartSample = sessionRecorder.retainedSampleCount
                 localFinalPassOptedInForSession = true
             }
-            let keepRecordingForDiarization = sessionAudioStart != nil
+            let keepRecordingForDiarization = sessionRetainedAudioStart != nil
             systemChunker.reconfigure(
                 onChunk: systemHandler,
                 onSamples: keepRecordingForDiarization ? { recorder.append($0) } : nil,
@@ -10374,7 +10525,7 @@ final class AppState: ObservableObject {
                 source: .system, transcriber: previousTranscriber,
                 engine: settings.engine, generationToken: restoredGeneration,
                 routeLease: restoredRouteLease),
-            onSamples: sessionAudioStart != nil
+            onSamples: sessionRetainedAudioStart != nil
                 ? { [recorder = sessionRecorder] samples in recorder.append(samples) }
                 : nil,
             discardBufferedSamples: false,
@@ -10719,7 +10870,7 @@ final class AppState: ObservableObject {
             }
         }
         let recorder = sessionRecorder
-        let keepRecordingForDiarization = sessionAudioStart != nil
+        let keepRecordingForDiarization = sessionRetainedAudioStart != nil
         let systemSamples: ([Int16]) -> Void = { [weak system] samples in
             system?.send(samples)
             if keepRecordingForDiarization { recorder.append(samples) }
@@ -10793,7 +10944,10 @@ final class AppState: ObservableObject {
             // intact; the final pass may refine only this Local suffix.
             systemChunker?.discardBufferedSamples()
             micChunker?.discardBufferedSamples()
-            let wasAlreadyRetaining = sessionAudioStart != nil
+            let wasAlreadyRetaining = sessionRetainedAudioStart != nil
+            if !wasAlreadyRetaining {
+                sessionRetainedAudioStart = nextRouteStart
+            }
             sessionAudioStart = nextRouteStart
             sessionAudioStartSample = sessionRecorder.retainedSampleCount
             localFinalPassOptedInForSession = true

@@ -44,6 +44,11 @@ final class AudioChunkBuffer {
     /// first-6-seconds window before it lands is harmless.
     var vadThreshold: Float = VoiceActivity.defaultThreshold
     private var sampleAccumulator: [Int16] = []
+    /// Capture remains installed while a call is paused, but no paused PCM may
+    /// reach either the streaming sample callback or the chunk recognizer.
+    /// Resume starts with a clean window so a pre-pause fragment cannot be
+    /// joined to future speech and assigned the wrong wall-clock boundary.
+    private var paused = false
     private var converter: AVAudioConverter?
     private var sourceFormat: AVAudioFormat?
     private let lock = NSLock()
@@ -93,6 +98,17 @@ final class AudioChunkBuffer {
     func discardBufferedSamples() {
         lock.lock(); defer { lock.unlock() }
         sampleAccumulator.removeAll(keepingCapacity: true)
+    }
+
+    func pause() {
+        lock.lock(); defer { lock.unlock() }
+        paused = true
+        sampleAccumulator.removeAll(keepingCapacity: true)
+    }
+
+    func resume() {
+        lock.lock(); defer { lock.unlock() }
+        paused = false
     }
 
     init(chunkSeconds: Double,
@@ -159,6 +175,7 @@ final class AudioChunkBuffer {
 
         buffersIn += 1
         heartbeatIfDue()
+        guard !paused else { return }
 
         guard let mono16k = convertToMono16k(buffer) else { return }
         let frameLength = Int(mono16k.frameLength)

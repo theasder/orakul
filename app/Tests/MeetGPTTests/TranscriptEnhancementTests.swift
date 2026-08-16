@@ -2,8 +2,108 @@ import Foundation
 import Testing
 @testable import MeetGPT
 
+private actor FirefliesFetchGate {
+    private var started = false
+    private var startWaiters: [CheckedContinuation<Void, Never>] = []
+    private var fetchContinuation: CheckedContinuation<FirefliesTranscript, Never>?
+
+    func fetch() async -> FirefliesTranscript {
+        started = true
+        let waiters = startWaiters
+        startWaiters.removeAll()
+        for waiter in waiters { waiter.resume() }
+        return await withCheckedContinuation { continuation in
+            fetchContinuation = continuation
+        }
+    }
+
+    func waitUntilStarted() async {
+        if started { return }
+        await withCheckedContinuation { continuation in
+            startWaiters.append(continuation)
+        }
+    }
+
+    func release(title: String = "Old call", text: String = "stale words") {
+        fetchContinuation?.resume(returning: FirefliesTranscript(title: title, text: text))
+        fetchContinuation = nil
+    }
+}
+
 @Suite("Transcript enhancement")
 struct TranscriptEnhancementTests {
+
+    @MainActor
+    @Test("an old call Fireflies import cannot attach context to a new call")
+    func staleImportCannotMutateNewCall() async {
+        let gate = FirefliesFetchGate()
+        let state = AppState(
+            llm: MockLLMGateway(response: "unused"),
+            credentialStore: InMemoryKeychain(),
+            firefliesTranscriptProvider: { _, _ in await gate.fetch() })
+        state.transcript = [TranscriptEntry(
+            source: .system, text: "old private transcript", timestamp: Date())]
+        let oldSession = state.currentSessionID
+
+        let fetch = Task { await state.importAndEnhanceWithFireflies() }
+        await gate.waitUntilStarted()
+        state.resetForNewRecording()
+        state.transcript = [TranscriptEntry(
+            source: .system, text: "new call transcript", timestamp: Date())]
+        await gate.release()
+        await fetch.value
+
+        #expect(state.currentSessionID != oldSession)
+        #expect(state.transcript.map(\.text) == ["new call transcript"])
+        #expect(!state.contextFiles.contains(where: { $0.name.hasPrefix("Fireflies ·") }))
+        #expect(state.lastError == nil)
+    }
+
+    @MainActor
+    @Test("an old manual enhancement fetch cannot mutate a new call")
+    func staleEnhancementCannotMutateNewCall() async {
+        let gate = FirefliesFetchGate()
+        let state = AppState(
+            llm: MockLLMGateway(response: "unused"),
+            credentialStore: InMemoryKeychain(),
+            firefliesTranscriptProvider: { _, _ in await gate.fetch() })
+        state.transcript = [TranscriptEntry(
+            source: .system, text: "old private transcript", timestamp: Date())]
+
+        state.enhanceTranscriptWithFirefliesNow()
+        await gate.waitUntilStarted()
+        state.resetForNewRecording()
+        state.transcript = [TranscriptEntry(
+            source: .system, text: "new call transcript", timestamp: Date())]
+        await gate.release()
+        // The provider ignores cancellation deliberately. Wait for the stale
+        // task's identity guard and defer to finish.
+        while state.enhancingTranscript { await Task.yield() }
+
+        #expect(state.transcript.map(\.text) == ["new call transcript"])
+        #expect(!state.contextFiles.contains(where: { $0.name.hasPrefix("Fireflies ·") }))
+        #expect(state.transcriptEnhanceNote == nil)
+        #expect(state.lastError == nil)
+    }
+
+    @MainActor
+    @Test("Fireflies transcript mutation is eligible only at exact idle")
+    func eligibilityRequiresIdle() {
+        let state = AppState(
+            credentialStore: InMemoryKeychain(),
+            firefliesTranscriptProvider: { _, _ in
+                FirefliesTranscript(title: "test", text: "test")
+            })
+        state.transcript = [TranscriptEntry(
+            source: .system, text: "private transcript", timestamp: Date())]
+
+        for status: AppState.RecordingStatus in [.starting, .recording, .paused, .stopping] {
+            state.status = status
+            #expect(!state.canEnhanceWithFireflies)
+        }
+        state.status = .idle
+        #expect(state.canEnhanceWithFireflies)
+    }
 
     @Test("extractJSONObject tolerates fences and prose wrappers")
     func extractsObject() {
