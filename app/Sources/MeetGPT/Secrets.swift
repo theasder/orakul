@@ -1,5 +1,5 @@
 // GENERATED FILE — do not edit or commit real values.
-// build.sh regenerates this from mac/.env on every build. It is gitignored.
+// build.sh regenerates this from app/.env on every build. It is gitignored.
 enum Secrets {
     static let openAIAPIKey    = ""
     static let anthropicAPIKey = ""
@@ -7,9 +7,9 @@ enum Secrets {
     static let deepgramAPIKey  = ""
     static let assemblyAIAPIKey = ""
     static let googleClientID  = ""
-    // A native OAuth client cannot keep this credential confidential, so Google
-    // does not treat it as a server secret. Keep it in distribution builds too;
-    // it identifies the Desktop client during code exchange and token refresh.
+    // A native OAuth client cannot keep this credential confidential. Local/test
+    // builds may inject it from app/.env; MEETGPT_DIST=1 scrubs it and the client
+    // ID so public builds cannot accidentally reuse a private test project.
     static let googleClientSecret = ""
     static let backendBaseURL  = ""
     static let backendCertPins = ""
@@ -33,6 +33,8 @@ enum Secrets {
     static let ensembleChairman = ""
     static let hubSpotClientID = ""
     static let hubSpotClientSecret = ""
+    static let asanaClientID = ""
+    static let asanaClientSecret = ""
     static let affinityClientID = ""
     static let affinityClientSecret = ""
     static let zoomClientID = ""

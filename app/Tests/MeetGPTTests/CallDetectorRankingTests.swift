@@ -45,6 +45,26 @@ struct CallDetectorRankingTests {
         ]) == "Zoom")
     }
 
+    @Test("Jitsi desktop is a dedicated meeting client with a canonical label")
+    func jitsiDesktopIsRecognised() {
+        #expect(label([
+            app("ru.keepcoder.Telegram", name: "Telegram"),
+            app("org.jitsi.jitsi-meet", name: "Jitsi Meet"),
+        ]) == "Jitsi")
+        #expect(CallDetector.meetingApps.contains("org.jitsi.jitsi-meet"))
+    }
+
+    @Test("TrueConf is recognised by the live acoustic detector")
+    func trueConfIsRecognised() {
+        // TrueConf is a communication client rather than history data source:
+        // mic-in-use + running app is the evidence, and the localized app name
+        // cannot change the meeting label.
+        #expect(label([
+            app("org.trueconf.client", name: "Труконф", active: true),
+        ]) == "TrueConf")
+        #expect(!CallDetector.meetingApps.contains("org.trueconf.client"))
+    }
+
     @Test("a real Telegram call is still attributed to Telegram")
     func telegramCallIsNotStolen() {
         // The fix must not simply always prefer meeting apps: with no meeting

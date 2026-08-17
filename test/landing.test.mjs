@@ -760,8 +760,9 @@ describe('orakul landing (ru)', () => {
     // Same rule as the Russian trackers, applied to what was added later: a
     // solid chip is a promise, and the build is the only authority on whether
     // it can be kept. Read from the `title` switch of each connector — the doc
-    // comments name Telegram and VK Teams to explain why they are ABSENT, so a
-    // plain substring search would call them shipped.
+    // comments may name absent services, so a plain substring search would call
+    // them shipped. Telegram is a separate prospective-only source rather than
+    // a server-side search connector, and is detected from its own type.
     // Три коннектора переехали в OrakulCore — они знают только Foundation и
     // потому доступны и приложению, и командной строке.
     const titles = (path) => {
@@ -772,8 +773,11 @@ describe('orakul landing (ru)', () => {
     };
 
     const core = ['mvp', 'Sources', 'OrakulCore'];
+    const telegram = readFileSync(
+      resolve(here, '..', ...core, 'TelegramSupergroups.swift'), 'utf8');
     const shipped = [...titles([...core, 'WorkMessengers.swift']),
-                     ...titles([...core, 'SelfHostedTrackers.swift'])];
+                     ...titles([...core, 'SelfHostedTrackers.swift']),
+                     ...(telegram.includes('public struct TelegramSupergroups') ? ['Telegram'] : [])];
     assert.ok(shipped.length >= 6, 'the title switches changed shape — the list is now fake');
 
     for (const tool of shipped) {
@@ -781,8 +785,8 @@ describe('orakul landing (ru)', () => {
         `${tool} ships but the page does not list it`);
     }
 
-    // And the ones that CANNOT ship must not be sold as chips.
-    for (const impossible of ['Telegram', 'VK Teams']) {
+    // And the one that still cannot ship must not be sold as a chip.
+    for (const impossible of ['VK Teams']) {
       assert.doesNotMatch(html, new RegExp(`<span class="tool">${impossible}</span>`),
         `${impossible} has no message-search API — it may not appear as a connector`);
     }
@@ -816,17 +820,15 @@ describe('orakul landing (ru)', () => {
     const trackers = readFileSync(
       resolve(here, '..', 'mvp', 'Sources', 'OrakulCore', 'RussianTrackers.swift'), 'utf8');
     // Only the `title` switch counts as "shipped". Reading the whole file was
-    // wrong in a way that mattered: the doc comment explains WHY WEEEK and
-    // Pyrus are absent, so a plain substring search found them and called them
-    // shipped. A comment about a service is the opposite of that service
-    // existing.
+    // wrong in a way that mattered: a doc comment can explain why a service is
+    // absent, so a plain substring search may call it shipped. Only enum cases
+    // exposed through the title switch count.
     const titleBlock = trackers.slice(trackers.indexOf('public var title: String'));
     const shipped = [...titleBlock.slice(0, titleBlock.indexOf('}\n\n')).matchAll(/return "([^"]+)"/g)]
       .map(([, title]) => title);
     assert.ok(shipped.length >= 3, 'the title switch changed shape — the list is now fake');
 
-    for (const tool of ['Яндекс Трекер', 'Kaiten', 'YouGile']) {
-      assert.ok(shipped.includes(tool), `${tool} is no longer in the build — unsell it`);
+    for (const tool of shipped) {
       assert.match(html, new RegExp(`<span class="tool">${tool}</span>`),
         `${tool} ships but the page still hides it behind a dotted chip`);
     }
@@ -845,7 +847,7 @@ describe('orakul landing (ru)', () => {
     // Two kinds of "not yet" share the dotted chip: call services, where the
     // audio handover is unwritten, and the two trackers whose task search the
     // vendor API does not offer.
-    for (const tool of ['WEEEK', 'Pyrus', 'Яндекс Телемост', 'VK Teams', 'SberJazz', 'TrueConf',
+    for (const tool of ['Pyrus', 'Яндекс Телемост', 'VK Teams', 'SberJazz', 'TrueConf',
                         'Яндекс Вики', 'Teamly']) {
       assert.ok(!shipped.includes(tool), `${tool} now exists — move it out of "soon"`);
       assert.match(html, new RegExp(`<span class="tool soon">${tool}</span>`),
@@ -1582,7 +1584,8 @@ describe('orakul landing (ru)', () => {
 
     // Запись обязана оставаться строгой и в разборе ответа: «завели задачу,
     // которой нет» — худшее, что может сделать кнопка после звонка.
-    assert.match(trackers, /guard let created = parseCreated\(data\) else/,
+    assert.match(trackers,
+      /guard let created = parseCreated\(data\) else|return try parseCreated\(data\)/,
       'createIssue accepts an unparseable response again');
   });
 

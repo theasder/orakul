@@ -65,7 +65,7 @@ LEGACY_DEST="$APP_DIR/MeetGPT.app"
 cd "$ROOT"
 
 # --- Generate Secrets.swift from .env (build-time key injection) ---
-# Keys leave the UI and live in mac/.env; we bake them into a gitignored
+# Keys leave the UI and live in app/.env; we bake them into a gitignored
 # Secrets.swift so they compile into the app. No .env → empty keys (still builds).
 echo ">> generating Secrets.swift from .env"
 ENV_FILE="$ROOT/.env"
@@ -77,7 +77,7 @@ SECRETS="$ROOT/Sources/MeetGPT/Secrets.swift"
 # transcribes on-device (TRANSCRIPTION_ENGINE=local). Dev builds (flag unset)
 # keep keys baked for local iteration.
 DIST="${MEETGPT_DIST:-0}"
-SECRET_VARS="OPENAI_API_KEY ANTHROPIC_API_KEY GOOGLE_AI_API_KEY DEEPGRAM_API_KEY ASSEMBLYAI_API_KEY DEEPSEEK_API_KEY DASHSCOPE_API_KEY ZHIPU_API_KEY MOONSHOT_API_KEY HUBSPOT_CLIENT_ID HUBSPOT_CLIENT_SECRET AFFINITY_CLIENT_ID AFFINITY_CLIENT_SECRET ZOOM_CLIENT_ID ZOOM_CLIENT_SECRET SLACK_BOT_TOKEN SLACK_CHANNEL_IDS CONFLUENCE_SITE CONFLUENCE_EMAIL CONFLUENCE_TOKEN"
+SECRET_VARS="OPENAI_API_KEY ANTHROPIC_API_KEY GOOGLE_AI_API_KEY DEEPGRAM_API_KEY ASSEMBLYAI_API_KEY DEEPSEEK_API_KEY DASHSCOPE_API_KEY ZHIPU_API_KEY MOONSHOT_API_KEY GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET GOOGLE_SIGNIN_CLIENT_ID GOOGLE_SIGNIN_CLIENT_SECRET HUBSPOT_CLIENT_ID HUBSPOT_CLIENT_SECRET ASANA_CLIENT_ID ASANA_CLIENT_SECRET AFFINITY_CLIENT_ID AFFINITY_CLIENT_SECRET ZOOM_CLIENT_ID ZOOM_CLIENT_SECRET SLACK_BOT_TOKEN SLACK_CHANNEL_IDS CONFLUENCE_SITE CONFLUENCE_EMAIL CONFLUENCE_TOKEN"
 
 sw() {  # sw VAR  -> value of VAR from .env (empty if absent), Swift-string-escaped
     if [ "$DIST" = "1" ]; then
@@ -140,18 +140,20 @@ sw() {  # sw VAR  -> value of VAR from .env (empty if absent), Swift-string-esca
 }
 cat > "$SECRETS" <<EOF
 // GENERATED FILE — do not edit or commit real values.
-// build.sh regenerates this from mac/.env on every build. It is gitignored.
+// build.sh regenerates this from app/.env on every build. It is gitignored.
 enum Secrets {
     static let openAIAPIKey    = "$(sw OPENAI_API_KEY)"
     static let anthropicAPIKey = "$(sw ANTHROPIC_API_KEY)"
     static let googleAIAPIKey  = "$(sw GOOGLE_AI_API_KEY)"
     static let deepgramAPIKey  = "$(sw DEEPGRAM_API_KEY)"
     static let assemblyAIAPIKey = "$(sw ASSEMBLYAI_API_KEY)"
-    static let googleClientID  = ""
-    // A native OAuth client cannot keep this credential confidential, so Google
-    // does not treat it as a server secret. Keep it in distribution builds too;
-    // it identifies the Desktop client during code exchange and token refresh.
-    static let googleClientSecret = ""
+    // Local/test builds may use the gitignored .env Desktop OAuth client.
+    // MEETGPT_DIST=1 blanks both values through SECRET_VARS above.
+    static let googleClientID  = "$(sw GOOGLE_CLIENT_ID)"
+    // A native OAuth client cannot keep this credential confidential. Local and
+    // tester builds may inject it from the gitignored .env; public distribution
+    // builds still scrub it so they cannot accidentally reuse a private project.
+    static let googleClientSecret = "$(sw GOOGLE_CLIENT_SECRET)"
     static let backendBaseURL  = "$(sw BACKEND_URL)"
     static let backendCertPins = "$(sw BACKEND_CERT_PINS)"
     static let transcriptionEngine = "$(sw TRANSCRIPTION_ENGINE)"
@@ -174,12 +176,14 @@ enum Secrets {
     static let ensembleChairman = "$(sw ENSEMBLE_CHAIRMAN)"
     static let hubSpotClientID = "$(sw HUBSPOT_CLIENT_ID)"
     static let hubSpotClientSecret = "$(sw HUBSPOT_CLIENT_SECRET)"
+    static let asanaClientID = "$(sw ASANA_CLIENT_ID)"
+    static let asanaClientSecret = "$(sw ASANA_CLIENT_SECRET)"
     static let affinityClientID = "$(sw AFFINITY_CLIENT_ID)"
     static let affinityClientSecret = "$(sw AFFINITY_CLIENT_SECRET)"
     static let zoomClientID = "$(sw ZOOM_CLIENT_ID)"
     static let zoomClientSecret = "$(sw ZOOM_CLIENT_SECRET)"
-    static let googleSignInClientID = ""
-    static let googleSignInClientSecret = ""
+    static let googleSignInClientID = "$(sw GOOGLE_SIGNIN_CLIENT_ID)"
+    static let googleSignInClientSecret = "$(sw GOOGLE_SIGNIN_CLIENT_SECRET)"
     static let gmailClientID = "$(sw GMAIL_CLIENT_ID)"
     static let gmailClientSecret = "$(sw GMAIL_CLIENT_SECRET)"
     static let googleAnalyticsClientID = "$(sw GOOGLE_ANALYTICS_CLIENT_ID)"

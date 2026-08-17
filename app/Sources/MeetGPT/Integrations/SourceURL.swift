@@ -19,6 +19,22 @@ enum SourceURL {
         firstMatch(in: input, pattern: #"/spreadsheets/d/([a-zA-Z0-9_-]+)"#) ?? bareID(input)
     }
 
+    /// Google Slides: …/presentation/d/<ID>/edit
+    static func googleSlidesID(from input: String) -> String? {
+        firstMatch(in: input, pattern: #"/presentation/(?:u/\d+/)?d/([a-zA-Z0-9_-]+)"#)
+            ?? bareID(input)
+    }
+
+    /// Google Forms editor/share links: …/forms/d/<FORM_ID>/edit. Published
+    /// responder links use `/d/e/<published-id>`; that id is deliberately not
+    /// accepted because the Forms API requires the private form id.
+    static func googleFormID(from input: String) -> String? {
+        firstMatch(
+            in: input,
+            pattern: #"/forms/(?:u/\d+/)?d/(?!e/)([a-zA-Z0-9_-]+)(?:/|$)"#)
+            ?? bareID(input)
+    }
+
     // Notion links go straight to the notion-fetch MCP tool (it accepts the
     // raw URL), so no Notion ID parsing lives here anymore.
 

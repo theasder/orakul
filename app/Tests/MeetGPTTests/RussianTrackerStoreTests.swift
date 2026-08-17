@@ -33,6 +33,21 @@ struct RussianTrackerStoreTests {
         #expect(keychain.count == 2)
     }
 
+    @Test("WEEEK хранит токен и проект в отдельных записях Связки ключей")
+    func weeekCredentialsRoundTrip() {
+        let keychain = InMemoryKeychain()
+        let store = RussianTrackerStore(store: keychain)
+        store.setToken("weeek-token", for: .weeek)
+        store.setDestination("42", for: .weeek)
+
+        let afterRestart = RussianTrackerStore(store: keychain)
+        #expect(afterRestart.token(for: .weeek) == "weeek-token")
+        #expect(afterRestart.destination(for: .weeek) == "42")
+        #expect(afterRestart.isConfigured(.weeek))
+        #expect(afterRestart.canFileTasks(.weeek))
+        #expect(keychain.count == 2)
+    }
+
     @Test("пустой токен стирает запись, а не сохраняет пустоту")
     func emptyTokenClears() {
         let keychain = InMemoryKeychain()

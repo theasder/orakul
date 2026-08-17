@@ -174,7 +174,9 @@ struct KeychainStorageTests {
 
         await manager.loadPersistedAuthorization()
         let initializationReads = kc.readCount
-        #expect(initializationReads == manager.servers.count)
+        // One extra read checks whether prospective Telegram ingestion should
+        // start. It still happens once during restore, never during layout.
+        #expect(initializationReads == manager.servers.count + 1)
         #expect(kc.deleteCount == 1)
         #expect(manager.isAuthorized(server.id))
 

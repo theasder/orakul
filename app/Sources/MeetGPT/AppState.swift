@@ -2805,6 +2805,8 @@ final class AppState: ObservableObject {
         case .calendar: return "calendar"
         case .docs: return "doc.richtext"
         case .sheets: return "tablecells"
+        case .slides: return "rectangle.on.rectangle.angled"
+        case .forms: return "list.bullet.clipboard"
         case .drive: return "externaldrive"
         }
     }
@@ -6868,25 +6870,34 @@ final class AppState: ObservableObject {
         contextNotes = ""
     }
 
-    // MARK: - Document connectors (Google Docs / Sheets / Notion)
+    // MARK: - Document connectors (Google Workspace / Notion)
 
-    /// True when the CURRENT grant covers the Docs + Sheets services (granular
-    /// authorization — the user may have excluded them from the grant).
-    var googleHasDocsScope: Bool {
+    /// Whether the current, non-stale granular grant covers one service.
+    func googleHasService(_ service: GoogleService) -> Bool {
         googleConnected
-            && Config.googleGrantedServices.contains(GoogleService.docs.rawValue)
-            && Config.googleGrantedServices.contains(GoogleService.sheets.rawValue)
+            && Config.googleScopeVersion >= GoogleAuth.scopeVersion
+            && Config.googleGrantedServices.contains(service.rawValue)
+    }
+
+    /// Kept for document-export routing. This now means Docs specifically;
+    /// requiring an unrelated Sheets grant hid Docs from users who declined it.
+    var googleHasDocsScope: Bool {
+        googleHasService(.docs)
     }
 
     /// A fresh Google access token, refreshing if needed. Nil (with an error
     /// set) when not connected or the grant predates the Docs/Sheets scope.
-    private func freshGoogleToken() async -> String? {
+    private func freshGoogleToken(for service: GoogleService? = nil) async -> String? {
         guard googleConnected, let current = Config.googleTokens else {
             lastError = GoogleAuthError.notConnected.errorDescription
             return nil
         }
         guard Config.googleScopeVersion >= GoogleAuth.scopeVersion else {
-            lastError = "Переподключите Google в настройках, чтобы выдать доступ к Docs и Sheets."
+            lastError = "Переподключите Google Workspace в настройках, чтобы обновить доступ."
+            return nil
+        }
+        if let service, !Config.googleGrantedServices.contains(service.rawValue) {
+            lastError = "Переподключите Google Workspace в настройках с доступом к \(service.label)."
             return nil
         }
         do {
@@ -6917,7 +6928,7 @@ final class AppState: ObservableObject {
         }
         do {
             let doc = try await prepareCurrentAnswerExport()
-            guard let token = await freshGoogleToken() else { return }   // sets lastError
+            guard let token = await freshGoogleToken(for: .docs) else { return }   // sets lastError
             let html = AssistantDocHTML.build(
                 title: doc.title, date: doc.exportedAt, prompt: doc.prompt,
                 answer: doc.answer, blindSpots: doc.blindSpots,
@@ -6957,7 +6968,7 @@ final class AppState: ObservableObject {
             lastError = "Подключите Google в настройках, чтобы создать таблицу."
             return
         }
-        guard let token = await freshGoogleToken() else { return }   // sets lastError
+        guard let token = await freshGoogleToken(for: .sheets) else { return }   // sets lastError
         do {
             let created = try await GoogleDriveWriter.createSpreadsheet(
                 title: title, table: table, accessToken: token)
@@ -6977,7 +6988,7 @@ final class AppState: ObservableObject {
     /// applies if the undo was itself a mistake.
     func undoLastSpreadsheetExport() async {
         guard let created = lastCreatedSpreadsheet else { return }
-        guard let token = await freshGoogleToken() else { return }
+        guard let token = await freshGoogleToken(for: .sheets) else { return }
         do {
             try await GoogleDriveWriter.trashFile(
                 fileID: created.id, createdByUs: true, accessToken: token)
@@ -7039,7 +7050,7 @@ final class AppState: ObservableObject {
             return
         }
         await withImporting {
-            guard let token = await self.freshGoogleToken() else { return }
+            guard let token = await self.freshGoogleToken(for: .docs) else { return }
             let doc = try await GoogleDocsService.read(documentID: id, accessToken: token)
             self.appendContext(name: "Doc · \(doc.title)", text: doc.text)
         }
@@ -7051,9 +7062,35 @@ final class AppState: ObservableObject {
             return
         }
         await withImporting {
-            guard let token = await self.freshGoogleToken() else { return }
+            guard let token = await self.freshGoogleToken(for: .sheets) else { return }
             let sheet = try await GoogleSheetsService.read(spreadsheetID: id, accessToken: token)
             self.appendContext(name: "Sheet · \(sheet.title)", text: sheet.text)
+        }
+    }
+
+    func importGoogleSlides(from urlString: String) async {
+        guard let id = SourceURL.googleSlidesID(from: urlString) else {
+            lastError = "Это не похоже на ссылку Google Slides."
+            return
+        }
+        await withImporting {
+            guard let token = await self.freshGoogleToken(for: .slides) else { return }
+            let slides = try await GoogleSlidesService.read(
+                presentationID: id, accessToken: token)
+            self.appendContext(name: "Slides · \(slides.title)", text: slides.text)
+        }
+    }
+
+    func importGoogleForm(from urlString: String) async {
+        guard let id = SourceURL.googleFormID(from: urlString) else {
+            lastError = "Нужна ссылка редактора Google Forms вида /forms/d/<id>/edit — публичная ссылка /d/e/ не содержит API ID формы."
+            return
+        }
+        await withImporting {
+            guard let token = await self.freshGoogleToken(for: .forms) else { return }
+            let form = try await GoogleFormsService.read(
+                formID: id, accessToken: token)
+            self.appendContext(name: "Form responses · \(form.title)", text: form.text)
         }
     }
 
@@ -7067,7 +7104,12 @@ final class AppState: ObservableObject {
         guard !contextImporting else { return }
         contextImporting = true
         defer { contextImporting = false }
-        do { try await work(); lastError = nil }
+        // Clear the previous failure before starting. Some guards inside the
+        // work (missing granular Google grant, empty imported document) report
+        // through `lastError` and return normally; clearing *after* the closure
+        // used to erase that useful message and make the click silently no-op.
+        lastError = nil
+        do { try await work() }
         catch { lastError = error.localizedDescription }
     }
 

@@ -9,9 +9,9 @@ import OrakulCore
 /// либо не создаёт ничего, и человек узнаёт об этом после звонка. Поэтому тут
 /// проверяется форма запроса по документации вендора, а не «хоть что-то ушло».
 ///
-/// Обязательные поля сверены с документацией 2026-08-11:
+/// Обязательные поля сверены с документацией 2026-08-16:
 /// Яндекс — `summary` + `queue`, Kaiten — `title` + `board_id` (целое),
-/// YouGile — `title` + колонка.
+/// YouGile — `title` + колонка, WEEEK — `title` + `locations.projectId`.
 @Suite("Заведение задач в трекерах")
 struct RussianTrackerWritebackTests {
 
@@ -35,7 +35,7 @@ struct RussianTrackerWritebackTests {
             case .yandexTracker: return "1234567"
             case .kaiten:        return "team.kaiten.ru"
             case .bitrix24:      return "company.bitrix24.ru"
-            case .yougile:       return nil
+            case .yougile, .weeek: return nil
             }
         }()
         return RussianTrackers(service: service, token: "t0ken",
@@ -49,6 +49,7 @@ struct RussianTrackerWritebackTests {
         // У Битрикса третье поле — номер ответственного, а не доски.
         case .bitrix24:      return "1"
         case .yougile:       return "col-1"
+        case .weeek:         return "42"
         }
     }
 
@@ -58,11 +59,15 @@ struct RussianTrackerWritebackTests {
             .yandexTracker: "https://api.tracker.yandex.net/v3/issues/",
             .kaiten: "https://team.kaiten.ru/api/latest/cards",
             .yougile: "https://yougile.com/api-v2/tasks",
+            .weeek: "https://api.weeek.net/public/v1/tm/tasks",
             // У Битрикса ключ вебхука — часть пути, поэтому он виден и здесь.
             .bitrix24: "https://company.bitrix24.ru/rest/t0ken/tasks.task.add",
         ]
         for service in RussianTrackers.Service.allCases {
-            let (http, recorder) = stub()
+            let response = service == .weeek
+                ? #"{"success":true,"task":{"id":42,"title":"Поднять лимиты"}}"#
+                : #"{"key":"TREK-42"}"#
+            let (http, recorder) = stub(json: response)
             _ = try await client(service, destination: destination(for: service), http: http)
                 .createIssue(title: "Поднять лимиты")
 
@@ -145,6 +150,24 @@ struct RussianTrackerWritebackTests {
         let body = try #require(recorder.last?.httpBody)
         let payload = try #require(try JSONSerialization.jsonObject(with: body) as? [String: Any])
         #expect(payload["columnId"] as? String == "col-1")
+    }
+
+    @Test("WEEEK получает числовой проект и возвращает созданную задачу")
+    func weeekGetsItsProject() async throws {
+        let (http, recorder) = stub(
+            json: #"{"success":true,"task":{"id":19,"title":"Поднять лимиты"}}"#)
+        let issue = try await client(.weeek, destination: "42", http: http)
+            .createIssue(title: "Поднять лимиты")
+
+        let body = try #require(recorder.last?.httpBody)
+        let payload = try #require(
+            try JSONSerialization.jsonObject(with: body) as? [String: Any])
+        let locations = try #require(payload["locations"] as? [[String: Any]])
+        #expect(locations.count == 1)
+        #expect(locations.first?["projectId"] as? Int == 42)
+        #expect(issue.key == "19")
+        #expect(issue.title == "Поднять лимиты")
+        #expect(issue.url == nil)
     }
 
     @Test("без места назначения запрос не уходит")

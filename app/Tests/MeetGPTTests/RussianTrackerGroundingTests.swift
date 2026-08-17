@@ -50,6 +50,18 @@ struct RussianTrackerGroundingTests {
         #expect(calls() == 1)
     }
 
+    @Test("WEEEK участвует в подсказке как обычный трекер")
+    func weeekGrounds() async {
+        let answer = #"{"success":true,"tasks":[{"id":19,"title":"Лимиты WEEEK"}],"hasMore":false}"#
+        let (manager, calls) = self.manager(seeding: [.weeek], answer: answer)
+        let snippets = await manager.groundingSnippets(goal: "лимиты")
+
+        let tracker = snippets.first { $0.sourceID == "tracker:weeek" }
+        #expect(tracker?.serverName == "WEEEK")
+        #expect(tracker?.text.contains("Лимиты WEEEK") == true)
+        #expect(calls() == 1)
+    }
+
     @Test("ненастроенный трекер не занимает место среди источников")
     func unconfiguredTrackerStaysOut() async {
         // Пустой список источников — не то же, что источник, который молчит:

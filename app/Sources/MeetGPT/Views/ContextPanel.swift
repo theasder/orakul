@@ -3,13 +3,15 @@ import UniformTypeIdentifiers
 
 /// Which external document connector a prompt sheet is collecting a link for.
 enum SourceKind: Int, Identifiable {
-    case doc, sheet, notion
+    case doc, sheet, slide, form, notion
     var id: Int { rawValue }
 
     var title: String {
         switch self {
         case .doc:    return "Документ Google"
         case .sheet:  return "Таблица Google"
+        case .slide:  return "Презентация Google"
+        case .form:   return "Форма Google и ответы"
         case .notion: return "Страница Notion"
         }
     }
@@ -17,6 +19,8 @@ enum SourceKind: Int, Identifiable {
         switch self {
         case .doc:    return "https://docs.google.com/document/d/…"
         case .sheet:  return "https://docs.google.com/spreadsheets/d/…"
+        case .slide:  return "https://docs.google.com/presentation/d/…"
+        case .form:   return "https://docs.google.com/forms/d/…/edit"
         case .notion: return "https://www.notion.so/…"
         }
     }
@@ -24,7 +28,19 @@ enum SourceKind: Int, Identifiable {
         switch self {
         case .doc:    return "doc.richtext"
         case .sheet:  return "tablecells"
+        case .slide:  return "rectangle.on.rectangle.angled"
+        case .form:   return "list.bullet.clipboard"
         case .notion: return "note.text"
+        }
+    }
+
+    var googleService: GoogleService? {
+        switch self {
+        case .doc: return .docs
+        case .sheet: return .sheets
+        case .slide: return .slides
+        case .form: return .forms
+        case .notion: return nil
         }
     }
 }
@@ -140,6 +156,8 @@ struct ContextSection: View {
             Button { showFolderImporter = true } label: { Label("Папка…", systemImage: "folder.badge.plus") }
             Button { promptKind = .doc } label: { Label("Google Документ…", systemImage: "doc.richtext") }
             Button { promptKind = .sheet } label: { Label("Google Таблица…", systemImage: "tablecells") }
+            Button { promptKind = .slide } label: { Label("Google Презентация…", systemImage: "rectangle.on.rectangle.angled") }
+            Button { promptKind = .form } label: { Label("Google Форма + ответы…", systemImage: "list.bullet.clipboard") }
             Button { promptKind = .notion } label: { Label("Страница Notion…", systemImage: "note.text") }
             Button { showMCPImport = true } label: { Label("Подключённое приложение…", systemImage: "app.connected.to.app.below.fill") }
             if mcp.prefersMCP("fireflies") || state.googleConnected {
@@ -222,10 +240,16 @@ private struct SourcePromptSheet: View {
                     .font(Typo.caption)
                     .foregroundStyle(Theme.accentText)
             }
-            if kind != .notion, !state.googleHasDocsScope {
-                Text("Сначала подключите Google в настройках с доступом к Документам и Таблицам.")
+            if let service = kind.googleService, !state.googleHasService(service) {
+                Text("Сначала подключите Google Workspace в настройках с доступом к \(service.label).")
                     .font(Typo.caption)
                     .foregroundStyle(Theme.accentText)
+            }
+            if kind == .form {
+                Text("Будут прочитаны вопросы и ответы этой формы. Ответы могут содержать персональные данные; импортируйте только форму, к которой у вас есть право доступа.")
+                    .font(Typo.caption)
+                    .foregroundStyle(Theme.inkSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             TextField("", text: $link, prompt: Text(kind.placeholder))
                 .textFieldStyle(.plain)
@@ -242,6 +266,8 @@ private struct SourcePromptSheet: View {
                         switch kind {
                         case .doc:    await state.importGoogleDoc(from: url)
                         case .sheet:  await state.importGoogleSheet(from: url)
+                        case .slide:  await state.importGoogleSlides(from: url)
+                        case .form:   await state.importGoogleForm(from: url)
                         case .notion: await importNotionViaMCP(url: url)
                         }
                     }

@@ -137,10 +137,9 @@ struct PromptWorkflowTests {
 
     @Test("specs only reference real catalog server ids")
     func serversAreReal() {
-        // Built-in catalog ids + the pre-registered-app servers, which only
-        // appear in the live catalog when their credentials are baked in but
-        // are always legitimate spec targets.
-        let known = Set(MCPCatalog.builtIn.map(\.id)).union(["hubspot", "affinity", "zoom"])
+        // Credential-independent contract inventory includes providers such as
+        // Asana which stay hidden until a tester build supplies its OAuth app.
+        let known = Set(MCPCatalog.providerContracts.map(\.id))
         for (id, spec) in PromptWorkflows.byID {
             #expect(spec.servers.isSubset(of: known), "\(id) names unknown servers: \(spec.servers.subtracting(known))")
             #expect(!spec.servers.isEmpty, "\(id) has an empty server set")

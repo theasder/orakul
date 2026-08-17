@@ -125,16 +125,32 @@ describe('учётные данные', () => {
     }
   });
 
-  test('сборка не вписывает учётные данные Google обратно', () => {
-    // Обнулено в build.sh, а не только в файле: иначе первая же сборка
-    // вернула бы всё на место, и проверка выше прошла бы ровно до неё.
+  test('Google Desktop OAuth берётся только из локального .env и стирается из dist', () => {
+    // Локальная/tester-сборка должна уметь реально подключиться, но публичный
+    // dist не может случайно унаследовать частный OAuth-проект. `sw` — единая
+    // граница: при MEETGPT_DIST=1 он возвращает пустую строку для каждого имени
+    // из SECRET_VARS независимо от содержимого .env.
     const build = readFileSync(resolve(repo, 'app', 'build.sh'), 'utf8');
-    for (const field of ['googleClientID', 'googleClientSecret',
-                         'googleSignInClientID', 'googleSignInClientSecret']) {
-      const line = new RegExp(`static let ${field}\\s*=\\s*"([^"]*)"`).exec(build);
-      assert.ok(line, `build.sh больше не задаёт ${field} — проверка ослепла`);
-      assert.equal(line[1], '',
-        `build.sh снова вписывает ${field} — учётные данные Cruxwing вернутся в сборку`);
+    const fields = new Map([
+      ['googleClientID', 'GOOGLE_CLIENT_ID'],
+      ['googleClientSecret', 'GOOGLE_CLIENT_SECRET'],
+      ['googleSignInClientID', 'GOOGLE_SIGNIN_CLIENT_ID'],
+      ['googleSignInClientSecret', 'GOOGLE_SIGNIN_CLIENT_SECRET'],
+    ]);
+    const secretVars = /SECRET_VARS="([^"]+)"/.exec(build)?.[1]?.split(/\s+/) ?? [];
+    assert.match(build,
+      /sw\(\)[^{]*\{[\s\S]*?if \[ "\$DIST" = "1" \]; then/,
+      'sw больше не проверяет MEETGPT_DIST=1');
+    assert.match(build,
+      /case " \$SECRET_VARS " in \*" \$1 "\*\) printf ''; return ;; esac/,
+      'sw больше не обнуляет имена из SECRET_VARS в dist-сборке');
+    for (const [field, variable] of fields) {
+      assert.ok(secretVars.includes(variable),
+        `${variable} не входит в SECRET_VARS и попадёт в публичную сборку`);
+      const line = new RegExp(
+        `static let ${field}\\s*=\\s*"\\$\\(sw ${variable}\\)"`).exec(build);
+      assert.ok(line,
+        `build.sh должен брать ${field} только через dist-scrubbed sw ${variable}`);
     }
   });
 

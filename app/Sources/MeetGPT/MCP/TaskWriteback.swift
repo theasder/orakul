@@ -13,7 +13,10 @@ enum TaskWriteback {
     static let createToolPreferences: [String: [String]] = [
         "linear":    ["create_issue", "createIssue"],
         "atlassian": ["createJiraIssue", "jira_create_issue", "create_issue"],
-        "asana":     ["create_task", "createTask"],
+        // V2 currently advertises the batch-shaped `create_tasks` tool. Keep
+        // the singular spellings behind it because Asana explicitly says the
+        // live tools/list schema is authoritative and tool names may evolve.
+        "asana":     ["create_tasks", "create_task", "createTask"],
     ]
 
     /// True for servers we offer write-back on.
@@ -52,6 +55,33 @@ enum TaskWriteback {
     /// carry the title.
     static func buildArguments(for item: TasksArtifact.Item, tool: Tool,
                                extra: [String: Value] = [:]) -> [String: Value]? {
+        // Asana V2's create_tasks input is { tasks: [{ name, ... }], ... }.
+        // Resolve that shape from the live schema rather than special-casing
+        // the server id, so a compatible schema continues to work if the tool
+        // is renamed. Context such as project_id belongs to the task object;
+        // default_project and other batch controls remain at the top level.
+        if let taskProperties = tool.objectArrayItemProperties(for: "tasks"),
+           let titleKey = taskProperties.stringPropertyKey(
+               preferring: ["name", "title", "summary"]) {
+            var task: [String: Value] = [titleKey: .string(item.task)]
+            for key in ["description", "html_notes", "notes", "details"]
+                where taskProperties[key] != nil {
+                task[key] = .string(describe(item))
+                break
+            }
+
+            var args: [String: Value] = [:]
+            for (key, value) in extra {
+                if taskProperties[key] != nil {
+                    task[key] = value
+                } else {
+                    args[key] = value
+                }
+            }
+            args["tasks"] = .array([.object(task)])
+            return args
+        }
+
         guard let titleKey = tool.stringArgumentKey(preferring: ["title", "summary", "name"]) else {
             return nil
         }
@@ -72,6 +102,34 @@ extension Tool {
     var isCreateTool: Bool {
         let n = name.lowercased()
         return n.contains("create") && (n.contains("issue") || n.contains("task"))
+    }
+
+    /// Properties of an object stored as the items of an array argument.
+    /// JSON Schema producers do not consistently repeat `type: object`, so the
+    /// structural `properties` member is the compatibility boundary here.
+    func objectArrayItemProperties(for argument: String) -> [String: Value]? {
+        guard let spec = schemaProperties?[argument],
+              case .object(let arraySchema) = spec,
+              case .object(let itemSchema)? = arraySchema["items"],
+              case .object(let properties)? = itemSchema["properties"] else { return nil }
+        return properties
+    }
+}
+
+private extension Dictionary where Key == String, Value == MCP.Value {
+    func stringPropertyKey(preferring preferred: [String]) -> String? {
+        for name in preferred {
+            guard let spec = self[name], case .object(let details) = spec,
+                  case .string(let type)? = details["type"], type == "string" else { continue }
+            return name
+        }
+        for (name, spec) in sorted(by: { $0.key < $1.key }) {
+            if case .object(let details) = spec,
+               case .string(let type)? = details["type"], type == "string" {
+                return name
+            }
+        }
+        return nil
     }
 }
 

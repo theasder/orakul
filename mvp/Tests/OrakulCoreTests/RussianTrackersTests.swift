@@ -9,7 +9,7 @@ import Testing
 /// проверяет Яндекс Трекер.
 ///
 /// Форма запроса у каждого сервиса своя и сверена с документацией вендора:
-/// у Яндекса поиск — POST с телом, у Kaiten и YouGile — GET с параметрами.
+/// у Яндекса поиск — POST с телом, у Kaiten, YouGile и WEEEK — GET с параметрами.
 /// Первая версия этого файла проверяла GET у всех и проходила, потому что
 /// проверяла мой же вымысел.
 @Suite("Российские трекеры")
@@ -33,7 +33,7 @@ struct RussianTrackersTests {
         case .yandexTracker: return "1234567"
         case .kaiten:        return "team.kaiten.ru"
         case .bitrix24:      return "company.bitrix24.ru"
-        case .yougile:       return nil
+        case .yougile, .weeek: return nil
         }
     }
 
@@ -46,7 +46,9 @@ struct RussianTrackersTests {
     @Test("каждый сервис ходит по своему адресу и со своим токеном")
     func requestShape() async throws {
         for service in RussianTrackers.Service.allCases {
-            let (http, recorder) = stub()
+            let response = service == .weeek
+                ? #"{"success":true,"tasks":[],"hasMore":false}"# : "[]"
+            let (http, recorder) = stub(json: response)
             _ = try await client(service, http: http).search("тарифы")
 
             let request = try #require(recorder.last)
@@ -54,7 +56,7 @@ struct RussianTrackersTests {
             #expect(url.hasPrefix(service.host(secondary: secondary(for: service))),
                     "\(service.title): чужой хост")
             // Ключ обязан уехать — но каждый сервис берёт его по-своему:
-            // трое заголовком, Битрикс частью адреса. Требовать заголовок у
+            // четверо заголовком, Битрикс частью адреса. Требовать заголовок у
             // всех значило бы либо выкинуть Битрикс из проверки, либо
             // придумать ему заголовок, которого вендор не ждёт.
             let auth = request.value(forHTTPHeaderField: "Authorization") ?? ""
@@ -82,10 +84,12 @@ struct RussianTrackersTests {
         }
     }
 
-    @Test("у Kaiten и YouGile запрос уезжает в адрес, закодированным")
+    @Test("GET-трекеры кодируют запрос как одно значение")
     func getServicesCarryTheQueryInTheURL() async throws {
-        for service in [RussianTrackers.Service.kaiten, .yougile] {
-            let (http, recorder) = stub()
+        for service in [RussianTrackers.Service.kaiten, .yougile, .weeek] {
+            let response = service == .weeek
+                ? #"{"success":true,"tasks":[],"hasMore":false}"# : "[]"
+            let (http, recorder) = stub(json: response)
             _ = try await client(service, http: http).search("тарифы")
             let request = try #require(recorder.last)
             let url = try #require(request.url?.absoluteString)
@@ -95,6 +99,47 @@ struct RussianTrackersTests {
             #expect(url.contains("%D1%82"), "\(service.title): кириллица потерялась")
             #expect(request.httpMethod != "POST")
             #expect(request.httpBody == nil)
+        }
+    }
+
+    @Test("WEEEK ищет по документированному search и разбирает конверт")
+    func weeekSearchMatchesThePublicAPI() async throws {
+        let json = #"{"success":true,"tasks":[{"id":42,"title":"Поднять лимиты"}],"hasMore":false}"#
+        let (http, recorder) = stub(json: json)
+        let issues = try await client(.weeek, http: http).search("лимиты", limit: 7)
+
+        let request = try #require(recorder.last)
+        let url = try #require(request.url)
+        let components = try #require(URLComponents(
+            url: url, resolvingAgainstBaseURL: false))
+        #expect(components.path == "/public/v1/tm/tasks")
+        #expect(components.queryItems?.first { $0.name == "search" }?.value == "лимиты")
+        #expect(components.queryItems?.first { $0.name == "perPage" }?.value == "7")
+        #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer t0ken")
+        #expect(issues == [.init(key: "42", title: "Поднять лимиты", url: nil)])
+    }
+
+    @Test("спецсимволы запроса не превращаются в параметры API")
+    func queryCannotInjectParameters() async throws {
+        let (http, recorder) = stub(json: #"{"content":[]}"#)
+        _ = try await client(.yougile, http: http).search("лимиты&limit=1000")
+
+        let url = try #require(recorder.last?.url)
+        let components = try #require(URLComponents(
+            url: url, resolvingAgainstBaseURL: false))
+        #expect(components.path == "/api-v2/task-list")
+        #expect(components.queryItems?.filter { $0.name == "limit" }.map(\.value) == ["10"])
+        #expect(components.queryItems?.first { $0.name == "title" }?.value
+                == "лимиты&limit=1000")
+        #expect(recorder.last?.value(forHTTPHeaderField: "Content-Type") == "application/json")
+    }
+
+    @Test("WEEEK success=false — отказ, а не пустая выдача")
+    func weeekFailureEnvelopeIsAnError() async {
+        let (http, _) = stub(json: #"{"success":false,"error":"invalid_token","message":"Token revoked"}"#)
+        await #expect(throws: RussianTrackers.TrackerError.vendor(
+            .weeek, code: "invalid_token", description: "Token revoked")) {
+            try await client(.weeek, http: http).search("лимиты")
         }
     }
 

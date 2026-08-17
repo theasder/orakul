@@ -82,9 +82,6 @@ enum MCPCatalog {
         MCPServerDescriptor(id: "linear", name: "Linear",
                             endpoint: URL(string: "https://mcp.linear.app/mcp")!,
                             symbol: "line.3.horizontal.decrease.circle", isCustom: false, keywords: ["issues", "tickets", "backlog", "sprint"]),
-        MCPServerDescriptor(id: "asana", name: "Asana",
-                            endpoint: URL(string: "https://mcp.asana.com/mcp")!,
-                            symbol: "checklist", isCustom: false, keywords: ["tasks", "projects", "to-do"]),
         MCPServerDescriptor(id: "atlassian", name: "Atlassian · Jira & Confluence",
                             endpoint: URL(string: "https://mcp.atlassian.com/v1/mcp/authv2")!,
                             symbol: "square.grid.2x2", isCustom: false, keywords: ["jira", "confluence", "issues", "tickets", "sprint", "backlog", "wiki"]),
@@ -136,6 +133,18 @@ enum MCPCatalog {
     /// the computed catalog properties below attach credentials only when both
     /// halves are present.
     private static let preRegisteredContracts: [MCPProviderContract] = [
+        // Asana MCP V2 is pre-registration only (no RFC 7591 DCR). The
+        // developer console validates the redirect URI exactly, hence the
+        // dedicated fixed port. V1's keyless endpoint is retired and must not
+        // be offered as a working integration.
+        MCPProviderContract(
+            descriptor: MCPServerDescriptor(
+                id: "asana", name: "Asana",
+                endpoint: URL(string: "https://mcp.asana.com/v2/mcp")!,
+                symbol: "checklist", isCustom: false,
+                keywords: ["tasks", "projects", "to-do"],
+                fixedLoopbackPort: 52703),
+            registration: .preRegistered(loopbackPort: 52703)),
         MCPProviderContract(
             descriptor: MCPServerDescriptor(
                 id: "hubspot", name: "HubSpot",
@@ -190,7 +199,7 @@ enum MCPCatalog {
     /// Servers that speak MCP + PKCE but require a pre-registered app (no open
     /// DCR) — each appears only when its client credentials are baked in.
     static var preRegistered: [MCPServerDescriptor] {
-        [hubSpot, affinity, zoom, gmail, googleAnalytics].compactMap { $0 }
+        [asana, hubSpot, affinity, zoom, gmail, googleAnalytics].compactMap { $0 }
     }
 
     /// Google's own hosted GA4 Data API MCP (live-probed 2026-07:
@@ -247,6 +256,17 @@ enum MCPCatalog {
             id: "gmail",
             clientID: Config.gmailClientID,
             clientSecret: Config.gmailClientSecret)
+    }
+
+    /// Asana's supported V2 MCP endpoint. Register
+    /// `http://127.0.0.1:52703/callback` in an Asana MCP app; the descriptor is
+    /// hidden when either credential half is absent rather than opening an
+    /// authorization flow which can only fail.
+    static var asana: MCPServerDescriptor? {
+        configuredDescriptor(
+            id: "asana",
+            clientID: Config.asanaClientID,
+            clientSecret: Config.asanaClientSecret)
     }
 
     /// HubSpot's hosted MCP (live-probed: https://mcp.hubspot.com/, PKCE S256,

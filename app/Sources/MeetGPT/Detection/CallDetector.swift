@@ -23,6 +23,7 @@ final class CallDetector {
         "com.microsoft.teams2",              // Teams (new)
         "com.webex.meetingmanager",          // Webex
         "com.cisco.webexmeetingsapp",        // Webex Meetings
+        "org.jitsi.jitsi-meet",              // Jitsi Meet desktop
         "com.hnc.Discord",                   // Discord
         "com.tinyspeck.slackmacgap",         // Slack (huddles/calls)
         "com.apple.FaceTime"                 // FaceTime
@@ -38,7 +39,11 @@ final class CallDetector {
         "com.tdesktop.Telegram",             // Telegram Desktop
         "org.whispersystems.signal-desktop", // Signal
         "com.viber.osx",                     // Viber
-        "com.skype.skype"                    // Skype
+        "com.skype.skype",                   // Skype
+        // TrueConf exposes no portable public call-history connector we can
+        // safely assume. Its official macOS bundle is still useful as LIVE
+        // evidence when CoreAudio reports that the microphone is in use.
+        "org.trueconf.client"                 // TrueConf
     ])
 
     /// Bundle IDs we treat as music/video playback — used to suppress false
@@ -198,6 +203,7 @@ final class CallDetector {
         case "com.microsoft.teams", "com.microsoft.teams2":  return "Microsoft Teams"
         case "com.webex.meetingmanager",
              "com.cisco.webexmeetingsapp":                   return "Webex"
+        case "org.jitsi.jitsi-meet":                         return "Jitsi"
         case "com.hnc.Discord":                              return "Discord"
         case "com.tinyspeck.slackmacgap":                    return "Slack"
         case "com.apple.FaceTime":                           return "FaceTime"
@@ -207,6 +213,7 @@ final class CallDetector {
         case "org.whispersystems.signal-desktop":            return "Signal"
         case "com.viber.osx":                                return "Viber"
         case "com.skype.skype":                              return "Skype"
+        case "org.trueconf.client":                          return "TrueConf"
         default:                                             return nil
         }
     }

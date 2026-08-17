@@ -353,6 +353,7 @@ struct RecordingContextLifecycleTests {
 
     @Test("meeting apps are never reclassified as content", arguments: [
         "us.zoom.xos", "com.microsoft.teams2", "com.google.Chrome",
+        "org.jitsi.jitsi-meet", "org.trueconf.client",
     ])
     func meetingAppsStayMeetings(bundleID: String) {
         // The failure that matters in the other direction: filing a real call

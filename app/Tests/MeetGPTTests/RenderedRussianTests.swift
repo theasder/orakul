@@ -38,6 +38,7 @@ struct RenderedRussianTests {
         "gemini", "deepseek", "qwen", "kimi", "glm", "yandexgpt", "whisper",
         "deepgram", "assemblyai", "parakeet", "docx", "word", "docs", "api",
         "mcp", "oauth", "url", "macos", "screencapturekit", "calendar",
+        "workspace", "slides", "forms",
         "orakul", "cruxwing", "wav", "png", "json", "rice", "arr", "kubernetes",
         "tech", "debt", "term", "sheet", "cap", "table", "sla", "wer", "key",
         "keys", "get", "com", "platform", "console", "aistudio", "dashscope",
@@ -136,6 +137,10 @@ struct RenderedRussianTests {
             Config.contextSets = savedContextSets
         }
         Config.userCustomRole = ""
+        // Saved context-set names are also user-authored sidebar copy. A
+        // parallel test can leave an English fixture in UserDefaults, which
+        // made this renderer test fail depending on suite order rather than UI
+        // language. Isolate the persisted list before AppState reads it.
         Config.contextSets = []
 
         let state = AppState(llm: MockLLMGateway(response: ""),

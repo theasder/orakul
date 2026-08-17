@@ -12,13 +12,10 @@ import Foundation
 /// Поэтому здесь прямой REST по документации вендора: токен пользователь
 /// заводит сам, токен лежит в Связке ключей.
 ///
-/// **Почему сервисов три, а не пять.** Первый заход описывал ещё WEEEK и Pyrus,
-/// и оба адреса были выдуманы. По документации: у Pyrus нет поиска задач по
-/// тексту вообще — только реестр конкретной формы (`GET /forms/{id}/register`),
-/// то есть коннектор такого вида там невозможен; у WEEEK параметры выдачи задач
-/// публично не описаны, и «скорее всего `search`» означало бы фильтр, который
-/// сервис вправе проигнорировать и вернуть первые попавшиеся задачи — а
-/// подсказка из случайных задач хуже пустой. Осталось то, что проверено.
+/// Pyrus сюда не входит: его API выдаёт реестр конкретной формы
+/// (`GET /forms/{id}/register`), но не умеет искать задачи по тексту. WEEEK,
+/// напротив, с июня 2026 публично документирует `GET /tm/tasks?search=…` и форму
+/// ответа, поэтому подключается тем же прямым REST-путём, что остальные.
 ///
 /// HTTP приходит снаружи: тест, который ходит в чужой трекер, проверяет чужой
 /// трекер, а не наш код.
@@ -38,13 +35,14 @@ public struct RussianTrackers {
     }
 
     public enum Service: String, CaseIterable, Sendable {
-        case yandexTracker, kaiten, yougile, bitrix24
+        case yandexTracker, kaiten, yougile, weeek, bitrix24
 
         public var title: String {
             switch self {
             case .yandexTracker: return "Яндекс Трекер"
             case .kaiten:        return "Kaiten"
             case .yougile:       return "YouGile"
+            case .weeek:         return "WEEEK"
             case .bitrix24:      return "Битрикс24"
             }
         }
@@ -56,7 +54,10 @@ public struct RussianTrackers {
             switch self {
             case .yandexTracker: return "OAuth-токен и идентификатор организации: «Администрирование» → «Организации», поле ID"
             case .kaiten:        return "API-токен из профиля, раздел «API», и адрес вашей команды"
-            case .yougile:       return "Ключ компании из раздела «Интеграции»"
+            case .yougile:
+                return "API-ключ создаётся через POST /api-v2/auth/keys в интерактивной документации YouGile: нужны логин, пароль и ID компании"
+            case .weeek:
+                return "Токен доступа из раздела API в настройках рабочего пространства WEEEK"
             case .bitrix24:
                 // Вебхук показывают одной строкой вида
                 // https://фирма.bitrix24.ru/rest/1/abc.../ — сюда идёт
@@ -81,14 +82,14 @@ public struct RussianTrackers {
             // возьмётся из ссылки. Поле остаётся для тех, кто вписывает
             // середину руками, и для порталов на своём домене.
             case .bitrix24:      return "адрес портала, если вставили не ссылку целиком"
-            case .yougile:       return nil
+            case .yougile, .weeek: return nil
             }
         }
 
         public var needsSecondary: Bool { secondaryPrompt != nil }
 
         /// Куда класть заведённую задачу. Третье поле, и без него завести
-        /// задачу нельзя ни в одном из трёх сервисов: у каждого своё
+        /// задачу нельзя ни в одном из пяти сервисов: у каждого своё
         /// обязательное «место» и своё для него слово.
         ///
         /// Проверено по документации вендоров: Яндекс требует `queue`, Kaiten —
@@ -101,6 +102,7 @@ public struct RussianTrackers {
             case .yandexTracker: return "ключ очереди, например TREK"
             case .kaiten:        return "номер доски, например 4"
             case .yougile:       return "идентификатор колонки"
+            case .weeek:         return "номер проекта, например 42"
             case .bitrix24:      return "номер ответственного, например 1"
             }
         }
@@ -123,6 +125,7 @@ public struct RussianTrackers {
                     .map(String.init) ?? ""
                 return "https://\(domain.trimmingCharacters(in: .whitespaces))/api/latest"
             case .yougile:       return "https://yougile.com/api-v2"
+            case .weeek:         return "https://api.weeek.net/public/v1"
             case .bitrix24:
                 // Тот же случай, что у Kaiten: адрес копируют из строки
                 // браузера вместе со схемой и путём до раздела.
@@ -205,7 +208,7 @@ public struct RussianTrackers {
     /// Разбирает вставленную целиком ссылку вебхука на портал и учётную часть.
     ///
     /// Возвращает исходный токен, если это не Битрикс или если вставлена не
-    /// ссылка: у остальных трёх сервисов токен — обычная строка, и трогать её
+    /// ссылка: у остальных четырёх сервисов токен — обычная строка, и трогать её
     /// нельзя.
     static func splitBitrixWebhook(service: Service,
                                    token: String) -> (token: String, host: String?) {
@@ -250,7 +253,7 @@ public struct RussianTrackers {
         case 401, 403:  throw TrackerError.unauthorised(service)
         default:        throw TrackerError.http(service, response.statusCode)
         }
-        // Верхняя граница ещё раз, уже после разбора: у трёх сервисов размер
+        // Верхняя граница ещё раз, уже после разбора: у четырёх сервисов размер
         // задаётся параметром и это ничего не меняет, а у Битрикса страница
         // всегда пятьдесят и урезать выдачу больше негде.
         return Array(try parse(data).prefix(limit))
@@ -263,8 +266,13 @@ public struct RussianTrackers {
                           "Content-Type": "application/json"]
             if let secondary { fields[Self.orgHeader(for: secondary)] = secondary }
             return fields
-        case .kaiten, .yougile:
+        case .kaiten:
             return ["Authorization": "Bearer \(token)"]
+        case .yougile, .weeek:
+            // YouGile's API contract requires JSON content type on every
+            // request, including GET. WEEEK uses the same header set.
+            return ["Authorization": "Bearer \(token)",
+                    "Content-Type": "application/json"]
         // У Битрикса ключа в заголовке нет вовсе: вебхук — это адрес, и права
         // проверяются по нему. Заголовок остаётся один, про формат тела.
         case .bitrix24:
@@ -287,23 +295,44 @@ public struct RussianTrackers {
     }
 
     func endpoint(for query: String, limit: Int) throws -> URL {
-        let escaped = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
         let path: String
+        let queryItems: [URLQueryItem]
         switch service {
         // Поиск у Яндекса — POST с телом; в адресе остаётся только размер
         // страницы. Строка запроса уезжает в body, см. body(for:limit:).
-        case .yandexTracker: path = "/issues/_search?perPage=\(limit)"
-        case .kaiten:        path = "/cards?query=\(escaped)&limit=\(limit)"
-        case .yougile:       path = "/tasks?title=\(escaped)&limit=\(limit)"
+        case .yandexTracker:
+            path = "/issues/_search"
+            queryItems = [.init(name: "perPage", value: String(limit))]
+        case .kaiten:
+            path = "/cards"
+            queryItems = [.init(name: "query", value: query),
+                          .init(name: "limit", value: String(limit))]
+        case .yougile:
+            // GET /tasks remains in the current schema only as deprecated.
+            path = "/task-list"
+            queryItems = [.init(name: "title", value: query),
+                          .init(name: "limit", value: String(limit))]
+        case .weeek:
+            path = "/tm/tasks"
+            queryItems = [.init(name: "search", value: query),
+                          .init(name: "perPage", value: String(limit))]
         // У Битрикса ключ едет в адресе, а не в заголовке: вебхук — это
         // и есть номер пользователя с кодом внутри пути. Размер страницы
         // всегда пятьдесят и не настраивается, поэтому limit урезает
         // выдачу уже здесь, после разбора.
-        case .bitrix24:      path = "/\(token)/tasks.task.list"
+        case .bitrix24:
+            path = "/\(token)/tasks.task.list"
+            queryItems = []
         }
-        guard let url = URL(string: service.host(secondary: secondary) + path) else {
+        guard var components = URLComponents(
+            string: service.host(secondary: secondary) + path) else {
             throw TrackerError.unreadable(service)
         }
+        // URLComponents treats the user's words as one value. In contrast,
+        // `.urlQueryAllowed` leaves `&` and `=` untouched and lets a task title
+        // silently become extra API parameters.
+        if !queryItems.isEmpty { components.queryItems = queryItems }
+        guard let url = components.url else { throw TrackerError.unreadable(service) }
         return url
     }
 
@@ -337,8 +366,7 @@ public struct RussianTrackers {
         case 401, 403:  throw TrackerError.unauthorised(service)
         default:        throw TrackerError.http(service, response.statusCode)
         }
-        guard let created = parseCreated(data) else { throw TrackerError.unreadable(service) }
-        return created
+        return try parseCreated(data)
     }
 
     func createEndpoint() throws -> URL {
@@ -347,6 +375,7 @@ public struct RussianTrackers {
         case .yandexTracker: path = "/issues/"
         case .kaiten:        path = "/cards"
         case .yougile:       path = "/tasks"
+        case .weeek:         path = "/tm/tasks"
         case .bitrix24:      path = "/\(token)/tasks.task.add"
         }
         guard let url = URL(string: service.host(secondary: secondary) + path) else {
@@ -381,6 +410,15 @@ public struct RussianTrackers {
         case .yougile:
             payload = ["title": title, "columnId": place]
             if let description { payload["description"] = description }
+        case .weeek:
+            // WEEEK requires at least one location. The project id is numeric;
+            // replacing an invalid value with zero could file the task nowhere
+            // (or into an unintended project), so reject it before the network.
+            guard let project = Int(place.trimmingCharacters(in: .whitespaces)) else {
+                throw TrackerError.notConfigured(service)
+            }
+            payload = ["title": title, "locations": [["projectId": project]]]
+            if let description { payload["description"] = description }
         case .bitrix24:
             // Задача без ответственного в Битриксе не заводится, поэтому
             // третье поле здесь — номер человека, а не доски или колонки.
@@ -401,11 +439,23 @@ public struct RussianTrackers {
 
     /// Ответ на создание: ключ и ссылка. У Яндекса это `key` (`TREK-42`), у
     /// остальных числовой `id`.
-    func parseCreated(_ data: Data) -> Issue? {
-        guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-        else { return nil }
+    func parseCreated(_ data: Data) throws -> Issue {
+        guard let envelope = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { throw TrackerError.unreadable(service) }
+        try rejectVendorFailure(envelope)
+
+        let object: [String: Any]
+        if service == .weeek {
+            guard envelope["success"] as? Bool == true,
+                  let task = envelope["task"] as? [String: Any] else {
+                throw TrackerError.unreadable(service)
+            }
+            object = task
+        } else {
+            object = envelope
+        }
         let key = (object["key"] as? String) ?? (object["id"].map { "\($0)" }) ?? ""
-        guard !key.isEmpty else { return nil }
+        guard !key.isEmpty else { throw TrackerError.unreadable(service) }
         let title = (object["summary"] as? String) ?? (object["title"] as? String) ?? ""
         return Issue(key: key, title: title, url: issueURL(key: key, raw: object))
     }
@@ -419,6 +469,7 @@ public struct RussianTrackers {
                 .replacingOccurrences(of: "/api/latest", with: "")
             return URL(string: "\(host)/ticket/\(key)")
         case .yougile: return nil
+        case .weeek: return nil
         case .bitrix24:
             let portal = service.host(secondary: secondary)
                 .replacingOccurrences(of: "/rest", with: "")
@@ -438,7 +489,7 @@ public struct RussianTrackers {
                 throw TrackerError.unreadable(service)
             }
             return data
-        case .kaiten, .yougile:
+        case .kaiten, .yougile, .weeek:
             return nil
         case .bitrix24:
             // Документация метода: TITLE ищется по шаблону, где `%` и `_` —
@@ -469,10 +520,11 @@ public struct RussianTrackers {
         let root = try? JSONSerialization.jsonObject(with: data)
         // Проверяется до разбора списка: у Битрикса отказ приезжает с кодом
         // 200, и если сначала искать задачи, отказ станет пустой выдачей.
-        if let object = root as? [String: Any], let code = object["error"] as? String {
-            throw TrackerError.vendor(
-                service, code: code,
-                description: (object["error_description"] as? String) ?? "")
+        if let object = root as? [String: Any] {
+            try rejectVendorFailure(object)
+            if service == .weeek, object["success"] as? Bool != true {
+                throw TrackerError.unreadable(service)
+            }
         }
         let rows: [[String: Any]]
         if let array = root as? [[String: Any]] {
@@ -508,7 +560,7 @@ public struct RussianTrackers {
 
         return rows.compactMap { row in
             // Битрикс отдаёт поля прописными: ID, TITLE. Строчные варианты
-            // остаются первыми — у трёх остальных сервисов они и приходят.
+            // остаются первыми — у четырёх остальных сервисов они и приходят.
             let key = (row["key"] as? String)
                 ?? (row["id"].map { "\($0)" })
                 ?? (row["ID"].map { "\($0)" })
@@ -521,5 +573,28 @@ public struct RussianTrackers {
             guard !key.isEmpty else { return nil }
             return Issue(key: key, title: title, url: URL(string: (row["url"] as? String) ?? ""))
         }
+    }
+
+    /// Some APIs return a syntactically successful envelope with a vendor-level
+    /// failure. Treating it as an empty task list would invite duplicate work.
+    private func rejectVendorFailure(_ object: [String: Any]) throws {
+        let successIsFalse = object["success"] as? Bool == false
+        guard object["error"] != nil || successIsFalse else { return }
+
+        let code: String
+        let description: String
+        if let error = object["error"] as? String {
+            code = error
+            description = (object["error_description"] as? String)
+                ?? (object["message"] as? String) ?? ""
+        } else if let error = object["error"] as? [String: Any] {
+            code = (error["code"] as? String) ?? "vendor_error"
+            description = (error["message"] as? String)
+                ?? (error["description"] as? String) ?? ""
+        } else {
+            code = "success_false"
+            description = (object["message"] as? String) ?? ""
+        }
+        throw TrackerError.vendor(service, code: code, description: description)
     }
 }

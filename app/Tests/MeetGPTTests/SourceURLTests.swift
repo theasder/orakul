@@ -73,4 +73,39 @@ struct SourceURLTests {
     func sheetWrongPath() {
         #expect(SourceURL.googleSheetID(from: "https://docs.google.com/document/d/1DocABC/edit") == nil)
     }
+
+    // MARK: Google Slides
+
+    @Test("extracts Slides ids from normal and account-qualified editor URLs")
+    func slidesURLs() {
+        #expect(SourceURL.googleSlidesID(
+            from: "https://docs.google.com/presentation/d/1Slide_ABC-9/edit") == "1Slide_ABC-9")
+        #expect(SourceURL.googleSlidesID(
+            from: "https://docs.google.com/presentation/u/0/d/1Slide_ABC-9/edit") == "1Slide_ABC-9")
+        #expect(SourceURL.googleSlidesID(from: "1Slide_ABC-9") == "1Slide_ABC-9")
+    }
+
+    @Test("Slides parser rejects non-Slides URLs")
+    func slidesWrongPath() {
+        #expect(SourceURL.googleSlidesID(
+            from: "https://docs.google.com/spreadsheets/d/1SheetXYZ/edit") == nil)
+    }
+
+    // MARK: Google Forms
+
+    @Test("extracts the API form id from editor URLs")
+    func formsEditorURL() {
+        #expect(SourceURL.googleFormID(
+            from: "https://docs.google.com/forms/d/1Form_ABC-9/edit") == "1Form_ABC-9")
+        #expect(SourceURL.googleFormID(
+            from: "https://docs.google.com/forms/u/1/d/1Form_ABC-9/edit") == "1Form_ABC-9")
+        #expect(SourceURL.googleFormID(from: "1Form_ABC-9") == "1Form_ABC-9")
+    }
+
+    @Test("rejects public responder links because /d/e ids are not Forms API ids")
+    func formsPublishedURL() {
+        #expect(SourceURL.googleFormID(
+            from: "https://docs.google.com/forms/d/e/1FAIpQLScPublished/viewform") == nil)
+        #expect(SourceURL.googleFormID(from: "https://forms.gle/short-code") == nil)
+    }
 }

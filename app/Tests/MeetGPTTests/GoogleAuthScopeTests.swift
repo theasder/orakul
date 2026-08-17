@@ -10,13 +10,17 @@ struct GoogleAuthScopeTests {
             "https://www.googleapis.com/auth/calendar.readonly",
             "https://www.googleapis.com/auth/documents.readonly",
             "https://www.googleapis.com/auth/spreadsheets.readonly",
+            "https://www.googleapis.com/auth/presentations.readonly",
+            "https://www.googleapis.com/auth/forms.body.readonly",
+            "https://www.googleapis.com/auth/forms.responses.readonly",
             // Docs and Sheets each also need drive.file (create a Doc, create a
             // Sheet). Without it the compound grant is partial (see
             // partialGrant below).
             "https://www.googleapis.com/auth/drive.file",
         ].joined(separator: " ")
 
-        #expect(GoogleAuth.servicesGranted(by: scope) == ["calendar", "docs", "sheets"])
+        #expect(GoogleAuth.servicesGranted(by: scope)
+                == ["calendar", "docs", "sheets", "slides", "forms"])
     }
 
     @Test("does not claim a service whose compound grant is partial")
@@ -37,6 +41,13 @@ struct GoogleAuthScopeTests {
         #expect(GoogleAuth.servicesGranted(
             by: "openid email https://www.googleapis.com/auth/drive.file"
         ).isEmpty)
+    }
+
+    @Test("an empty service selection never falls back to Calendar")
+    func emptySelectionRequestsNothing() {
+        #expect(GoogleAuth.scope(for: []).isEmpty)
+        #expect(GoogleAuth.scope(for: [GoogleService.slides.rawValue])
+                == ["https://www.googleapis.com/auth/presentations.readonly"])
     }
 
     @Test("preserves Google's token endpoint error detail on HTTP failures")
@@ -98,12 +109,15 @@ struct GoogleConsentScopeSetTests {
         Set(GoogleService.requestable.flatMap(\.scopeURLs))
     }
 
-    @Test("the client requests exactly these four scopes")
+    @Test("the client requests exactly these seven scopes")
     func exactSet() {
         #expect(requested == [
             "https://www.googleapis.com/auth/calendar.readonly",
             "https://www.googleapis.com/auth/documents.readonly",
             "https://www.googleapis.com/auth/spreadsheets.readonly",
+            "https://www.googleapis.com/auth/presentations.readonly",
+            "https://www.googleapis.com/auth/forms.body.readonly",
+            "https://www.googleapis.com/auth/forms.responses.readonly",
             "https://www.googleapis.com/auth/drive.file",
         ])
     }

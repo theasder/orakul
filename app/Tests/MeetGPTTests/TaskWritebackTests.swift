@@ -32,6 +32,9 @@ struct TaskWritebackTests {
 
         // Nothing creatable.
         #expect(TaskWriteback.pickCreateTool(from: [tool("search"), tool("fetch")], serverID: "linear") == nil)
+
+        let asanaTools = [tool("create_task"), tool("create_tasks")]
+        #expect(TaskWriteback.pickCreateTool(from: asanaTools, serverID: "asana")?.name == "create_tasks")
     }
 
     @Test("isCreateTool matches create+issue/task names only")
@@ -99,5 +102,45 @@ struct TaskWritebackTests {
     func buildArgsNoTitle() {
         let weird = tool("create_issue", props: ["count": "integer"])
         #expect(TaskWriteback.buildArguments(for: item("x"), tool: weird) == nil)
+    }
+
+    @Test("maps Asana V2 create_tasks into its nested live schema")
+    func buildAsanaV2Args() throws {
+        let taskProperties: Value = .object([
+            "name": .object(["type": .string("string")]),
+            "description": .object(["type": .string("string")]),
+            "project_id": .object(["type": .string("string")]),
+        ])
+        let tasks: Value = .object([
+            "type": .string("array"),
+            "items": .object([
+                "type": .string("object"),
+                "properties": taskProperties,
+            ]),
+        ])
+        let t = Tool(
+            name: "create_tasks", description: nil,
+            inputSchema: .object(["properties": .object([
+                "tasks": tasks,
+                "default_project": .object(["type": .string("string")]),
+            ])]))
+        let args = try #require(TaskWriteback.buildArguments(
+            for: item("Ship onboarding", owner: "Sam"), tool: t,
+            extra: [
+                "project_id": .string("project-in-task"),
+                "default_project": .string("project-default"),
+            ]))
+
+        #expect(args["default_project"] == .string("project-default"))
+        let values = try #require(args["tasks"]?.arrayValue)
+        let task = try #require(values.first?.objectValue)
+        #expect(task["name"] == .string("Ship onboarding"))
+        #expect(task["project_id"] == .string("project-in-task"))
+        if case .string(let description)? = task["description"] {
+            #expect(description.contains("Владелец: Sam"))
+        } else {
+            Issue.record("expected nested Asana description")
+        }
+        #expect(args["name"] == nil)
     }
 }

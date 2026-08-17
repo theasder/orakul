@@ -80,7 +80,7 @@ cp .env.example .env      # then edit; build.sh bakes keys into a gitignored Sec
 | `GOOGLE_AI_API_KEY` | Gemini models |
 | `DEEPGRAM_API_KEY` | live diarized transcription |
 | `ASSEMBLYAI_API_KEY` | at-stop speaker diarization |
-| `GOOGLE_CLIENT_ID` | Google sign-in (Calendar + Docs + Sheets, Desktop-app OAuth client with PKCE). The backend must list this ID in `GOOGLE_NATIVE_CLIENT_IDS` or native account login 503s |
+| `GOOGLE_CLIENT_ID` | Google Workspace sign-in (Calendar, Docs, Sheets, Slides, Forms; Desktop-app OAuth client with PKCE) |
 | `GOOGLE_CLIENT_SECRET` | Token exchange for that same Google Desktop-app OAuth client |
 | `BACKEND_URL` | gateway / brainstormer / fact-check backend. **Required** with `LLM_GATEWAY=backend`: empty or `off` means no cloud LLM at all |
 | `DEEPSEEK_API_KEY` `DASHSCOPE_API_KEY` `ZHIPU_API_KEY` `MOONSHOT_API_KEY` | Chinese providers (catalog models + Council mode) |
@@ -417,11 +417,12 @@ The sidebar **Context** block (folded into every AI prompt) accepts more than
 files. **Add source** ▸:
 
 - **Files** — text/PDF/Word/RTF/Markdown.
-- **Google Doc / Google Sheet** — paste the link; the text is pulled read-only
-  via your Google sign-in. Requires the Docs + Sheets scopes — if you connected
-  before this feature, **reconnect Google** in Settings to grant them. Settings
-  has **per-service checkboxes** (Calendar · Docs · Sheets): a disabled service
-  is excluded from the OAuth grant itself, so the token cannot touch it.
+- **Google Doc / Sheet / Slides / Form** — paste an explicit link; text is
+  pulled through your Google sign-in. Forms includes a bounded page of responses
+  and omits provider email metadata; Slides includes visible text and speaker
+  notes. If you connected before these scopes existed, **reconnect Google**.
+  Settings has per-service checkboxes: a disabled service is excluded from the
+  OAuth grant itself, so the token cannot touch it.
 - **Notion page** — paste the link; fetched through your Notion connection
   (Settings → Connected apps → Notion → **Connect**, one click, no keys).
 - **Fireflies / Agenda** — quick buttons when those connections exist.
@@ -452,9 +453,10 @@ default off).
 
 ## Connected apps (MCP)
 
-`Settings → Connected apps` links Cruxwing to work apps through their hosted
-**MCP servers** with one uniform, keyless flow — no API keys, no client
-secrets, no backend:
+`Settings → Connected apps` links orakul to work apps through their hosted
+**MCP servers**. Servers with dynamic client registration use a keyless flow;
+providers such as Asana V2 and HubSpot require their own pre-registered OAuth
+app at build time:
 
 1. Click **Connect** → the SDK discovers the server's OAuth metadata
    (RFC 9728/8414), registers Cruxwing on the fly as a public client
@@ -465,10 +467,11 @@ secrets, no backend:
    its tools (e.g. Notion `notion-fetch`, Fireflies `fireflies_get_transcripts`)
    and folds the text result into the meeting context.
 
-Built-in catalog (endpoints live-verified 2026-07): **Notion, Fireflies,
-Linear, Asana, Atlassian (Jira), Intercom, Sentry** — plus **HubSpot** (its MCP
-has no dynamic registration, so it appears once `HUBSPOT_CLIENT_ID/SECRET` from
-a HubSpot developer app are in `.env`; register redirect
+Built-in catalog (endpoints live-verified 2026-08): **Notion, Fireflies,
+Linear, Atlassian (Jira), Intercom, Sentry** — plus **Asana V2** (appears once
+`ASANA_CLIENT_ID/SECRET` are in the private `.env`; register exactly
+`http://127.0.0.1:52703/callback`) and **HubSpot** (appears once
+`HUBSPOT_CLIENT_ID/SECRET` are present; register redirect
 `http://127.0.0.1:52700/callback`) — plus **Add custom server…** for any other
 Streamable-HTTP MCP server. Adding a catalog app is one line in
 `MCP/MCPCatalog.swift`.
@@ -527,22 +530,24 @@ with transcript lines appearing in real time, speakers already attached. Whisper
 and AssemblyAI are bypassed in this mode. Two sessions run (system + mic); a
 `KeepAlive` holds the socket open and `CloseStream` flushes finals at stop.
 
-### Google Calendar, Docs, and Sheets
+### Google Calendar, Docs, Sheets, Slides, and Forms
 
 One button — **Sign in with Google** — uses OAuth 2.0 Authorization Code with
 PKCE. Cruxwing starts a loopback listener on a random local port for each
 attempt and supplies `http://127.0.0.1:<random-port>/callback` as the redirect.
 There is no backend callback or custom URL scheme. The token exchange sends the
 Desktop client's ID and client secret in addition to its PKCE verifier. Access
-is read-only and limited to the services enabled in Settings; Docs and Sheets
-search also requests read-only Drive metadata.
+is limited to the services enabled in Settings. Explicit-link imports do not
+request Drive-wide discovery. `drive.file` is used only to create/manage files
+the app itself creates, such as a new spreadsheet export.
 
 It needs exactly **one** Google OAuth client, configured a single time (not
 per user):
 
 1. In [Google Cloud Console](https://console.cloud.google.com/), create or select
    a project and enable the **Google Calendar API**, **Google Docs API**,
-   **Google Sheets API**, and **Google Drive API**.
+   **Google Sheets API**, **Google Slides API**, **Google Forms API**, and
+   **Google Drive API**.
 2. Configure the OAuth consent screen / Google Auth Platform audience. For an
    External app in **Testing**, add each developer or tester under **Test
    users**. Alternatively publish the app when its consent configuration is
@@ -571,8 +576,9 @@ per user):
    backend Web client's secret; that separate secret remains server-side only.
 
 After that, **Settings → Connected Apps** shows **Sign in with Google** /
-**Disconnect**. Calendar can provide the current event and agenda; granted Docs
-and Sheets access can import or search relevant Workspace files.
+**Disconnect**. Calendar provides the current event and agenda; Docs, Sheets,
+Slides and Forms import the explicitly pasted resource. Project-wide Drive
+search is intentionally disabled because its metadata scope is restricted.
 
 > OAuth tokens are stored in the macOS Keychain. The Desktop client ID and
 > secret are build-time native-app credentials; neither is a substitute for a

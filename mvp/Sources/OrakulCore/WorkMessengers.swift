@@ -24,10 +24,9 @@ import Foundation
 ///     документации.
 ///
 /// **Кого здесь нет и почему.** Telegram — Bot API не отдаёт историю чата и не
-/// умеет по ней искать (RESEARCH-AND-PLAN §8.1); бот видит только то, что
-/// адресовано ему. VK Teams — Bot API той же формы, с тем же ограничением.
-/// Обещать поиск по переписке там, где его нет в API, значит показать кнопку,
-/// которая не может сработать.
+/// умеет по ней искать, поэтому он реализован отдельным потоком: приложение
+/// получает новые сообщения после подключения и ищет в локальном архиве.
+/// Этот тип описывает только серверы с настоящим API поиска.
 ///
 /// HTTP приходит снаружи: тест, который ходит в чужой мессенджер, проверяет
 /// чужой мессенджер, а не наш код.
@@ -62,7 +61,7 @@ public struct WorkMessengers {
         public var credentialHint: String {
             switch self {
             case .pachca:
-                return "Токен доступа из настроек Пачки, раздел «Интеграции»"
+                return "Персональный токен из «Автоматизации → API» с правом search:messages"
             case .mattermost:
                 return "Личный токен доступа из профиля и адрес вашего сервера"
             case .rocketChat:
@@ -140,6 +139,9 @@ public struct WorkMessengers {
     public enum ConnectorError: Error, Equatable, LocalizedError {
         case notConfigured
         case unauthorised
+        /// Пачка отличает неверный токен (401) от исправного токена без права
+        /// поиска (403). Совет перевыпустить такой токен скрывает настоящую причину.
+        case missingScope(String)
         /// Пара значений в одном поле, а вписано одно. Отдельно от
         /// `unauthorised`: сервер отвечает на это тем же 401, и общий текст
         /// советовал перевыпустить исправный токен.
@@ -163,6 +165,8 @@ public struct WorkMessengers {
                 return "Мессенджер не подключён. Откройте «Настройки → Подключённые приложения» и вставьте токен."
             case .unauthorised:
                 return "Мессенджер не принял токен. Обычно он истёк или у него не тех прав — создайте новый в самом сервисе."
+            case .missingScope(let scope):
+                return "Токен принят, но у него нет права \(scope). Добавьте это право в настройках токена."
             case .incompleteToken(let expected):
                 return "В поле токена нужны два значения: \(expected). Сейчас там одно — сервис откажет, сколько бы раз токен ни перевыпускали."
             case .http(let status):
@@ -234,7 +238,11 @@ public struct WorkMessengers {
         request.timeoutInterval = 8
 
         let (data, response) = try await http(request)
-        if response.statusCode == 401 || response.statusCode == 403 {
+        if response.statusCode == 401 {
+            throw ConnectorError.unauthorised
+        }
+        if response.statusCode == 403 {
+            if service == .pachca { throw ConnectorError.missingScope("search:messages") }
             throw ConnectorError.unauthorised
         }
         // Всё прочее, кроме успеха, — ошибка сервера, а не мусор в
@@ -254,6 +262,8 @@ public struct WorkMessengers {
             components?.queryItems = [
                 URLQueryItem(name: "query", value: query),
                 URLQueryItem(name: "limit", value: "10"),
+                URLQueryItem(name: "sort", value: "created_at"),
+                URLQueryItem(name: "order", value: "desc"),
             ]
             guard let url = components?.url else { throw ConnectorError.notConfigured }
             var request = URLRequest(url: url)

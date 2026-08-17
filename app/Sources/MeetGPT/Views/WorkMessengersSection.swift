@@ -21,6 +21,143 @@ struct WorkMessengersSection: View {
                     isExpanded: expanded == service,
                     toggle: { expanded = expanded == service ? nil : service })
             }
+            TelegramSupergroupRow()
+        }
+    }
+}
+
+private struct TelegramSupergroupRow: View {
+    @EnvironmentObject private var mcp: MCPConnectionManager
+    @State private var token = ""
+    @State private var chatIDs = ""
+    @State private var isExpanded = false
+    @State private var isConfigured = false
+    @State private var isSaving = false
+    @State private var errorText: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Space.xs) {
+            HStack(spacing: Space.s) {
+                Label("Telegram — супергруппы",
+                      systemImage: isConfigured ? "checkmark.seal.fill" : "paperplane")
+                    .labelStyle(ConnectedRowLabelStyle())
+                    .lineLimit(1)
+                Spacer()
+                if isConfigured {
+                    Button("Отключить") {
+                        Task {
+                            isSaving = true
+                            defer { isSaving = false }
+                            do {
+                                try await mcp.disconnectTelegram()
+                                token = ""; chatIDs = ""; errorText = nil
+                                load()
+                            } catch {
+                                isExpanded = true
+                                errorText = "Не удалось удалить локальный архив Telegram. Подключение и токен оставлены; попробуйте ещё раз."
+                            }
+                        }
+                    }
+                    .buttonStyle(QuietButtonStyle())
+                    .disabled(isSaving)
+                    .accessibilityIdentifier("settings.messenger.telegram.disconnect")
+                }
+                Button(isExpanded ? "Свернуть" : (isConfigured ? "Изменить" : "Подключить")) {
+                    isExpanded.toggle()
+                    errorText = nil
+                }
+                .buttonStyle(QuietButtonStyle())
+                .disabled(isSaving)
+                .accessibilityIdentifier("settings.messenger.telegram.connect")
+            }
+
+            if isExpanded {
+                Text("Создайте отдельного бота через BotFather и добавьте его в выбранные супергруппы. Отключите режим приватности или сделайте бота администратором.")
+                    .font(Typo.caption)
+                    .foregroundStyle(Theme.inkTertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                SecureField("", text: $token, prompt: Text("токен бота"))
+                    .textFieldStyle(.plain)
+                    .font(Typo.callout)
+                    .padding(.horizontal, Space.s)
+                    .padding(.vertical, 6)
+                    .background(Theme.surfaceSunken,
+                                in: RoundedRectangle(cornerRadius: Radius.s, style: .continuous))
+                    .accessibilityLabel("Токен Telegram-бота")
+                    .accessibilityIdentifier("settings.messenger.telegram.token")
+
+                TextField("", text: $chatIDs,
+                          prompt: Text("ID супергрупп через запятую, например -100123…"))
+                    .textFieldStyle(.plain)
+                    .font(Typo.callout)
+                    .padding(.horizontal, Space.s)
+                    .padding(.vertical, 6)
+                    .background(Theme.surfaceSunken,
+                                in: RoundedRectangle(cornerRadius: Radius.s, style: .continuous))
+                    .accessibilityLabel("Разрешённые ID супергрупп Telegram")
+                    .accessibilityIdentifier("settings.messenger.telegram.chatIDs")
+
+                Text("История начинается после подключения: Bot API не отдаёт старые сообщения. Orakul только получает и локально ищет новые сообщения из указанных супергрупп; сам ничего в Telegram не отправляет.")
+                    .font(Typo.caption)
+                    .foregroundStyle(Theme.inkTertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if let errorText {
+                    Text(errorText)
+                        .font(Typo.caption)
+                        .foregroundStyle(.red)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("settings.messenger.telegram.error")
+                }
+
+                HStack {
+                    Button(isSaving ? "Проверяем…" : "Проверить и сохранить") { save() }
+                        .buttonStyle(QuietButtonStyle())
+                        .disabled(!canSave || isSaving)
+                        .accessibilityIdentifier("settings.messenger.telegram.save")
+                    Spacer()
+                }
+            }
+        }
+        .onAppear(perform: load)
+    }
+
+    private var parsedChatIDs: Set<Int64>? {
+        RussianTrackerStore.parseTelegramChatIDs(chatIDs)
+    }
+
+    private var canSave: Bool {
+        !token.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !(parsedChatIDs?.isEmpty ?? true)
+    }
+
+    private func load() {
+        isConfigured = mcp.trackerStore.isTelegramConfigured
+        let saved = mcp.trackerStore.telegramAllowedChatIDs()
+        if !saved.isEmpty { chatIDs = saved.sorted().map(String.init).joined(separator: ", ") }
+    }
+
+    private func save() {
+        guard let parsedChatIDs, !parsedChatIDs.isEmpty else {
+            errorText = "Укажите числовые ID супергрупп через запятую."
+            return
+        }
+        isSaving = true
+        errorText = nil
+        let submittedToken = token
+        Task {
+            do {
+                _ = try await mcp.connectTelegram(
+                    token: submittedToken, allowedChatIDs: parsedChatIDs)
+                token = ""
+                isSaving = false
+                load()
+            } catch {
+                isSaving = false
+                errorText = (error as? LocalizedError)?.errorDescription
+                    ?? "Не удалось проверить подключение Telegram."
+            }
         }
     }
 }

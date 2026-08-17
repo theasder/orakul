@@ -55,4 +55,29 @@ struct WorkMessengersStoreTests {
         #expect(store.messengerScope(for: .rocketChat) == nil)
         #expect(keychain.count == 0)
     }
+
+    @Test("Telegram хранит токен, allowlist и подтверждённый bot id вместе")
+    func telegramCredentialsAreCompleteAndRemovable() {
+        let keychain = InMemoryKeychain()
+        let store = RussianTrackerStore(store: keychain)
+        store.setTelegram(token: "123:synthetic", allowedChatIDs: [-1002, -1001], botID: 44)
+
+        #expect(store.telegramToken() == "123:synthetic")
+        #expect(store.telegramAllowedChatIDs() == [-1001, -1002])
+        #expect(store.telegramBotID() == 44)
+        #expect(store.isTelegramConfigured)
+
+        store.removeTelegram()
+        #expect(!store.isTelegramConfigured)
+        #expect(store.telegramBotID() == nil)
+        #expect(keychain.count == 0)
+    }
+
+    @Test("allowlist не принимает частично ошибочную строку")
+    func telegramAllowlistParsingIsAllOrNothing() {
+        #expect(RussianTrackerStore.parseTelegramChatIDs("-1001, -1002\n-1003")
+                == [-1001, -1002, -1003])
+        #expect(RussianTrackerStore.parseTelegramChatIDs("-1001, не-id") == nil)
+        #expect(RussianTrackerStore.parseTelegramChatIDs("  ") == nil)
+    }
 }

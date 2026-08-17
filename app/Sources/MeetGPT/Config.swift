@@ -190,6 +190,8 @@ enum Config {
     }
     static var hubSpotClientID: String { Secrets.hubSpotClientID }
     static var hubSpotClientSecret: String { Secrets.hubSpotClientSecret }
+    static var asanaClientID: String { Secrets.asanaClientID }
+    static var asanaClientSecret: String { Secrets.asanaClientSecret }
     static var affinityClientID: String { Secrets.affinityClientID }
     static var affinityClientSecret: String { Secrets.affinityClientSecret }
     static var zoomClientID: String { Secrets.zoomClientID }
@@ -770,7 +772,7 @@ enum Config {
     }
 
     /// The scope version granted at the last successful Google connect. When it
-    /// is behind `GoogleAuth.scopeVersion`, Docs/Sheets access needs a reconnect.
+    /// is behind `GoogleAuth.scopeVersion`, Workspace access needs a reconnect.
     static var googleScopeVersion: Int {
         get { UserDefaults.standard.integer(forKey: "google.scopeVersion") }
         set { UserDefaults.standard.set(newValue, forKey: "google.scopeVersion") }
@@ -796,7 +798,7 @@ enum Config {
 
     /// Persisted Google OAuth tokens (access + refresh + expiry). Stored in the
     /// Keychain — like the Wheespr session — because the refresh token grants
-    /// durable Calendar/Docs/Sheets access and must never sit in a world-readable
+    /// durable Google Workspace access and must never sit in a world-readable
     /// UserDefaults plist.
     static var googleTokens: GoogleTokens? {
         get { credentialCache.googleTokens() }

@@ -185,6 +185,241 @@ struct RESTClientTests {
         }
     }
 
+    // MARK: Google Slides
+
+    @Test("Slides: reads visible text, tables and BODY speaker notes with auth")
+    func slidesSuccess() async throws {
+        let presentation: [String: Any] = [
+            "presentationId": "deck-1",
+            "title": "Project Atlas",
+            "slides": [[
+                "pageElements": [
+                    ["shape": ["text": ["textElements": [
+                        ["textRun": ["content": "Launch plan\n"]],
+                    ]]]],
+                    ["table": ["tableRows": [["tableCells": [
+                        ["text": ["textElements": [["textRun": ["content": "Owner"]]]]],
+                        ["text": ["textElements": [["textRun": ["content": "Mira"]]]]],
+                    ]]]]],
+                ],
+                "slideProperties": ["notesPage": ["pageElements": [
+                    ["shape": [
+                        "placeholder": ["type": "BODY"],
+                        "text": ["textElements": [[
+                            "textRun": ["content": "Confirm launch date with legal."]
+                        ]]],
+                    ]],
+                    ["shape": [
+                        "placeholder": ["type": "FOOTER"],
+                        "text": ["textElements": [["textRun": ["content": "PRIVATE FOOTER"]]]],
+                    ]],
+                ]]],
+            ]],
+        ]
+        try await withResponder({ _ in (200, json(presentation)) }) {
+            let out = try await GoogleSlidesService.read(
+                presentationID: "deck-1", accessToken: "slides-token",
+                session: RESTMockURLProtocol.session())
+            #expect(out.title == "Project Atlas")
+            #expect(out.text.contains("Слайд 1"))
+            #expect(out.text.contains("Launch plan"))
+            #expect(out.text.contains("Owner\tMira"))
+            #expect(out.text.contains("Заметки докладчика"))
+            #expect(out.text.contains("Confirm launch date with legal."))
+            #expect(!out.text.contains("PRIVATE FOOTER"))
+            let request = try #require(RESTMockURLProtocol.requests.first)
+            #expect(request.url?.path == "/v1/presentations/deck-1")
+            #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer slides-token")
+        }
+    }
+
+    @Test("Slides: provider errors and malformed success envelopes throw")
+    func slidesFailures() async throws {
+        try await withResponder({ _ in (403, Data(#"{"error":"scope"}"#.utf8)) }) {
+            await #expect(throws: (any Error).self) {
+                _ = try await GoogleSlidesService.read(
+                    presentationID: "deck", accessToken: "t",
+                    session: RESTMockURLProtocol.session())
+            }
+        }
+        try await withResponder({ _ in (200, json(["title": "missing id"])) }) {
+            await #expect(throws: (any Error).self) {
+                _ = try await GoogleSlidesService.read(
+                    presentationID: "deck", accessToken: "t",
+                    session: RESTMockURLProtocol.session())
+            }
+        }
+    }
+
+    // MARK: Google Forms
+
+    @Test("Forms: paginates bounded responses, maps question labels and omits email/file ids")
+    func formsPaginationAndRedaction() async throws {
+        let form: [String: Any] = [
+            "formId": "form-1",
+            "info": ["title": "Mentor feedback", "description": "Private feedback"],
+            "items": [
+                ["title": "What helped?", "questionItem": ["question": ["questionId": "q1"]]],
+                ["title": "Evidence", "questionItem": ["question": ["questionId": "q2"]]],
+            ],
+        ]
+        try await withResponder({ request in
+            guard request.url?.path.hasSuffix("/responses") == true else {
+                return (200, json(form))
+            }
+            let query = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems ?? []
+            if query.first(where: { $0.name == "pageToken" })?.value == "next-page" {
+                return (200, json(["responses": [[
+                    "lastSubmittedTime": "2026-08-16T11:00:00Z",
+                    "respondentEmail": "private@example.com",
+                    "answers": ["q2": ["fileUploadAnswers": ["answers": [[
+                        "fileId": "drive-secret-id", "fileName": "evidence.pdf",
+                        "mimeType": "application/pdf",
+                    ]]]]],
+                ]]]))
+            }
+            return (200, json([
+                "responses": [[
+                    "createTime": "2026-08-16T10:00:00Z",
+                    "answers": ["q1": ["textAnswers": ["answers": [[
+                        "value": "Weekly check-ins"
+                    ]]]]],
+                ]],
+                "nextPageToken": "next-page",
+            ]))
+        }) {
+            let out = try await GoogleFormsService.read(
+                formID: "form-1", accessToken: "forms-token", maxResponses: 2,
+                session: RESTMockURLProtocol.session())
+            #expect(out.title == "Mentor feedback")
+            #expect(out.text.contains("What helped?: Weekly check-ins"))
+            #expect(out.text.contains("Evidence: evidence.pdf"))
+            #expect(!out.text.contains("private@example.com"))
+            #expect(!out.text.contains("drive-secret-id"))
+            #expect(RESTMockURLProtocol.requests.count == 3)
+            for request in RESTMockURLProtocol.requests {
+                #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer forms-token")
+            }
+            let responseRequests = RESTMockURLProtocol.requests.filter {
+                $0.url?.path.hasSuffix("/responses") == true
+            }
+            #expect(responseRequests.count == 2)
+            let secondQuery = URLComponents(
+                url: try #require(responseRequests.last?.url),
+                resolvingAgainstBaseURL: false)?.queryItems
+            #expect(secondQuery?.first(where: { $0.name == "pageToken" })?.value == "next-page")
+        }
+    }
+
+    @Test("Forms: response and character caps are enforced")
+    func formsCaps() async throws {
+        #expect(GoogleFormsService.boundedResponseLimit(-1) == 0)
+        #expect(GoogleFormsService.boundedResponseLimit(999) == 500)
+        let form: [String: Any] = [
+            "formId": "form-1", "info": ["title": "Large form"],
+            "items": [[
+                "title": "Long answer",
+                "questionItem": ["question": ["questionId": "q1"]],
+            ]],
+        ]
+        try await withResponder({ request in
+            if request.url?.path.hasSuffix("/responses") == true {
+                return (200, json(["responses": [[
+                    "answers": ["q1": ["textAnswers": ["answers": [[
+                        "value": String(repeating: "x", count: 100_000)
+                    ]]]]],
+                ]]]))
+            }
+            return (200, json(form))
+        }) {
+            let out = try await GoogleFormsService.read(
+                formID: "form-1", accessToken: "t", maxResponses: 1,
+                session: RESTMockURLProtocol.session())
+            #expect(out.text.count == GoogleFormsService.maxTextCharacters)
+        }
+
+        // Zero is a real bound: read the form body but make no response request.
+        try await withResponder({ _ in (200, json(form)) }) {
+            _ = try await GoogleFormsService.read(
+                formID: "form-1", accessToken: "t", maxResponses: 0,
+                session: RESTMockURLProtocol.session())
+            #expect(RESTMockURLProtocol.requests.count == 1)
+        }
+    }
+
+    @Test("Forms: provider errors and malformed form envelopes throw")
+    func formsFailures() async throws {
+        try await withResponder({ _ in (401, Data(#"{"error":"unauthorized"}"#.utf8)) }) {
+            await #expect(throws: (any Error).self) {
+                _ = try await GoogleFormsService.read(
+                    formID: "form", accessToken: "t",
+                    session: RESTMockURLProtocol.session())
+            }
+        }
+        try await withResponder({ _ in (200, json(["formId": "form", "items": []])) }) {
+            await #expect(throws: (any Error).self) {
+                _ = try await GoogleFormsService.read(
+                    formID: "form", accessToken: "t",
+                    session: RESTMockURLProtocol.session())
+            }
+        }
+
+        let form: [String: Any] = ["formId": "form", "info": ["title": "Feedback"]]
+        try await withResponder({ request in
+            request.url?.path.hasSuffix("/responses") == true
+                ? (200, json(["responses": "not-an-array"]))
+                : (200, json(form))
+        }) {
+            await #expect(throws: (any Error).self) {
+                _ = try await GoogleFormsService.read(
+                    formID: "form", accessToken: "t",
+                    session: RESTMockURLProtocol.session())
+            }
+        }
+
+        try await withResponder({ request in
+            request.url?.path.hasSuffix("/responses") == true
+                ? (200, json(["responses": [], "nextPageToken": 42]))
+                : (200, json(form))
+        }) {
+            await #expect(throws: (any Error).self) {
+                _ = try await GoogleFormsService.read(
+                    formID: "form", accessToken: "t",
+                    session: RESTMockURLProtocol.session())
+            }
+        }
+    }
+
+    @Test("Forms: follows a valid next token even after an empty page")
+    func formsEmptyIntermediatePage() async throws {
+        let form: [String: Any] = [
+            "formId": "form", "info": ["title": "Feedback"],
+            "items": [[
+                "title": "Comment",
+                "questionItem": ["question": ["questionId": "q1"]],
+            ]],
+        ]
+        try await withResponder({ request in
+            guard request.url?.path.hasSuffix("/responses") == true else {
+                return (200, json(form))
+            }
+            let token = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?
+                .queryItems?.first(where: { $0.name == "pageToken" })?.value
+            if token == "second" {
+                return (200, json(["responses": [[
+                    "answers": ["q1": ["textAnswers": ["answers": [["value": "Found"]]]]],
+                ]]]))
+            }
+            return (200, json(["responses": [], "nextPageToken": "second"]))
+        }) {
+            let out = try await GoogleFormsService.read(
+                formID: "form", accessToken: "t", maxResponses: 1,
+                session: RESTMockURLProtocol.session())
+            #expect(out.text.contains("Comment: Found"))
+            #expect(RESTMockURLProtocol.requests.count == 3)
+        }
+    }
+
     // MARK: Google Workspace workflow search
 
     @Test("Workspace search is inert while its scope is withdrawn")

@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import MCP
 @testable import MeetGPT
 
 /// The built-in MCP catalog is a hand-curated list of hosted work-app servers,
@@ -10,7 +11,7 @@ struct MCPCatalogTests {
     // Analytics (posthog / amplitude / mixpanel) live-probed 2026-07: 401 +
     // WWW-Authenticate with resource_metadata, PKCE S256, open DCR — so they
     // belong in builtIn rather than the credential-gated pre-registered lane.
-    private let expectedBuiltInIDs = ["notion", "fireflies", "linear", "asana",
+    private let expectedBuiltInIDs = ["notion", "fireflies", "linear",
                                       "atlassian", "intercom", "sentry", "zapier", "attio",
                                       "posthog", "amplitude", "mixpanel"]
 
@@ -25,7 +26,7 @@ struct MCPCatalogTests {
         "notion": .init(endpoint: "https://mcp.notion.com/mcp", registration: .dynamicClientRegistration),
         "fireflies": .init(endpoint: "https://api.fireflies.ai/mcp", registration: .dynamicClientRegistration),
         "linear": .init(endpoint: "https://mcp.linear.app/mcp", registration: .dynamicClientRegistration),
-        "asana": .init(endpoint: "https://mcp.asana.com/mcp", registration: .dynamicClientRegistration),
+        "asana": .init(endpoint: "https://mcp.asana.com/v2/mcp", registration: .preRegistered(loopbackPort: 52703)),
         "atlassian": .init(endpoint: "https://mcp.atlassian.com/v1/mcp/authv2", registration: .dynamicClientRegistration),
         "intercom": .init(endpoint: "https://mcp.intercom.com/mcp", registration: .dynamicClientRegistration),
         "sentry": .init(endpoint: "https://mcp.sentry.dev/mcp", registration: .dynamicClientRegistration),
@@ -132,11 +133,12 @@ struct MCPCatalogTests {
 
     @Test("pre-registered servers are gated on Config credentials")
     func preRegisteredGating() {
-        // The pre-registered apps (HubSpot, Affinity, Zoom, Gmail, Google
-        // Analytics) only surface
+        // The pre-registered apps (Asana, HubSpot, Affinity, Zoom, Gmail,
+        // Google Analytics) only surface
         // when their client credentials are baked into the build. In the
         // default build (empty Secrets) the list is empty.
-        let credsPresent = !Config.hubSpotClientID.isEmpty && !Config.hubSpotClientSecret.isEmpty
+        let credsPresent = !Config.asanaClientID.isEmpty && !Config.asanaClientSecret.isEmpty
+            || !Config.hubSpotClientID.isEmpty && !Config.hubSpotClientSecret.isEmpty
             || !Config.affinityClientID.isEmpty && !Config.affinityClientSecret.isEmpty
             || !Config.zoomClientID.isEmpty && !Config.zoomClientSecret.isEmpty
             || !Config.gmailClientID.isEmpty && !Config.gmailClientSecret.isEmpty
@@ -147,6 +149,41 @@ struct MCPCatalogTests {
         } else {
             #expect(!MCPCatalog.preRegistered.isEmpty)
         }
+    }
+
+    @Test("Asana V2 is credential-gated and pins its OAuth audience")
+    @MainActor
+    func asanaV2Contract() {
+        let hasCreds = !Config.asanaClientID.isEmpty && !Config.asanaClientSecret.isEmpty
+        if !hasCreds {
+            #expect(MCPCatalog.asana == nil)
+        } else {
+            #expect(MCPCatalog.asana?.id == "asana")
+            #expect(MCPCatalog.asana?.fixedLoopbackPort == 52703)
+        }
+        #expect(MCPConnectionManager.tokenStorageID(for: "asana") == "asana-v2")
+        #expect(MCPConnectionManager.oauthEndpointOverrides(for: "asana").resource?.absoluteString
+                == "https://mcp.asana.com/v2")
+        #expect(MCPConnectionManager.oauthEndpointOverrides(for: "linear").resource == nil)
+    }
+
+    @Test("Asana research prefers universal task search on every workspace tier")
+    @MainActor
+    func asanaSearchContract() throws {
+        #expect(MCPConnectionManager.searchToolPreferences["asana"]?.first == "search_objects")
+        let properties: Value = .object([
+            "query": .object(["type": .string("string")]),
+            "resource_type": .object(["type": .string("string")]),
+            "limit": .object(["type": .string("integer")]),
+        ])
+        let tool = Tool(
+            name: "search_objects", description: nil,
+            inputSchema: .object(["properties": properties]))
+        let args = try #require(MCPConnectionManager.researchArguments(
+            tool: tool, serverID: "asana", query: "launch"))
+        #expect(args["query"] == .string("launch"))
+        #expect(args["resource_type"] == .string("task"))
+        #expect(args["limit"] == .int(3))
     }
 
     @Test("hubSpot descriptor is nil without both credentials")

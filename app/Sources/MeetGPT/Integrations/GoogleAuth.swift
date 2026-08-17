@@ -2,9 +2,9 @@ import CryptoKit
 import Foundation
 
 /// The Google services MeetGPT can be authorized for — user-selectable in
-/// Settings, each mapping to one read-only OAuth scope.
+/// Settings, each mapping to the narrow scopes needed for that surface.
 enum GoogleService: String, CaseIterable, Identifiable {
-    case calendar, docs, sheets, drive
+    case calendar, docs, sheets, slides, forms, drive
 
     var id: String { rawValue }
 
@@ -20,6 +20,8 @@ enum GoogleService: String, CaseIterable, Identifiable {
         case .calendar: return "Calendar"
         case .docs:     return "Docs"
         case .sheets:   return "Sheets"
+        case .slides:   return "Slides"
+        case .forms:    return "Forms + ответы"
         case .drive:    return "Drive"
         }
     }
@@ -49,6 +51,18 @@ enum GoogleService: String, CaseIterable, Identifiable {
                 // `.../auth/spreadsheets`: creating a sheet needs no access to
                 // the ones the user already has.
                 "https://www.googleapis.com/auth/drive.file",
+            ]
+        case .slides:
+            // Explicit-link import only. This scope reads a presentation by ID
+            // but cannot enumerate or search the user's Drive.
+            return ["https://www.googleapis.com/auth/presentations.readonly"]
+        case .forms:
+            // A pasted editor/form ID supplies the boundary. Body covers the
+            // question labels; responses is separate because answer data can
+            // contain personal or otherwise sensitive information.
+            return [
+                "https://www.googleapis.com/auth/forms.body.readonly",
+                "https://www.googleapis.com/auth/forms.responses.readonly",
             ]
         case .drive:
             // WITHDRAWN for the verification submission, not deleted.
@@ -97,6 +111,7 @@ enum GoogleAuthError: LocalizedError {
     case missingClientID
     case missingClientSecret
     case badClientID
+    case noServicesSelected
     case cancelled
     case noCode
     case stateMismatch
@@ -109,13 +124,14 @@ enum GoogleAuthError: LocalizedError {
         case .missingClientID: return "Add GOOGLE_CLIENT_ID for the Google Desktop OAuth client and rebuild Cruxwing."
         case .missingClientSecret: return "Add GOOGLE_CLIENT_SECRET for the same Google Desktop OAuth client and rebuild Cruxwing."
         case .badClientID:     return "That doesn't look like a Google OAuth client ID."
+        case .noServicesSelected: return "Select at least one Google Workspace service before connecting."
         case .cancelled:       return "Google sign-in was cancelled."
         case .noCode:          return "Google didn't return an authorization code."
         case .stateMismatch:   return "Google sign-in could not be verified (state mismatch). Please try again."
         case .server(let code, let desc):
             return desc.map { "Google: \($0)" } ?? "Google auth error: \(code)"
         case .http(let code):  return "Google auth responded \(code)."
-        case .notConnected:    return "Connect Google Calendar first."
+        case .notConnected:    return "Connect Google Workspace first."
         }
     }
 }
@@ -134,13 +150,19 @@ final class GoogleAuth {
     /// Settings (granular authorization: a disabled service is excluded from
     /// the grant itself, so the token can't touch it — enforced by Google).
     static var scope: String {
-        let enabled = Config.googleEnabledServices
+        scope(for: Config.googleEnabledServices).joined(separator: " ")
+    }
+
+    /// Pure catalog projection so an empty user selection stays empty. An older
+    /// fallback silently requested Calendar when every switch was off, granting
+    /// access the user had explicitly declined.
+    nonisolated static func scope(for enabled: Set<String>) -> [String] {
         let services = GoogleService.requestable.filter { enabled.contains($0.rawValue) }
         var scopes: [String] = []
-        for service in (services.isEmpty ? [GoogleService.calendar] : services) {
+        for service in services {
             for scope in service.scopeURLs where !scopes.contains(scope) { scopes.append(scope) }
         }
-        return scopes.joined(separator: " ")
+        return scopes
     }
 
     /// Increment whenever the scope CATALOG gains a scope. Grants below this
@@ -158,7 +180,9 @@ final class GoogleAuth {
     ///     (drive.readonly) and drive.metadata.readonly from Docs and Sheets.
     ///     The bump matters twice over here: a v5 token still HOLDS the
     ///     restricted scope, and re-consenting is what actually drops it.
-    static let scopeVersion = 6
+    /// v7: added explicit-link Slides reads and explicit-link Forms schema +
+    ///     response reads. No Drive discovery scope was added.
+    static let scopeVersion = 7
 
     private static let authEndpoint = "https://accounts.google.com/o/oauth2/v2/auth"
     private static let tokenEndpoint = "https://oauth2.googleapis.com/token"
@@ -176,6 +200,8 @@ final class GoogleAuth {
         let prefix = clientID.replacingOccurrences(of: ".apps.googleusercontent.com", with: "")
         guard !prefix.isEmpty else { throw GoogleAuthError.badClientID }
         guard !clientSecret.isEmpty else { throw GoogleAuthError.missingClientSecret }
+        let requestedScope = Self.scope
+        guard !requestedScope.isEmpty else { throw GoogleAuthError.noServicesSelected }
 
         let port = UInt16.random(in: 49500...64500)
         let redirectURI = "http://127.0.0.1:\(port)/callback"
@@ -188,7 +214,7 @@ final class GoogleAuth {
             .init(name: "client_id", value: clientID),
             .init(name: "redirect_uri", value: redirectURI),
             .init(name: "response_type", value: "code"),
-            .init(name: "scope", value: Self.scope),
+            .init(name: "scope", value: requestedScope),
             .init(name: "code_challenge", value: challenge),
             .init(name: "code_challenge_method", value: "S256"),
             .init(name: "state", value: state),
@@ -330,9 +356,9 @@ final class GoogleAuth {
     }
 
     /// Convert Google's space-delimited granted-scope response into the service
-    /// ids used by workflow routing. Docs and Sheets each require both their
-    /// content scope and Drive metadata scope, so a partial grant is not treated
-    /// as a usable workflow connection.
+    /// ids used by workflow routing. Compound services (Docs/Sheets need the
+    /// app-file creation scope; Forms needs body + response reads) count only
+    /// when every required scope was actually granted.
     nonisolated static func servicesGranted(by scope: String?) -> Set<String> {
         let scopes = Set((scope ?? "").split(whereSeparator: \Character.isWhitespace).map(String.init))
         // `requestable`, not `allCases`: a withdrawn service has no scopes, and

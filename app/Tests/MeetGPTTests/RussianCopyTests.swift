@@ -250,7 +250,7 @@ struct RussianCopyTests {
     ///
     /// Их две, и каждая — не недоделка перевода:
     ///
-    /// - `Google Calendar` — имя продукта, по-русски его не называют;
+    /// - `Google Workspace` — имя продукта, по-русски его не называют;
     /// - `orakul, RICE, ARR, Kubernetes…` — пример перечисления терминов.
     ///
     /// Было восемь: пять строк вида `platform.openai.com → API keys` уехали к
@@ -262,7 +262,7 @@ struct RussianCopyTests {
     /// Поэтому число проверяется на равенство: и рост, и «улучшение»
     /// переводом требуют объяснения.
     static let deliberateEnglish: Set<String> = [
-        "Google Calendar",
+        "Google Workspace",
         "orakul, RICE, ARR, Kubernetes…",
     ]
 
@@ -566,15 +566,16 @@ struct RussianCopyTests {
             "anthropic", "claude", "gpt", "gemini", "deepseek", "qwen", "zhipu",
             "moonshot", "kimi", "glm", "mcp", "oauth", "api", "http", "https",
             // Мессенджеры: марки сервисов, а не забытый перевод.
-            "mattermost", "rocket", "chat", "telegram", "teams", "bot", "pachca",
+            "mattermost", "rocket", "chat", "telegram", "teams", "bot", "botfather", "pachca",
             "gitlab", "gitea", "forgejo", "zulip",
-            "redmine", "outline", "settings", "tokens", "teamly",
+            "redmine", "outline", "settings", "tokens", "teamly", "app",
             "matrix", "element",
             "json", "url", "pdf", "mac", "macos", "kaiten", "yougile",
             "weeek", "pyrus", "slack", "confluence", "hubspot", "attio", "sentry",
             "posthog", "amplitude", "mixpanel", "intercom", "zoom", "atlassian",
             "env", "wasapi", "screencapturekit", "llm", "sberjazz",
             "trueconf", "doc", "sheet", "drive", "calendar", "docs", "sheets",
+            "workspace", "slides", "forms",
             "org", "base", "small", "medium", "large", "tiny", "auto",
             // Имена и торговые марки, которые по-русски так и пишутся.
             "apple", "crm", "salesforce", "affinity", "chatgpt", "cursor",

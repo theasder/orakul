@@ -28,7 +28,7 @@ struct WorkMessengersTests {
     private static let pachcaJSON = """
     {"data": [{"id": 1, "chat_id": 7, "content": "Про тарифы решили в пятницу",
                "user_id": 42, "created_at": "2026-08-12T10:00:00Z"}],
-     "meta": {"count": 1}}
+     "meta": {"total": 1, "paginate": {"next_page": ""}}}
     """
 
     @Test("Пачка ищет по всем чатам и кладёт токен в заголовок")
@@ -40,6 +40,8 @@ struct WorkMessengersTests {
         let url = try #require(recorder.last?.url?.absoluteString)
         #expect(url.hasPrefix("https://api.pachca.com/api/shared/v1/search/messages"))
         #expect(url.contains("query="))
+        #expect(url.contains("sort=created_at"))
+        #expect(url.contains("order=desc"))
         #expect(recorder.last?.value(forHTTPHeaderField: "Authorization")
                 == "Bearer tok-synthetic")
         // Адрес сервера у Пачки не спрашивается: облако одно.
@@ -197,14 +199,18 @@ struct WorkMessengersTests {
         #expect(recorder.count == 0, "ушёл запрос при неполной настройке")
     }
 
-    @Test("401 и 403 читаются как неподходящий токен")
+    @Test("401 означает неподходящий токен, а 403 — недостающее право поиска")
     func unauthorisedIsRecognised() async {
-        for status in [401, 403] {
-            let (http, _) = stub(status: status, json: "{}")
-            await #expect(throws: WorkMessengers.ConnectorError.unauthorised) {
-                try await WorkMessengers(service: .pachca, token: "t", http: http).search("q")
-            }
+        let (unauthorised, _) = stub(status: 401, json: "{}")
+        await #expect(throws: WorkMessengers.ConnectorError.unauthorised) {
+            try await WorkMessengers(service: .pachca, token: "t", http: unauthorised).search("q")
         }
+        let (forbidden, _) = stub(status: 403, json: "{}")
+        await #expect(throws: WorkMessengers.ConnectorError.missingScope("search:messages")) {
+            try await WorkMessengers(service: .pachca, token: "t", http: forbidden).search("q")
+        }
+        #expect(WorkMessengers.ConnectorError.missingScope("search:messages")
+            .localizedDescription.contains("search:messages"))
     }
 
     @Test("ошибка сервиса не выдаётся за пустую выдачу")

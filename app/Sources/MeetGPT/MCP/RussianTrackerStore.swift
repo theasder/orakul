@@ -371,6 +371,65 @@ struct RussianTrackerStore: Sendable {
         return client.isConfigured ? client : nil
     }
 
+    // MARK: - Telegram supergroups
+    // Telegram differs from the search APIs above: Bot API delivers only new
+    // updates, so the app archives and searches them locally. Credentials still
+    // belong beside the other messenger credentials in Keychain.
+
+    private var telegramTokenAccount: String { "messenger.telegram.token" }
+    private var telegramChatIDsAccount: String { "messenger.telegram.chatIDs" }
+    private var telegramBotIDAccount: String { "messenger.telegram.botID" }
+
+    func telegramToken() -> String? {
+        guard let data = store.get(telegramTokenAccount),
+              let token = String(data: data, encoding: .utf8),
+              !token.isEmpty else { return nil }
+        return token
+    }
+
+    func telegramAllowedChatIDs() -> Set<Int64> {
+        guard let data = store.get(telegramChatIDsAccount),
+              let value = String(data: data, encoding: .utf8) else { return [] }
+        return Self.parseTelegramChatIDs(value) ?? []
+    }
+
+    func telegramBotID() -> Int64? {
+        guard let data = store.get(telegramBotIDAccount),
+              let value = String(data: data, encoding: .utf8) else { return nil }
+        return Int64(value)
+    }
+
+    static func parseTelegramChatIDs(_ value: String) -> Set<Int64>? {
+        let parts = value.split { character in
+            character == "," || character == ";" || character.isWhitespace
+        }
+        guard !parts.isEmpty else { return nil }
+        let ids = parts.compactMap { Int64($0) }
+        guard ids.count == parts.count else { return nil }
+        return Set(ids)
+    }
+
+    func setTelegram(token: String, allowedChatIDs: Set<Int64>, botID: Int64) {
+        let trimmed = token.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !allowedChatIDs.isEmpty else {
+            return removeTelegram()
+        }
+        store.set(Data(trimmed.utf8), for: telegramTokenAccount)
+        let ids = allowedChatIDs.sorted().map(String.init).joined(separator: ",")
+        store.set(Data(ids.utf8), for: telegramChatIDsAccount)
+        store.set(Data(String(botID).utf8), for: telegramBotIDAccount)
+    }
+
+    var isTelegramConfigured: Bool {
+        telegramToken() != nil && !telegramAllowedChatIDs().isEmpty && telegramBotID() != nil
+    }
+
+    func removeTelegram() {
+        store.delete(telegramTokenAccount)
+        store.delete(telegramChatIDsAccount)
+        store.delete(telegramBotIDAccount)
+    }
+
     func githubClient(http: @escaping GitHubConnector.HTTP) -> GitHubConnector? {
         guard let token = githubToken(), !githubRepositories().isEmpty else { return nil }
         return GitHubConnector(token: token, repositories: githubRepositories(), http: http)

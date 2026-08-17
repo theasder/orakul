@@ -177,6 +177,10 @@ final class MCPConnectionManager: ObservableObject {
     /// server/DCR registration. Version its Keychain namespace so an upgraded
     /// app never attempts the first request with an incompatible old client id.
     static let atlassianTokenStorageID = "atlassian-authv2"
+    /// V1 tokens and dynamically registered client ids are not valid against
+    /// Asana's pre-registered V2 server. A versioned namespace prevents a stale
+    /// legacy token from being sent before the new OAuth flow can start.
+    static let asanaTokenStorageID = "asana-v2"
 
     enum ConnectionState: Equatable {
         case disconnected
@@ -263,6 +267,9 @@ final class MCPConnectionManager: ObservableObject {
     let selfHostedHTTP: SelfHostedTrackers.HTTP
     /// Сеть для базы знаний.
     let notesHTTP: TeamNotes.HTTP
+    /// Telegram is prospective-only: this actor long-polls new Bot API updates
+    /// and searches the durable local archive. It has no write methods.
+    let telegramSource: TelegramSupergroupSource
 
     init(tokenStore: KeychainStore = SystemKeychain.shared,
          deferTokenStoreAccess: Bool? = nil,
@@ -274,7 +281,9 @@ final class MCPConnectionManager: ObservableObject {
          trackerHTTP: RussianTrackers.HTTP? = nil,
          messengerHTTP: WorkMessengers.HTTP? = nil,
          selfHostedHTTP: SelfHostedTrackers.HTTP? = nil,
-         notesHTTP: TeamNotes.HTTP? = nil) {
+         notesHTTP: TeamNotes.HTTP? = nil,
+         telegramHTTP: TelegramSupergroups.HTTP? = nil,
+         telegramArchive: TelegramMessageArchive? = nil) {
         let customServers = Self.loadCustomServers()
         self.customServers = customServers
         self.tokenStore = tokenStore
@@ -284,6 +293,9 @@ final class MCPConnectionManager: ObservableObject {
         self.messengerHTTP = messengerHTTP ?? WorkMessengers.live
         self.selfHostedHTTP = selfHostedHTTP ?? SelfHostedTrackers.live
         self.notesHTTP = notesHTTP ?? TeamNotes.live
+        self.telegramSource = TelegramSupergroupSource(
+            archive: telegramArchive ?? .shared,
+            http: telegramHTTP ?? TelegramSupergroups.live)
         self.defersTokenStoreAccess = deferTokenStoreAccess ?? (tokenStore is SystemKeychain)
         self.notificationCenter = notificationCenter
         self.connectionAttemptOverride = connectionAttemptOverride
@@ -307,6 +319,8 @@ final class MCPConnectionManager: ObservableObject {
         if let accountContextObserver {
             notificationCenter.removeObserver(accountContextObserver)
         }
+        let source = telegramSource
+        Task { await source.stop() }
     }
 
     /// Restore cached OAuth badges after the first window exists. The Keychain
@@ -369,6 +383,53 @@ final class MCPConnectionManager: ObservableObject {
         let changed = restoredIDs != authorizedServerIDs
         authorizedServerIDs = restoredIDs
         if changed { capabilityRevision &+= 1 }
+
+        // Unlike request-time search connectors, Telegram must keep ingesting
+        // while the app is open or those updates will eventually expire at the
+        // Bot API. Startup begins only after the deferred Keychain restore.
+        if let token = trackerStore.telegramToken() {
+            let chatIDs = trackerStore.telegramAllowedChatIDs()
+            if !chatIDs.isEmpty {
+                try? await telegramSource.start(
+                    token: token, allowedChatIDs: chatIDs,
+                    botID: trackerStore.telegramBotID())
+            }
+        }
+    }
+
+    @discardableResult
+    func connectTelegram(token: String, allowedChatIDs: Set<Int64>) async throws
+        -> TelegramSupergroups.Bot {
+        let bot = try await telegramSource.validate(
+            token: token, allowedChatIDs: allowedChatIDs)
+        try await telegramSource.start(
+            token: token, allowedChatIDs: allowedChatIDs, botID: bot.id)
+        trackerStore.setTelegram(
+            token: token, allowedChatIDs: allowedChatIDs, botID: bot.id)
+        return bot
+    }
+
+    func disconnectTelegram() async throws {
+        // Erasure is the privacy boundary promised by the Settings UI. Keep the
+        // credential until it succeeds, so a filesystem error is observable and
+        // the user can retry instead of seeing a false "disconnected" state
+        // while plaintext messages remain on disk.
+        let token = trackerStore.telegramToken()
+        let chatIDs = trackerStore.telegramAllowedChatIDs()
+        let botID = trackerStore.telegramBotID()
+        do {
+            try await telegramSource.disconnectAndEraseArchive()
+        } catch {
+            // Disconnect stopped polling before attempting the erase. If the
+            // archive could not be removed, restore the still-configured source
+            // so the badge and runtime state continue to agree.
+            if let token, !chatIDs.isEmpty {
+                try? await telegramSource.start(
+                    token: token, allowedChatIDs: chatIDs, botID: botID)
+            }
+            throw error
+        }
+        trackerStore.removeTelegram()
     }
 
     /// Catalog (+ pre-registered apps whose credentials are configured) +
@@ -845,6 +906,11 @@ final class MCPConnectionManager: ObservableObject {
         let oauth = OAuthConfiguration(
             grantType: .authorizationCode,
             authentication: authentication,
+            // Asana documents `https://mcp.asana.com/v2` as its RFC 8707
+            // resource indicator even though the transport endpoint appends
+            // `/mcp`. The SDK then carries this value through authorization,
+            // code exchange, refresh and scope-step-up requests.
+            endpointOverrides: Self.oauthEndpointOverrides(for: server.id),
             authorizationRedirectURI: URL(string: "http://127.0.0.1:\(port)/callback")!,
             clientName: "Cruxwing",
             authorizationDelegate: LoopbackAuthDelegate(
@@ -877,7 +943,18 @@ final class MCPConnectionManager: ObservableObject {
     }
 
     static func tokenStorageID(for serverID: String) -> String {
-        serverID == "atlassian" ? atlassianTokenStorageID : serverID
+        switch serverID {
+        case "atlassian": return atlassianTokenStorageID
+        case "asana": return asanaTokenStorageID
+        default: return serverID
+        }
+    }
+
+    /// Vendor-specific discovery overrides kept pure so catalog tests can pin
+    /// the OAuth audience without starting a browser flow.
+    static func oauthEndpointOverrides(for serverID: String) -> OAuthConfiguration.EndpointOverrides {
+        guard serverID == "asana" else { return .none }
+        return .init(resource: URL(string: "https://mcp.asana.com/v2"))
     }
 
     private func setAuthorized(_ isAuthorized: Bool, serverID: String) {

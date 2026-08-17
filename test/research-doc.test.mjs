@@ -424,11 +424,12 @@ describe('RESEARCH-AND-PLAN', () => {
 
   test('keeps the dead ends recorded, with the date they were checked', () => {
     // The doc's real value is that impossible things stay recorded as
-    // impossible — Pyrus, WEEEK, Telegram history, keyless GitHub OAuth.
+    // impossible — Pyrus, Telegram *history*, keyless GitHub OAuth. WEEEK is
+    // deliberately absent from this list because its public API unblocked it.
     // Without that, each one gets re-attempted by the next person. Dates
     // matter because "we checked" ages, and the reader deserves to know how
     // old the check is.
-    for (const deadEnd of [/Pyrus/, /WEEEK/, /Telegram/, /GitHub/, /Мегаплан/, /GigaChat/]) {
+    for (const deadEnd of [/Pyrus/, /Telegram/, /GitHub/, /Мегаплан/, /GigaChat/]) {
       assert.match(doc, deadEnd, 'a researched dead end vanished from the doc');
     }
 

@@ -706,7 +706,7 @@ private struct ConnectedAppsTab: View {
                 // «заводили ли задачу», а «обсуждали ли это». Ответ на второй
                 // чаще лежит в переписке, чем в трекере.
                 SettingsSection(title: "Рабочие мессенджеры",
-                                caption: "Пачка, Mattermost и Rocket.Chat умеют искать по сообщениям, и orakul спрашивает их по ходу звонка. Подключение по токену, как у трекеров. Telegram и VK Teams сюда добавить нельзя: их Bot API не отдаёт историю чата и не ищет по ней.") {
+                                caption: "Пачка, Mattermost и Rocket.Chat умеют искать по сообщениям. Telegram подключается отдельным ботом: старую историю Bot API не отдаёт, поэтому orakul локально архивирует и ищет только новые сообщения после подключения.") {
                     WorkMessengersSection()
                 }
 
@@ -1100,8 +1100,8 @@ private struct GoogleSignInRow: View {
         VStack(alignment: .leading, spacing: Space.s) {
             HStack(spacing: Space.s) {
                 VStack(alignment: .leading, spacing: Space.xxs) {
-                    Label(state.googleConnected ? "Google Календарь подключён" : "Google Calendar",
-                          systemImage: state.googleConnected ? "checkmark.seal.fill" : "calendar")
+                    Label(state.googleConnected ? "Google Workspace подключён" : "Google Workspace",
+                          systemImage: state.googleConnected ? "checkmark.seal.fill" : "square.grid.2x2")
                         .labelStyle(SettingLabelStyle())
                     if state.googleConnected {
                         let count = state.promptWorkflowCount(usingSourcePrefix: "google:")
@@ -1138,7 +1138,7 @@ private struct GoogleSignInRow: View {
             GoogleServiceToggles()
 
             if !state.hasGoogleClientID {
-                Text("Добавьте GOOGLE_CLIENT_ID в mac/.env и пересоберите orakul.")
+                Text("Добавьте GOOGLE_CLIENT_ID в app/.env и пересоберите orakul.")
                     .font(Typo.caption).foregroundStyle(Theme.inkTertiary)
             } else if !state.hasGoogleClientSecret {
                 Text("Добавьте GOOGLE_CLIENT_SECRET для того же клиента Google Desktop OAuth и пересоберите orakul.")
@@ -1169,7 +1169,8 @@ private struct GoogleServiceToggles: View {
     @State private var enabled = Config.googleEnabledServices
 
     var body: some View {
-        HStack(spacing: Space.l) {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 112), alignment: .leading)],
+                  alignment: .leading, spacing: Space.s) {
             ForEach(GoogleService.requestable) { service in
                 Toggle(service.label, isOn: Binding(
                     get: { enabled.contains(service.rawValue) },
@@ -1183,7 +1184,6 @@ private struct GoogleServiceToggles: View {
                 .font(Typo.caption)
                 .accessibilityIdentifier("settings.connected.google.service.\(service.rawValue)")
             }
-            Spacer()
         }
         .padding(.horizontal, Space.m)
         .padding(.vertical, 6)

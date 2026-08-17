@@ -65,10 +65,19 @@ struct CallDetectorWindowOwnerTests {
 
     @Test("a native meeting client is still detected", arguments: [
         "us.zoom.xos", "com.microsoft.teams2", "com.webex.meetingmanager",
+        "org.jitsi.jitsi-meet",
     ])
     func nativeClientsStillDetected(bundleID: String) {
         #expect(CallDetector.callLabel(forWindowTitle: "Zoom Meeting",
                                        ownerBundleID: bundleID) != nil)
+    }
+
+    @Test("the official Jitsi desktop owner can host its Jitsi Meet window")
+    func jitsiDesktopWindow() {
+        let match = CallDetector.callLabel(
+            forWindowTitle: "Jitsi Meet — Daily sync",
+            ownerBundleID: "org.jitsi.jitsi-meet")
+        #expect(match?.label == "Jitsi")
     }
 
     // MARK: - The default for anything else

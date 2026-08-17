@@ -148,6 +148,13 @@ extension MCPConnectionManager {
                     .joined(separator: " "),
                 strongFor: ConnectorProbeStrategy.trackerProbe.strongFor)
         }
+        let telegramReady = includeTeam && trackerStore.isTelegramConfigured
+        let telegramCandidates: [GroundingContextPolicy.SourceCandidate] = telegramReady
+            ? [GroundingContextPolicy.SourceCandidate(
+                id: "messenger:telegram",
+                searchableText: "telegram телеграм супергруппа чат сообщения переписка обсуждали писали",
+                strongFor: ConnectorProbeStrategy.trackerProbe.strongFor)]
+            : []
 
         // Открытые трекеры на своём сервере — тот же вопрос, что у GitHub,
         // только адрес свой.
@@ -184,7 +191,7 @@ extension MCPConnectionManager {
                 strongFor: probe?.strongFor ?? [])
         }
         let selected = GroundingContextPolicy.selectSources(
-            trackerCandidates + githubCandidates + messengerCandidates
+            trackerCandidates + githubCandidates + messengerCandidates + telegramCandidates
                 + selfHostedCandidates + notesCandidates + mcpCandidates + teamCandidates,
             query: goal,
             tier: Config.currentTier,
@@ -232,8 +239,10 @@ extension MCPConnectionManager {
             return allNotes.first { $0.rawValue == id }
         }
         let githubSelected = selected.contains { $0.id == "github" }
+        let telegramSelected = selected.contains { $0.id == "messenger:telegram" }
         guard !targets.isEmpty || !teamServices.isEmpty || !trackerServices.isEmpty
                 || githubSelected || !messengerServices.isEmpty
+                || telegramSelected
                 || !selfHostedServices.isEmpty || !notesServices.isEmpty
         else { return [] }
         // Тип результата закрытия проставлен явно. Без него компилятор
@@ -389,6 +398,38 @@ extension MCPConnectionManager {
                         readFor: ConnectorProbeStrategy.trackerProbe.readFor))
                 }
             }
+            if telegramSelected,
+               let token = trackerStore.telegramToken() {
+                let chatIDs = trackerStore.telegramAllowedChatIDs()
+                let botID = trackerStore.telegramBotID()
+                let source = telegramSource
+                var index: Int = targets.count
+                index += teamServices.count
+                index += trackerServices.count
+                index += githubCount
+                index += messengerServices.count
+                index += selfHostedServices.count
+                index += notesServices.count
+                group.addTask {
+                    try? await source.ensureStarted(
+                        token: token, allowedChatIDs: chatIDs,
+                        botID: botID)
+                    let query = ConnectorProbeStrategy.query(goal: goal, serverID: "telegram")
+                    let hits = await source.search(query, limit: 10)
+                    guard !hits.isEmpty else { return (index, nil) }
+                    let text = hits.map { hit in
+                        let topic = hit.message.topicID.map { " · тема \($0)" } ?? ""
+                        let author = hit.message.author.map { "[\($0)] " } ?? ""
+                        return "[\(hit.message.chatTitle)\(topic)] \(author)\(hit.message.text)"
+                    }
+                    .joined(separator: "\n")
+                    .prefix(maxCharsPerSource).description
+                    return (index, GroundingSnippet(
+                        serverName: "Telegram", toolName: "local_archive_search",
+                        text: text, sourceID: "messenger:telegram",
+                        readFor: ConnectorProbeStrategy.trackerProbe.readFor))
+                }
+            }
             if githubSelected {
                 let index: Int = targets.count + teamServices.count + trackerServices.count
                 let store = trackerStore
@@ -431,9 +472,12 @@ extension MCPConnectionManager {
 
     /// Known-good search tools per catalog server; anything else falls back to
     /// the first tool whose name contains "search".
-    private static let searchToolPreferences: [String: [String]] = [
+    static let searchToolPreferences: [String: [String]] = [
         "notion": ["notion-search"],
         "fireflies": ["fireflies_get_transcripts", "fireflies_search"],
+        // Asana V2's universal search works for every workspace tier; the more
+        // specific search_tasks tool requires a Premium workspace.
+        "asana": ["search_objects", "search_tasks"],
         // Not optional for Gmail. `list_drafts` also exposes a `query`
         // argument and is listed BEFORE `search_threads`, so the generic
         // readable-tool fallback picks it and researches the user's own
@@ -457,15 +501,9 @@ extension MCPConnectionManager {
         // The goal rides in whichever string property the schema declares — but
         // biased per connector. Sending the raw goal to every server asked a bug
         // tracker and a CRM the same question and got a generic answer from both.
-        guard let key = tool.stringArgumentKey(
-            preferring: ["query", "keyword", "q", "search", "term", "text"]) else { return nil }
         let query = ConnectorProbeStrategy.query(goal: goal, serverID: server.id)
-        var arguments: [String: Value] = [key: .string(query)]
-        // Schema-driven extras (verified live on Fireflies): cap results, search
-        // titles+content, and prefer the compact JSON shape.
-        if tool.hasArgument("limit") { arguments["limit"] = .int(3) }
-        if tool.hasArgument("scope") { arguments["scope"] = .string("all") }
-        if tool.hasArgument("format") { arguments["format"] = .string("json") }
+        guard let arguments = Self.researchArguments(
+            tool: tool, serverID: server.id, query: query) else { return nil }
 
         let sourceID = "mcp:\(server.id)"
         let breakerID = "\(cacheScope)|\(server.id)"
@@ -544,6 +582,28 @@ extension MCPConnectionManager {
         await groundingCache.store(cacheKey, text: text, serverID: breakerID)
         guard cacheScope == groundingCacheScope else { return nil }
         return snippet(text, staleAge: nil)
+    }
+
+    /// Schema-driven read arguments, pure so connector contracts can be tested
+    /// without opening a browser or starting an MCP transport.
+    static func researchArguments(tool: Tool, serverID: String,
+                                  query: String) -> [String: Value]? {
+        guard let key = tool.stringArgumentKey(
+            preferring: ["query", "keyword", "q", "search", "term", "text"]) else { return nil }
+        var arguments: [String: Value] = [key: .string(query)]
+        // Verified live on Fireflies: cap results, search titles+content, and
+        // prefer its compact JSON response shape.
+        if tool.hasArgument("limit") { arguments["limit"] = .int(3) }
+        if tool.hasArgument("scope") { arguments["scope"] = .string("all") }
+        if tool.hasArgument("format") { arguments["format"] = .string("json") }
+        // search_objects spans projects, users, portfolios, goals and tasks.
+        // Meeting grounding is task evidence, so constrain it when the live
+        // schema exposes the documented selector.
+        if serverID == "asana", tool.name == "search_objects",
+           tool.hasArgument("resource_type") {
+            arguments["resource_type"] = .string("task")
+        }
+        return arguments
     }
 
     /// How long one connected app may hold up a grounding round. Chosen against

@@ -25,16 +25,17 @@ struct RussianTrackerCreateTests {
         case .yandexTracker: return "1234567"
         case .kaiten:        return "team.kaiten.ru"
         case .bitrix24:      return "company.bitrix24.ru"
-        case .yougile:       return nil
+        case .yougile, .weeek: return nil
         }
     }
 
-    /// Третье поле значит у каждого своё, и у двух оно обязано быть числом.
+    /// Третье поле значит у каждого своё, и у трёх оно обязано быть числом.
     private func destination(for service: RussianTrackers.Service) -> String {
         switch service {
         case .yandexTracker: return "TREK"
         case .kaiten:        return "4"
         case .yougile:       return "col-77"
+        case .weeek:         return "42"
         case .bitrix24:      return "1"
         }
     }
@@ -57,7 +58,10 @@ struct RussianTrackerCreateTests {
     @Test("каждый сервис пишет по своему адресу и методом POST",
           arguments: RussianTrackers.Service.allCases)
     func endpointPerService(service: RussianTrackers.Service) async throws {
-        let (http, recorder) = stub(json: #"{"id": 42, "title": "Выкатить биллинг"}"#)
+        let response = service == .weeek
+            ? #"{"success":true,"task":{"id":42,"title":"Выкатить биллинг"}}"#
+            : #"{"id": 42, "title": "Выкатить биллинг"}"#
+        let (http, recorder) = stub(json: response)
         _ = try await client(service, http: http)
             .createIssue(title: "Выкатить биллинг")
 
@@ -68,6 +72,7 @@ struct RussianTrackerCreateTests {
         case .yandexTracker: #expect(url == "https://api.tracker.yandex.net/v3/issues/")
         case .kaiten:        #expect(url == "https://team.kaiten.ru/api/latest/cards")
         case .yougile:       #expect(url == "https://yougile.com/api-v2/tasks")
+        case .weeek:         #expect(url == "https://api.weeek.net/public/v1/tm/tasks")
         case .bitrix24:      #expect(url == "https://company.bitrix24.ru/rest/t0ken/tasks.task.add")
         }
     }
@@ -105,6 +110,17 @@ struct RussianTrackerCreateTests {
         _ = try await client(.yougile, http: http).createIssue(title: "Без описания")
         #expect(try json(recorder.last?.httpBody)["description"] == nil)
 
+        let (weeekHTTP, weeekRecorder) = stub(
+            json: #"{"success":true,"task":{"id":42,"title":"Выкатить биллинг"}}"#)
+        _ = try await client(.weeek, http: weeekHTTP)
+            .createIssue(title: "Выкатить биллинг", description: "к пятнице")
+        body = try json(weeekRecorder.last?.httpBody)
+        #expect(body["title"] as? String == "Выкатить биллинг")
+        #expect(body["description"] as? String == "к пятнице")
+        let locations = try #require(body["locations"] as? [[String: Any]])
+        #expect(locations.count == 1)
+        #expect(locations.first?["projectId"] as? Int == 42)
+
         _ = try await client(.bitrix24, http: http).createIssue(title: "Без описания")
         let bare = try #require(try json(recorder.last?.httpBody)["fields"] as? [String: Any])
         #expect(bare["DESCRIPTION"] == nil)
@@ -121,7 +137,7 @@ struct RussianTrackerCreateTests {
     /// Подстановка нуля вместо непонятного значения завела бы карточку не там,
     /// где её ждут, и человек узнал бы об этом не сразу.
     @Test("нечисловое место назначения — отказ, а не подстановка нуля",
-          arguments: [RussianTrackers.Service.kaiten, .bitrix24])
+          arguments: [RussianTrackers.Service.kaiten, .weeek, .bitrix24])
     func nonNumericDestinationRefuses(service: RussianTrackers.Service) async throws {
         var reached = false
         let http: RussianTrackers.HTTP = { request in
@@ -205,11 +221,16 @@ struct RussianTrackerCreateTests {
         // выдуманного адреса, который откроет не то.
         let (yougile, _) = stub(json: #"{"id": "abc-1"}"#)
         #expect(try await client(.yougile, http: yougile).createIssue(title: "Задача").url == nil)
+
+        let (weeek, _) = stub(
+            json: #"{"success":true,"task":{"id":91,"title":"Карточка WEEEK"}}"#)
+        let weeekTask = try await client(.weeek, http: weeek).createIssue(title: "Задача")
+        #expect(weeekTask == .init(key: "91", title: "Карточка WEEEK", url: nil))
     }
 
     /// Ровно то, что человек читает, когда трекер отказал. Без этого наружу
     /// шло «The operation couldn't be completed» — по-английски и без имени
-    /// сервиса, а подключённых может быть четыре.
+    /// сервиса, а подключённых может быть пять.
     @Test("отказ объясняется по-русски и называет сервис")
     func errorsSpeakRussian() throws {
         let cases: [(RussianTrackers.TrackerError, [String])] = [
